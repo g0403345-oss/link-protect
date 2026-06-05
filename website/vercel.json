@@ -2,14 +2,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "env": {
-    "NEXTAUTH_URL": "@nextauth_url",
-    "NEXTAUTH_SECRET": "@nextauth_secret",
-    "DISCORD_CLIENT_ID": "@discord_client_id",
-    "DISCORD_CLIENT_SECRET": "@discord_client_secret",
-    "BOT_TOKEN": "@bot_token",
-    "BOT_API_URL": "@bot_api_url",
-    "BOT_API_SECRET": "@bot_api_secret"
-  }
+  "installCommand": "npm install"
 }
