@@ -1,0 +1,15 @@
+[Unit]
+Description=LinkProtect Bot API Server
+After=network.target
+
+[Service]
+Type=simple
+User=justinguel
+WorkingDirectory=/home/justinguel/beta
+ExecStart=/usr/bin/python3 -m uvicorn api_server:app --host 127.0.0.1 --port 3002
+Restart=always
+RestartSec=5
+Environment=BOT_API_SECRET=linkprotect-api-secret-2026
+
+[Install]
+WantedBy=multi-user.target
