@@ -1,0 +1,25 @@
+# Bot
+__pycache__/
+*.pyc
+*.pyo
+bot.sqlite3
+.env
+*.log
+
+# Website
+website/node_modules/
+website/.next/
+website/.env.local
+website/.env*.local
+website/tsconfig.tsbuildinfo
+
+# System
+.DS_Store
+*.swp
+bot.sqlite3-shm
+bot.sqlite3-wal
+
+# Raw screenshot files (already copied to website/public/)
+*.webp
+Bildschirmfoto*
+firebase_key.json

@@ -1,0 +1,445 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { motion, useInView } from 'framer-motion';
+import { Shield, ArrowRight, Check, ExternalLink } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import Navbar from '@/components/Navbar';
+import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
+
+/* ── count-up hook ──────────────────────────────────────────── */
+function useCountUp(target: number, active: boolean) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let start: number | null = null;
+    const duration = 1400;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(ease * target));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [active, target]);
+  return val;
+}
+
+/* ── Discord window mockup ───────────────────────────────────── */
+function DiscordMockup() {
+  const [phase, setPhase] = useState<'idle' | 'typing' | 'blocked'>('idle');
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('typing'), 900);
+    const t2 = setTimeout(() => setPhase('blocked'), 2100);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  return (
+    <div style={{ width: '100%', maxWidth: 520, borderRadius: 12, overflow: 'hidden', border: '1px solid #2e2e36', background: '#1e1f22', boxShadow: '0 32px 80px rgba(0,0,0,0.55)', userSelect: 'none' }}>
+      {/* title bar */}
+      <div style={{ background: '#111214', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #2e2e36' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['#f23f43', '#f0b232', '#23a55a'].map((c) => <div key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />)}
+        </div>
+        <span style={{ fontSize: 12, color: '#52535a', marginLeft: 6 }}>Discord</span>
+      </div>
+
+      <div style={{ display: 'flex', height: 340 }}>
+        {/* server icons */}
+        <div style={{ width: 56, background: '#1a1b1e', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 8, borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+          {[{ bg: '#5865f2', label: 'LP', active: true }, { bg: '#23a55a', label: 'G', active: false }, { bg: '#f23f43', label: 'R', active: false }, { bg: '#f0b232', label: 'Y', active: false }].map(({ bg, label, active }, i) => (
+            <div key={i} style={{ width: 36, height: 36, borderRadius: active ? 10 : '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0, outline: active ? '2px solid #5865f2' : 'none', outlineOffset: 2 }}>{label}</div>
+          ))}
+        </div>
+
+        {/* channel list */}
+        <div style={{ width: 152, background: '#2b2d31', padding: '12px 0', borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+          <div style={{ padding: '4px 12px 8px', fontSize: 11, fontWeight: 700, color: '#6d6f78', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Text Channels</div>
+          {['# general', '# rules', '# off-topic', '# bot-cmds'].map((ch, i) => (
+            <div key={ch} style={{ padding: '5px 12px', fontSize: 13, color: i === 0 ? '#f2f3f5' : '#6d6f78', background: i === 0 ? 'rgba(88,101,242,0.15)' : 'transparent', borderLeft: i === 0 ? '2px solid #5865f2' : '2px solid transparent' }}>{ch}</div>
+          ))}
+        </div>
+
+        {/* chat */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid #2e2e36', fontSize: 13, fontWeight: 600, color: '#f2f3f5', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#52535a' }}>#</span> general
+          </div>
+          <div style={{ flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+            {/* normal message */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0b232', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#111' }}>J</div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#f0b232' }}>Jake</span>
+                  <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
+                </div>
+                <span style={{ fontSize: 13, color: '#dbdee1' }}>yo check this out lol</span>
+              </div>
+            </div>
+            {/* phishing link */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0b232', flexShrink: 0 }} />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#f0b232' }}>Jake</span>
+                  <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
+                </div>
+                <span style={{ fontSize: 13, color: '#5865f2', background: 'rgba(88,101,242,0.08)', padding: '1px 4px', borderRadius: 3, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>discord.gift/free-nitro-xyz</span>
+              </div>
+            </div>
+            {/* bot response */}
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: phase === 'blocked' ? 1 : 0, y: phase === 'blocked' ? 0 : 6 }} transition={{ duration: 0.3 }} style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#5865f2', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield size={14} color="#fff" strokeWidth={2.5} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#5865f2' }}>LinkProtect</span>
+                  <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#5865f2', background: 'rgba(88,101,242,0.15)', padding: '1px 5px', borderRadius: 3 }}>BOT</span>
+                </div>
+                <div style={{ borderLeft: '3px solid #f23f43', background: '#2b2d31', borderRadius: '0 6px 6px 0', padding: '8px 10px', fontSize: 12, maxWidth: 210 }}>
+                  <div style={{ fontWeight: 700, color: '#f23f43', marginBottom: 3 }}>🚫 Nitro Scam blocked</div>
+                  <div style={{ color: '#949ba4' }}>Jake — Warning 1/5</div>
+                  <div style={{ color: '#52535a', marginTop: 2 }}>Message deleted automatically.</div>
+                </div>
+              </div>
+            </motion.div>
+            {/* typing */}
+            {phase === 'typing' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 11, color: '#6d6f78', paddingLeft: 40 }}>
+                LinkProtect is scanning...
+              </motion.div>
+            )}
+          </div>
+          <div style={{ margin: '0 12px 12px', padding: '8px 12px', background: '#383a40', borderRadius: 8, fontSize: 13, color: '#52535a' }}>Message #general</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Stat number ─────────────────────────────────────────────── */
+function Stat({ value, suffix, label, active }: { value: number; suffix: string; label: string; active: boolean }) {
+  const count = useCountUp(value, active);
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 52, fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.04em', lineHeight: 1 }}>{count.toLocaleString()}{suffix}</div>
+      <div style={{ fontSize: 13, color: '#52535a', marginTop: 6, fontWeight: 500 }}>{label}</div>
+    </div>
+  );
+}
+
+/* ── Feature row ──────────────────────────────────────────────── */
+function Feature({ badge, title, description, bullets, visual, flip = false }: {
+  badge: string; title: string; description: string; bullets: string[]; visual: React.ReactNode; flip?: boolean;
+}) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  return (
+    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', direction: flip ? 'rtl' : 'ltr' }}>
+      <div style={{ direction: 'ltr' }}>
+        <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: '#5865f2', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 99, padding: '3px 10px', marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{badge}</div>
+        <h3 style={{ fontSize: 32, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>{title}</h3>
+        <p style={{ fontSize: 16, color: '#6d6f78', lineHeight: 1.65, marginBottom: 20 }}>{description}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {bullets.map((b) => (
+            <div key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(35,165,90,0.12)', border: '1px solid rgba(35,165,90,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                <Check size={10} color="#23a55a" strokeWidth={3} />
+              </div>
+              <span style={{ fontSize: 14, color: '#949ba4', lineHeight: 1.5 }}>{b}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ direction: 'ltr' }}>{visual}</div>
+    </motion.div>
+  );
+}
+
+/* ── Warning flow visual ─────────────────────────────────────── */
+function WarnFlow() {
+  return (
+    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Warning escalation</div>
+      {[
+        { label: '1–2 warnings', action: 'Warn only', color: '#f0b232', bar: 20 },
+        { label: '3–4 warnings', action: 'Timeout', color: '#f0b232', bar: 50 },
+        { label: '5 warnings', action: 'Auto-kick', color: '#f23f43', bar: 75 },
+        { label: '10 warnings', action: 'Permanent ban', color: '#f23f43', bar: 100 },
+      ].map(({ label, action, color, bar }) => (
+        <div key={label}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ fontSize: 12, color: '#6d6f78' }}>{label}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color }}>{action}</span>
+          </div>
+          <div style={{ height: 4, background: '#2e2e36', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${bar}%`, background: color, borderRadius: 99 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Silent mode toggle visual ───────────────────────────────── */
+function SilentModeVisual() {
+  const [silent, setSilent] = useState(false);
+  return (
+    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#f2f3f5' }}>Silent Mode</div>
+          <div style={{ fontSize: 12, color: '#52535a', marginTop: 2 }}>DM instead of channel message</div>
+        </div>
+        <button onClick={() => setSilent(!silent)} style={{ width: 44, height: 24, borderRadius: 99, background: silent ? '#23a55a' : '#2e2e36', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+          <div style={{ position: 'absolute', top: 3, left: silent ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+        </button>
+      </div>
+      <motion.div key={silent ? 'silent' : 'public'} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+        style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #2e2e36', fontSize: 12 }}>
+        {silent ? (
+          <div style={{ padding: 12, background: '#1e1f22' }}>
+            <div style={{ color: '#52535a', marginBottom: 8, fontWeight: 600 }}>📬 Private DM to user</div>
+            <div style={{ background: '#2b2d31', borderLeft: '3px solid #5865f2', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
+              ⚠️ Your message in <strong style={{ color: '#f2f3f5' }}>#general</strong> was removed (blocked link). Warning <strong style={{ color: '#f2f3f5' }}>1/5</strong>.
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: 12, background: '#1e1f22' }}>
+            <div style={{ color: '#52535a', marginBottom: 8, fontWeight: 600 }}>📢 Public channel message</div>
+            <div style={{ background: '#2b2d31', borderLeft: '3px solid #f23f43', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
+              🚫 <strong style={{ color: '#f23f43' }}>Link blocked</strong> · Jake — Nitro scam detected. Warning 1/5.
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ── Block type chips ─────────────────────────────────────────── */
+const BLOCKERS = [
+  { name: 'Nitro Scams', icon: '🎮' }, { name: 'Phishing Links', icon: '🎣' },
+  { name: 'NSFW Sites', icon: '🔞' }, { name: 'Malware URLs', icon: '🦠' },
+  { name: 'Discord Invites', icon: '📨' }, { name: 'YouTube Links', icon: '▶️' },
+  { name: 'Twitch Streams', icon: '🟣' }, { name: 'Steam Links', icon: '🎮' },
+  { name: 'Google Links', icon: '🔍' }, { name: 'URL Shorteners', icon: '🔗' },
+  { name: 'GIF Links', icon: '🖼️' }, { name: 'Custom Blacklist', icon: '📋' },
+  { name: 'Link-only channels', icon: '📌' }, { name: 'All external links', icon: '🌐' },
+];
+
+/* ── Main ─────────────────────────────────────────────────────── */
+export default function LandingClient() {
+  const statsRef = useRef(null);
+  const statsInView = useInView(statsRef, { once: true, margin: '-60px' });
+
+  return (
+    <div style={{ background: '#0e0e10', minHeight: '100vh', color: '#f2f3f5' }}>
+      <Navbar />
+
+      {/* HERO */}
+      <section className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', padding: '100px 24px 80px', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(88,101,242,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', position: 'relative' }}>
+          <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
+            {/* badge */}
+            <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
+              v2.1.0 — Silent Mode is live
+              <ArrowRight size={12} />
+            </a>
+
+            <h1 style={{ fontSize: 72, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1.0, color: '#f2f3f5', marginBottom: 20 }}>
+              Stop every<br /><span style={{ color: '#5865f2' }}>bad link.</span><br />Automatically.
+            </h1>
+
+            <p style={{ fontSize: 18, color: '#6d6f78', lineHeight: 1.6, maxWidth: 420, marginBottom: 32 }}>
+              14 independent shields blocking phishing, NSFW, scams and custom domains — before they ever appear in your server.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <a href={BOT_INVITE} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', transition: 'background 0.15s' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#4752c4')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>
+                Add to Discord — Free <ArrowRight size={15} />
+              </a>
+              <Link href="/dashboard"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 600, color: '#949ba4', borderRadius: 10, textDecoration: 'none', border: '1px solid #2e2e36', transition: 'border-color 0.15s, color 0.15s' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#52535a'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; (e.currentTarget as HTMLElement).style.color = '#949ba4'; }}>
+                Dashboard
+              </Link>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 36 }}>
+              <div style={{ display: 'flex' }}>
+                {['#f23f43', '#f0b232', '#23a55a', '#5865f2', '#9146ff'].map((c, i) => (
+                  <div key={c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: '2px solid #0e0e10', marginLeft: i ? -8 : 0 }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 13, color: '#52535a' }}>Trusted by <strong style={{ color: '#949ba4' }}>6,495+ servers</strong></span>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: 32 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }} style={{ display: 'flex', justifyContent: 'center' }}>
+            <DiscordMockup />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* STATS */}
+      <section ref={statsRef} style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, alignItems: 'center' }}>
+          <Stat value={6495} suffix="+" label="Active servers" active={statsInView} />
+          <div style={{ width: 1, height: 56, background: '#2e2e36', margin: '0 auto' }} />
+          <Stat value={14} suffix="" label="Protection shields" active={statsInView} />
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="features" style={{ padding: '100px 24px', maxWidth: 1120, margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 96 }}>
+          <Feature
+            badge="Real-time detection"
+            title="Catches threats the moment they're sent."
+            description="Every message is scanned instantly. Malicious links are deleted before anyone can click them — no delay, no manual review."
+            bullets={[
+              'Google Safe Browsing for known malware & phishing',
+              'Pattern-matching for Nitro scams and fake gift links',
+              'Custom domain blacklist per server',
+              'Zero false positives on normal messages',
+            ]}
+            visual={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4, overflow: 'hidden' }}>
+                  <Image src="/ss-embeds.png" alt="Bot moderation embeds in action" width={560} height={320} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
+                </div>
+                <p style={{ fontSize: 12, color: '#52535a', textAlign: 'center' }}>Real bot output — NSFW removal + automatic timeout</p>
+              </div>
+            }
+          />
+
+          <Feature
+            badge="Warning system"
+            title="Progressive punishment. Your rules."
+            description="Repeated offenders get escalating consequences. You control every threshold directly from the dashboard."
+            bullets={[
+              'Configure kick and ban thresholds per server',
+              'Adjustable timeout duration',
+              'Per-user warning history with reasons logged',
+              'One-click warning reset for individual users',
+            ]}
+            visual={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4 }}>
+                    <Image src="/ss-nsfw.png" alt="NSFW warning embed" width={280} height={120} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
+                  </div>
+                  <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4 }}>
+                    <Image src="/ss-timeout.png" alt="Timeout embed" width={280} height={120} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
+                  </div>
+                </div>
+                <WarnFlow />
+              </div>
+            }
+            flip
+          />
+
+          <Feature
+            badge="Silent mode"
+            title="Moderation without the noise."
+            description="Don't want a public warning message cluttering your channel? Enable silent mode — links get deleted, users get a private DM."
+            bullets={[
+              'User receives a private DM explaining the removal',
+              'No embed or message posted in the channel',
+              'Toggle per-server from the dashboard',
+              'Works across all 14 detection shields',
+            ]}
+            visual={<SilentModeVisual />}
+          />
+        </div>
+      </section>
+
+      {/* WHAT WE BLOCK */}
+      <section id="blockers" style={{ padding: '80px 24px', background: '#111113', borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b' }}>
+        <div style={{ maxWidth: 880, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>14 shields. Every threat covered.</h2>
+            <p style={{ fontSize: 15, color: '#52535a' }}>Toggle each protection on or off — per server, per channel.</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
+            {BLOCKERS.map(({ name, icon }) => (
+              <div key={name}
+                style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: '#6d6f78', transition: 'border-color 0.15s, color 0.15s', cursor: 'default' }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#52535a'; e.currentTarget.style.color = '#f2f3f5'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2e2e36'; e.currentTarget.style.color = '#6d6f78'; }}>
+                <span style={{ fontSize: 16 }}>{icon}</span>{name}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section style={{ padding: '96px 24px', textAlign: 'center' }}>
+        <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#23a55a', background: 'rgba(35,165,90,0.08)', border: '1px solid rgba(35,165,90,0.18)', borderRadius: 99, padding: '4px 12px', marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23a55a' }} /> Free forever
+          </div>
+          <h2 style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
+            Your server deserves<br />real protection.
+          </h2>
+          <p style={{ fontSize: 16, color: '#52535a', marginBottom: 36, maxWidth: 400, margin: '0 auto 36px' }}>
+            Add LinkProtect in 30 seconds. Works out of the box — no setup required.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href={BOT_INVITE} target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 26px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', transition: 'background 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#4752c4')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>
+              Add to Discord — It&apos;s free <ArrowRight size={15} />
+            </a>
+            <a href={SUPPORT_SERVER} target="_blank" rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 26px', fontSize: 15, fontWeight: 600, color: '#949ba4', borderRadius: 10, textDecoration: 'none', border: '1px solid #2e2e36', transition: 'border-color 0.15s, color 0.15s' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#52535a'; e.currentTarget.style.color = '#f2f3f5'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2e2e36'; e.currentTarget.style.color = '#949ba4'; }}>
+              <ExternalLink size={15} /> Join Support Server
+            </a>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ borderTop: '1px solid #18181b', padding: '28px 24px', background: '#0e0e10' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={12} color="#fff" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#52535a' }}>LinkProtect</span>
+          </div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            {[{ label: 'Support', href: SUPPORT_SERVER }, { label: 'Invite', href: BOT_INVITE }, { label: 'Dashboard', href: '/dashboard' }].map(({ label, href }) => (
+              <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}
+                style={{ fontSize: 13, color: '#52535a', textDecoration: 'none', transition: 'color 0.15s' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#949ba4')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#52535a')}>
+                {label}
+              </a>
+            ))}
+          </div>
+          <span style={{ fontSize: 12, color: '#2e2e36' }}>© 2026 LinkProtect · v2.1.0</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
