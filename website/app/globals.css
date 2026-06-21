@@ -75,6 +75,44 @@ input[type='number'] { -moz-appearance: textfield; }
   border-left: 2px solid var(--blurple);
 }
 
+/* ─── Mobile responsive ────────────────────────────────────── */
+.mobile-only { display: none !important; }
+
+@media (max-width: 768px) {
+  /* Landing — hero */
+  .hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
+  .hero-title { font-size: 40px !important; letter-spacing: -0.025em !important; }
+
+  /* Landing — features */
+  .feature-row { grid-template-columns: 1fr !important; direction: ltr !important; gap: 32px !important; }
+  .feature-images-2col { grid-template-columns: 1fr !important; }
+
+  /* Landing — stats */
+  .stats-3col { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .stats-divider { display: none !important; }
+
+  /* Landing — CTA / footer */
+  .cta-title { font-size: 34px !important; line-height: 1.1 !important; }
+  .footer-row { flex-direction: column !important; align-items: flex-start !important; }
+
+  /* Discord mockup — hide sidebars, keep chat only */
+  .discord-sidebar { display: none !important; }
+  .discord-channels { display: none !important; }
+
+  /* Navbar */
+  .nav-center-links { display: none !important; }
+
+  /* Guild dashboard — sidebar → horizontal tab strip */
+  .guild-sidebar { display: none !important; }
+  .guild-main { padding: 16px !important; }
+  .mobile-only { display: flex !important; }
+
+  /* Guild dashboard — grids */
+  .stats-3col-dashboard { grid-template-columns: 1fr 1fr !important; }
+  .stats-4col { grid-template-columns: 1fr 1fr !important; }
+  .thresholds-3col { grid-template-columns: 1fr !important; gap: 20px !important; }
+}
+
 /* Noise texture overlay */
 .noise::after {
   content: '';

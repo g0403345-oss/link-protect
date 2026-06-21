@@ -47,7 +47,7 @@ export default function Navbar() {
         </Link>
 
         {/* Center links */}
-        <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+        <div className="nav-center-links" style={{ display: 'flex', gap: 2, flex: 1 }}>
           {[
             { label: 'Features', href: '#features' },
             { label: 'What we block', href: '#blockers' },

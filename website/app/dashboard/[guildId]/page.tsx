@@ -259,9 +259,22 @@ export default function GuildDashboard() {
         <span style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace', marginLeft: 'auto' }}>{guildId}</span>
       </div>
 
+      {/* Mobile section tab strip — hidden on desktop */}
+      <div className="mobile-only" style={{ overflowX: 'auto', gap: 6, padding: '10px 16px', background: '#111113', borderBottom: '1px solid #1e1e22', scrollbarWidth: 'none' }}>
+        {NAV.map(({ id, label, icon: Icon }) => {
+          const active = section === id;
+          return (
+            <button key={id} onClick={() => setSection(id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, background: active ? 'rgba(88,101,242,0.15)' : 'transparent', color: active ? '#5865f2' : '#6d6f78', flexShrink: 0, transition: 'all 0.15s' }}>
+              <Icon size={13} /> {label}
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: 'flex', flex: 1 }}>
         {/* Sidebar */}
-        <aside style={{ width: 220, background: '#111113', borderRight: '1px solid #1e1e22', flexShrink: 0, position: 'sticky', top: 104, height: 'calc(100vh - 104px)', overflowY: 'auto', padding: '12px 8px' }}>
+        <aside className="guild-sidebar" style={{ width: 220, background: '#111113', borderRight: '1px solid #1e1e22', flexShrink: 0, position: 'sticky', top: 104, height: 'calc(100vh - 104px)', overflowY: 'auto', padding: '12px 8px' }}>
           {NAV.map(({ id, label, icon: Icon, desc }) => {
             const active = section === id;
             return (
@@ -278,7 +291,7 @@ export default function GuildDashboard() {
         </aside>
 
         {/* Content */}
-        <main style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+        <main className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
           <AnimatePresence mode="wait">
             <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
 
@@ -286,7 +299,7 @@ export default function GuildDashboard() {
               {section === 'overview' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Overview" description="Quick summary of your server's protection status" icon={Shield} />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <div className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
@@ -309,7 +322,7 @@ export default function GuildDashboard() {
                     </div>
                   </Card>
                   <Card title="Warning Thresholds">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
+                    <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
                       {[
                         { label: 'Kick at', value: warn.kick ?? 0, color: '#f0b232' },
                         { label: 'Ban at', value: warn.ban ?? 0, color: '#f23f43' },
@@ -379,7 +392,7 @@ export default function GuildDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Warning System" description="Configure automatic actions when users accumulate warnings" icon={Ban} />
                   <Card title="Action Thresholds">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+                    <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
                       <NumberInput label="Kick threshold" description="User is kicked at this many warnings (0 = disabled)" value={warn.kick ?? 0} icon={<TrendingUp size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('warn.kick', v, 'Kick threshold')} saving={saving === 'warn.kick'} />
                       <NumberInput label="Ban threshold" description="User is banned at this many warnings (0 = disabled)" value={warn.ban ?? 0} icon={<Ban size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('warn.ban', v, 'Ban threshold')} saving={saving === 'warn.ban'} />
                       <NumberInput label="Timeout threshold" description="User is timed out at this many warnings (0 = disabled)" value={warn.timeout?.warnings ?? 0} icon={<Clock size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('warn.timeout.warnings', v, 'Timeout threshold')} saving={saving === 'warn.timeout.warnings'} />
@@ -501,7 +514,7 @@ export default function GuildDashboard() {
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div className="stats-4col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         <StatCard label="Total warnings" value={stats.totalWarnings} icon={AlertTriangle} color="#f0b232" />
                         <StatCard label="Users warned" value={stats.warnedUsers} icon={Users} color="#5865f2" />
                         <StatCard label="Kick threshold" value={stats.kickThreshold} icon={TrendingUp} color="#f0b232" />

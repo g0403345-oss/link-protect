@@ -48,14 +48,14 @@ function DiscordMockup() {
 
       <div style={{ display: 'flex', height: 340 }}>
         {/* server icons */}
-        <div style={{ width: 56, background: '#1a1b1e', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 8, borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+        <div className="discord-sidebar" style={{ width: 56, background: '#1a1b1e', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 8, borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
           {[{ bg: '#5865f2', label: 'LP', active: true }, { bg: '#23a55a', label: 'G', active: false }, { bg: '#f23f43', label: 'R', active: false }, { bg: '#f0b232', label: 'Y', active: false }].map(({ bg, label, active }, i) => (
             <div key={i} style={{ width: 36, height: 36, borderRadius: active ? 10 : '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0, outline: active ? '2px solid #5865f2' : 'none', outlineOffset: 2 }}>{label}</div>
           ))}
         </div>
 
         {/* channel list */}
-        <div style={{ width: 152, background: '#2b2d31', padding: '12px 0', borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+        <div className="discord-channels" style={{ width: 152, background: '#2b2d31', padding: '12px 0', borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
           <div style={{ padding: '4px 12px 8px', fontSize: 11, fontWeight: 700, color: '#6d6f78', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Text Channels</div>
           {['# general', '# rules', '# off-topic', '# bot-cmds'].map((ch, i) => (
             <div key={ch} style={{ padding: '5px 12px', fontSize: 13, color: i === 0 ? '#f2f3f5' : '#6d6f78', background: i === 0 ? 'rgba(88,101,242,0.15)' : 'transparent', borderLeft: i === 0 ? '2px solid #5865f2' : '2px solid transparent' }}>{ch}</div>
@@ -141,7 +141,7 @@ function Feature({ badge, title, description, bullets, visual, flip = false }: {
   const inView = useInView(ref, { once: true, margin: '-80px' });
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', direction: flip ? 'rtl' : 'ltr' }}>
+      className="feature-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', direction: flip ? 'rtl' : 'ltr' }}>
       <div style={{ direction: 'ltr' }}>
         <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: '#5865f2', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 99, padding: '3px 10px', marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{badge}</div>
         <h3 style={{ fontSize: 32, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>{title}</h3>
@@ -247,7 +247,7 @@ export default function LandingClient() {
       <section className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', padding: '100px 24px 80px', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(88,101,242,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', position: 'relative' }}>
+        <div className="hero-grid" style={{ maxWidth: 1120, margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', position: 'relative' }}>
           <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
             {/* badge */}
             <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer"
@@ -257,7 +257,7 @@ export default function LandingClient() {
               <ArrowRight size={12} />
             </a>
 
-            <h1 style={{ fontSize: 72, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1.0, color: '#f2f3f5', marginBottom: 20 }}>
+            <h1 className="hero-title" style={{ fontSize: 72, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1.0, color: '#f2f3f5', marginBottom: 20 }}>
               Stop every<br /><span style={{ color: '#5865f2' }}>bad link.</span><br />Automatically.
             </h1>
 
@@ -298,9 +298,9 @@ export default function LandingClient() {
 
       {/* STATS */}
       <section ref={statsRef} style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px' }}>
-        <div style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, alignItems: 'center' }}>
+        <div className="stats-3col" style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, alignItems: 'center' }}>
           <Stat value={6495} suffix="+" label="Active servers" active={statsInView} />
-          <div style={{ width: 1, height: 56, background: '#2e2e36', margin: '0 auto' }} />
+          <div className="stats-divider" style={{ width: 1, height: 56, background: '#2e2e36', margin: '0 auto' }} />
           <Stat value={14} suffix="" label="Protection shields" active={statsInView} />
         </div>
       </section>
@@ -340,7 +340,7 @@ export default function LandingClient() {
             ]}
             visual={
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div className="feature-images-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4 }}>
                     <Image src="/ss-nsfw.png" alt="NSFW warning embed" width={280} height={120} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
                   </div>
@@ -395,7 +395,7 @@ export default function LandingClient() {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#23a55a', background: 'rgba(35,165,90,0.08)', border: '1px solid rgba(35,165,90,0.18)', borderRadius: 99, padding: '4px 12px', marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23a55a' }} /> Free forever
           </div>
-          <h2 style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
+          <h2 className="cta-title" style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
             Your server deserves<br />real protection.
           </h2>
           <p style={{ fontSize: 16, color: '#52535a', marginBottom: 36, maxWidth: 400, margin: '0 auto 36px' }}>
@@ -420,7 +420,7 @@ export default function LandingClient() {
 
       {/* FOOTER */}
       <footer style={{ borderTop: '1px solid #18181b', padding: '28px 24px', background: '#0e0e10' }}>
-        <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div className="footer-row" style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 22, height: 22, borderRadius: 6, background: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield size={12} color="#fff" strokeWidth={2.5} />
