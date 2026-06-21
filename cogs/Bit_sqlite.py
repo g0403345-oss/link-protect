@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, get_safe_list, apply_warn
+from .shared import get_settings, apply_warn, is_whitelisted
 
 _RE = re.compile(r"(?:https?://)?(?:www\.)?bit\.ly/[\w-]+", re.IGNORECASE)
 
@@ -31,14 +31,7 @@ class BitlyProtection(commands.Cog):
         if not settings.get("protect", {}).get("bit", False):
             return
 
-        user_id = str(message.author.id)
-        channel_id = str(message.channel.id)
-        role_ids = [str(r.id) for r in message.author.roles] if isinstance(message.author, discord.Member) else []
-
-        ch_wl = get_safe_list(settings.get("channel", {}).get("channel"))
-        mb_wl = get_safe_list(settings.get("channel", {}).get("member"))
-        ro_wl = get_safe_list(settings.get("channel", {}).get("role"))
-        if channel_id in ch_wl or user_id in mb_wl or any(r in ro_wl for r in role_ids):
+        if is_whitelisted(message, settings):
             return
 
         try:

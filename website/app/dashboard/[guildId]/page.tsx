@@ -232,7 +232,7 @@ export default function GuildDashboard() {
 
   const protect = data.protect ?? {};
   const warn = data.warn ?? {};
-  const channel = data.channel ?? { channel: [], member: [], role: [] };
+  const channel = data.channel ?? { channel: [], category: [], member: [], role: [] };
   const links = data.link?.links ?? [];
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
@@ -454,6 +454,7 @@ export default function GuildDashboard() {
                     <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted items bypass all link restrictions. Add Discord IDs (18-digit numbers).</p>
                   </div>
                   <AccessList title="Whitelisted Channels" description="Links are allowed in these channels" icon={<Lock size={13} color="#5865f2" />} items={channel.channel} placeholder="Channel ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.channel', v, 'Whitelisted channels')} saving={saving === 'channel.channel'} />
+                  <AccessList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#9b59b6" />} items={channel.category ?? []} placeholder="Category ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
                   <AccessList title="Whitelisted Members" description="These users can post any links" icon={<Users size={13} color="#23a55a" />} items={channel.member} placeholder="User ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.member', v, 'Whitelisted members')} saving={saving === 'channel.member'} />
                   <AccessList title="Whitelisted Roles" description="Members with these roles can post any links" icon={<Shield size={13} color="#f0b232" />} items={channel.role} placeholder="Role ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.role', v, 'Whitelisted roles')} saving={saving === 'channel.role'} />
                 </div>

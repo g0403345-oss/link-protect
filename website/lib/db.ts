@@ -44,7 +44,7 @@ export interface ServerData {
     malware: boolean;
   };
   silent: boolean;
-  channel: { channel: string[]; member: string[]; role: string[] };
+  channel: { channel: string[]; category: string[]; member: string[]; role: string[] };
   link: { links: string[] };
   log: { Activated: boolean; "log-channel": number; link: number; onlylink: boolean };
   warn: {

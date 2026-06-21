@@ -37,7 +37,7 @@ def _init_db():
 _init_db()
 
 _DEFAULT = {
-    "channel": {"channel": [], "member": [], "role": []},
+    "channel": {"channel": [], "category": [], "member": [], "role": []},
     "link": {"links": []},
     "log": {"Activated": False, "log-channel": 0, "link": 0, "onlylink": False},
     "onlylink": False,
@@ -92,6 +92,28 @@ def get_safe_list(value) -> list:
     if value in (0, None, "0"):
         return []
     return [str(value)]
+
+
+def is_whitelisted(message, settings: dict) -> bool:
+    """Return True if this message should be skipped (whitelisted channel, category, member, or role)."""
+    ch_cfg = settings.get("channel", {})
+    ch_wl = get_safe_list(ch_cfg.get("channel"))
+    cat_wl = get_safe_list(ch_cfg.get("category"))
+    mb_wl = get_safe_list(ch_cfg.get("member"))
+    ro_wl = get_safe_list(ch_cfg.get("role"))
+
+    channel_id = str(message.channel.id)
+    category_id = str(message.channel.category_id) if getattr(message.channel, "category_id", None) else None
+    user_id = str(message.author.id)
+    import discord as _discord
+    role_ids = [str(r.id) for r in message.author.roles] if isinstance(message.author, _discord.Member) else []
+
+    return (
+        channel_id in ch_wl
+        or (category_id is not None and category_id in cat_wl)
+        or user_id in mb_wl
+        or any(r in ro_wl for r in role_ids)
+    )
 
 
 # ── low-level DB writes (used by cogs for warn updates) ─────────────────────
