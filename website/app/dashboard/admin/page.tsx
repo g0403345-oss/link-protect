@@ -9,10 +9,13 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { ADMIN_USER_ID } from '@/lib/admin';
 
+interface GuildInfo { name: string; icon: string | null; }
+
 export default function AdminPanel() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [guilds, setGuilds] = useState<string[]>([]);
+  const [guildInfos, setGuildInfos] = useState<Record<string, GuildInfo>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -27,7 +30,15 @@ export default function AdminPanel() {
     setLoading(true);
     fetch('/api/admin/guilds')
       .then((r) => r.json())
-      .then((d) => { setGuilds(d.guilds ?? []); setLoading(false); })
+      .then((d) => {
+        setGuilds(d.guilds ?? []);
+        setLoading(false);
+        // Fetch guild names + icons in background
+        fetch('/api/admin/guilds/info')
+          .then(r => r.json())
+          .then(d => setGuildInfos(d.guilds ?? {}))
+          .catch(() => {});
+      })
       .catch(() => setLoading(false));
   };
 
@@ -35,7 +46,10 @@ export default function AdminPanel() {
     if (status === 'authenticated' && session.user?.id === ADMIN_USER_ID) fetchGuilds();
   }, [status, session]);
 
-  const filtered = guilds.filter((id) => id.includes(search));
+  const filtered = guilds.filter((id) => {
+    const name = guildInfos[id]?.name ?? '';
+    return id.includes(search) || name.toLowerCase().includes(search.toLowerCase());
+  });
 
   if (status === 'loading' || (status === 'authenticated' && session.user?.id !== ADMIN_USER_ID)) {
     return <div style={{ minHeight: '100vh', background: '#0e0e10' }} />;
@@ -91,12 +105,20 @@ export default function AdminPanel() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, transition: 'border-color 0.15s, background 0.15s' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; (e.currentTarget as HTMLElement).style.background = '#18181b'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#1e1e22'; (e.currentTarget as HTMLElement).style.background = '#111113'; }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `hsl(${parseInt(guildId.slice(-3)) % 360}, 55%, 30%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Shield size={14} color="#fff" strokeWidth={2} />
-                    </div>
+                    {guildInfos[guildId]?.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`https://cdn.discordapp.com/icons/${guildId}/${guildInfos[guildId].icon}.webp?size=64`} alt=""
+                        style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: `hsl(${parseInt(guildId.slice(-3)) % 360}, 55%, 30%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Shield size={14} color="#fff" strokeWidth={2} />
+                      </div>
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#f2f3f5', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guildId}</div>
-                      <div style={{ fontSize: 11, color: '#52535a', marginTop: 2 }}>Server ID</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {guildInfos[guildId]?.name ?? '…'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace', marginTop: 1 }}>{guildId}</div>
                     </div>
                     <Link href={`/dashboard/${guildId}`}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, background: '#5865f2', color: '#fff', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>

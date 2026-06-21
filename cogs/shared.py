@@ -32,6 +32,18 @@ def _init_db():
     c.execute("""CREATE TABLE IF NOT EXISTS kv (
         path TEXT PRIMARY KEY, value TEXT NOT NULL
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS actions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        warn_count INTEGER NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_actions_guild ON actions (guild_id, timestamp DESC)")
     c.commit()
 
 _init_db()
@@ -114,6 +126,20 @@ def is_whitelisted(message, settings: dict) -> bool:
         or user_id in mb_wl
         or any(r in ro_wl for r in role_ids)
     )
+
+
+def _log_action_sync(guild_id: int, user_id: str, username: str, channel_id: str, action: str, reason: str, warn_count: int) -> None:
+    c = _get_conn()
+    c.execute(
+        "INSERT INTO actions (guild_id, user_id, username, channel_id, action, reason, warn_count, timestamp) VALUES (?,?,?,?,?,?,?,?)",
+        (guild_id, user_id, username, channel_id, action, reason, warn_count, int(time.time())),
+    )
+    # Keep last 200 actions per guild
+    c.execute(
+        "DELETE FROM actions WHERE guild_id=? AND id NOT IN (SELECT id FROM actions WHERE guild_id=? ORDER BY id DESC LIMIT 200)",
+        (guild_id, guild_id),
+    )
+    c.commit()
 
 
 # ── low-level DB writes (used by cogs for warn updates) ─────────────────────
@@ -269,6 +295,11 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
     await asyncio.to_thread(warn_ref.set, warn_data)
 
     warn_count = warn_data["Warn"]
+    username = getattr(message.author, "name", str(message.author.id))
+    channel_id = str(message.channel.id)
+    await asyncio.to_thread(
+        _log_action_sync, int(guild_id), user_id, username, channel_id, "warned", reason, warn_count
+    )
     kick_limit = settings.get("warn", {}).get("kick", 0)
     ban_limit = settings.get("warn", {}).get("ban", 0)
     timeout_cfg = settings.get("warn", {}).get("timeout", {})
@@ -337,6 +368,10 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
             await message.channel.send(embed=t_embed)
             if log_channel:
                 await log_channel.send(embed=t_embed)
+            await asyncio.to_thread(
+                _log_action_sync, int(guild_id), user_id, username, channel_id,
+                "timeout", f"Auto-timeout ({timeout_minutes} min)", warn_count,
+            )
         except Exception:
             err = discord.Embed(title="⛔ ERROR",
                                 description=f"Cannot timeout {message.author.mention}. Check permissions.",
@@ -355,6 +390,10 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
                 await message.channel.send(embed=k_embed)
                 if log_channel:
                     await log_channel.send(embed=k_embed)
+                await asyncio.to_thread(
+                    _log_action_sync, int(guild_id), user_id, username, channel_id,
+                    "kicked", f"Auto-kick ({kick_limit} warnings)", warn_count,
+                )
             elif ban_limit and warn_count == ban_limit:
                 await message.author.ban(reason=f"Auto-ban: {ban_limit} warnings")
                 b_embed = discord.Embed(
@@ -365,6 +404,10 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
                 await message.channel.send(embed=b_embed)
                 if log_channel:
                     await log_channel.send(embed=b_embed)
+                await asyncio.to_thread(
+                    _log_action_sync, int(guild_id), user_id, username, channel_id,
+                    "banned", f"Auto-ban ({ban_limit} warnings)", warn_count,
+                )
         except discord.Forbidden:
             err = discord.Embed(
                 title="⛔ ERROR",

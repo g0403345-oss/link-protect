@@ -45,6 +45,24 @@ def _get_conn() -> sqlite3.Connection:
         _tls.conn = conn
     return _tls.conn
 
+def _ensure_actions_table():
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS actions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        warn_count INTEGER NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_actions_guild ON actions (guild_id, timestamp DESC)")
+    c.commit()
+
+_ensure_actions_table()
+
 # ── In-memory cache (same as bot's shared.py) ────────────────────────────────
 _cache: dict[str, tuple[float, dict]] = {}
 _CACHE_TTL = 5.0
@@ -244,6 +262,62 @@ async def reset_user_warns(request: Request, guild_id: str, user_id: str):
         del data["warn"][user_id]
         _save_server(guild_id, data)
     return {"ok": True}
+
+
+@app.get("/api/guild/{guild_id}/discord-info")
+@require_auth
+async def discord_guild_info(request: Request, guild_id: str):
+    if not BOT_TOKEN:
+        return {"id": guild_id, "name": guild_id, "icon": None}
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{DISCORD_API}/guilds/{guild_id}",
+            headers={"Authorization": f"Bot {BOT_TOKEN}"},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        return {"id": guild_id, "name": guild_id, "icon": None}
+    g = resp.json()
+    return {"id": g["id"], "name": g["name"], "icon": g.get("icon")}
+
+
+@app.get("/api/guilds/discord-info")
+@require_auth
+async def all_guilds_discord_info(request: Request):
+    rows = _get_conn().execute("SELECT guild_id FROM servers").fetchall()
+    guild_ids = [str(r["guild_id"]) for r in rows]
+    if not BOT_TOKEN:
+        return {"guilds": {gid: {"name": gid, "icon": None} for gid in guild_ids}}
+
+    async with httpx.AsyncClient() as client:
+        async def fetch_guild(gid: str):
+            try:
+                resp = await client.get(
+                    f"{DISCORD_API}/guilds/{gid}",
+                    headers={"Authorization": f"Bot {BOT_TOKEN}"},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    g = resp.json()
+                    return gid, {"name": g["name"], "icon": g.get("icon")}
+            except Exception:
+                pass
+            return gid, {"name": gid, "icon": None}
+
+        import asyncio as _asyncio
+        results = await _asyncio.gather(*[fetch_guild(gid) for gid in guild_ids])
+
+    return {"guilds": dict(results)}
+
+
+@app.get("/api/guild/{guild_id}/actions")
+@require_auth
+async def guild_actions(request: Request, guild_id: str, limit: int = 50):
+    rows = _get_conn().execute(
+        "SELECT user_id, username, channel_id, action, reason, warn_count, timestamp FROM actions WHERE guild_id=? ORDER BY timestamp DESC LIMIT ?",
+        (int(guild_id), min(limit, 100)),
+    ).fetchall()
+    return {"actions": [dict(r) for r in rows]}
 
 
 @app.get("/api/guild/{guild_id}/discord-channels")

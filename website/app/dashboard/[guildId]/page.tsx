@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
-  EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info,
+  EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -15,7 +15,13 @@ import PickerList from '@/components/PickerList';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'warnings' | 'access' | 'blacklist' | 'stats';
+type Section = 'overview' | 'blockers' | 'warnings' | 'access' | 'blacklist' | 'stats' | 'log';
+
+interface GuildAction {
+  user_id: string; username: string; channel_id: string;
+  action: 'warned' | 'kicked' | 'banned' | 'timeout';
+  reason: string; warn_count: number; timestamp: number;
+}
 
 interface Toast { id: number; type: 'success' | 'error'; message: string; }
 let toastId = 0;
@@ -115,6 +121,8 @@ export default function GuildDashboard() {
   const [selectedUser, setSelectedUser] = useState<{ id: string; warns: number; reasons: string[] } | null>(null);
   const [data, setData] = useState<ServerData | null>(null);
   const [stats, setStats] = useState<GuildStats | null>(null);
+  const [guildInfo, setGuildInfo] = useState<{ name: string; icon: string | null } | null>(null);
+  const [actions, setActions] = useState<GuildAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [newLink, setNewLink] = useState('');
@@ -141,7 +149,26 @@ export default function GuildDashboard() {
     } catch { /* silent */ }
   }, [guildId]);
 
-  useEffect(() => { if (status === 'authenticated') { fetchData(); fetchStats(); } }, [status, fetchData, fetchStats]);
+  const fetchActions = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/guild/${guildId}/actions`);
+      if (res.ok) { const d = await res.json(); setActions(d.actions ?? []); }
+    } catch { /* silent */ }
+  }, [guildId]);
+
+  useEffect(() => {
+    fetch(`/api/guild/${guildId}/discord-info`)
+      .then(r => r.json()).then(d => setGuildInfo(d)).catch(() => {});
+  }, [guildId]);
+
+  useEffect(() => { if (status === 'authenticated') { fetchData(); fetchStats(); fetchActions(); } }, [status, fetchData, fetchStats, fetchActions]);
+
+  // Auto-refresh actions every 5 s when the log tab is active
+  useEffect(() => {
+    if (section !== 'log') return;
+    const id = setInterval(fetchActions, 5000);
+    return () => clearInterval(id);
+  }, [section, fetchActions]);
 
   const patch = useCallback(async (path: string, value: unknown, label?: string) => {
     setSaving(path);
@@ -194,6 +221,7 @@ export default function GuildDashboard() {
     { id: 'access',    label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
     { id: 'blacklist', label: 'Blacklist',       icon: List,          desc: 'Custom blocked domains' },
     { id: 'stats',     label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
+    { id: 'log',       label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
   ];
 
   return (
@@ -208,7 +236,18 @@ export default function GuildDashboard() {
           <ChevronLeft size={13} /> All servers
         </Link>
         <span style={{ color: '#2e2e36' }}>/</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>Server Settings</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          {guildInfo?.icon ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`https://cdn.discordapp.com/icons/${guildId}/${guildInfo.icon}.webp?size=32`} alt=""
+              style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 20, height: 20, borderRadius: 6, background: '#5865f2', flexShrink: 0 }} />
+          )}
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>
+            {guildInfo?.name ?? 'Server Settings'}
+          </span>
+        </div>
         <span style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace', marginLeft: 'auto' }}>{guildId}</span>
       </div>
 
@@ -510,6 +549,66 @@ export default function GuildDashboard() {
                   )}
                 </div>
               )}
+
+              {/* LOG */}
+              {section === 'log' && (() => {
+                const actionMeta: Record<string, { label: string; color: string; bg: string }> = {
+                  warned:  { label: 'Warned',   color: '#f0b232', bg: 'rgba(240,178,50,0.08)' },
+                  kicked:  { label: 'Kicked',   color: '#f23f43', bg: 'rgba(242,63,67,0.08)' },
+                  banned:  { label: 'Banned',   color: '#f23f43', bg: 'rgba(242,63,67,0.12)' },
+                  timeout: { label: 'Timeout',  color: '#9b59b6', bg: 'rgba(155,89,182,0.08)' },
+                };
+                const relTime = (ts: number) => {
+                  const s = Math.floor(Date.now() / 1000 - ts);
+                  if (s < 60) return `${s}s ago`;
+                  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+                  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+                  return `${Math.floor(s / 86400)}d ago`;
+                };
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <SectionHeader title="Activity Log" description="Live moderation feed — auto-refreshes every 5 seconds" icon={Activity} />
+                      <button onClick={fetchActions} style={{ padding: '7px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'border-color 0.15s' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52535a')}
+                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}>
+                        <RefreshCw size={13} color="#6d6f78" />
+                      </button>
+                    </div>
+                    <Card title={`Recent Actions (${actions.length})`}>
+                      {actions.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                          <Activity size={28} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
+                          <p style={{ fontSize: 13, color: '#52535a' }}>No moderation actions yet</p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {actions.map((a, i) => {
+                            const meta = actionMeta[a.action] ?? actionMeta.warned;
+                            return (
+                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: meta.bg, color: meta.color, flexShrink: 0, marginTop: 1 }}>
+                                  {meta.label}
+                                </span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: '#f2f3f5' }}>{a.username}</span>
+                                    <span style={{ fontSize: 11, color: '#52535a' }}>warn #{a.warn_count}</span>
+                                    <span style={{ fontSize: 11, color: '#2e2e36' }}>•</span>
+                                    <span style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>#{a.channel_id.slice(-4)}</span>
+                                  </div>
+                                  <p style={{ fontSize: 12, color: '#6d6f78', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.reason}</p>
+                                </div>
+                                <span style={{ fontSize: 11, color: '#52535a', flexShrink: 0, marginTop: 1 }}>{relTime(a.timestamp)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Card>
+                  </div>
+                );
+              })()}
 
             </motion.div>
           </AnimatePresence>
