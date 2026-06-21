@@ -13,9 +13,9 @@ function authHeaders() {
   };
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, init?: RequestInit, timeoutMs = 10_000): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${BOT_API_URL}${path}`, {
       ...init,
@@ -31,6 +31,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Longer timeout variant for tunnel-dependent calls
+async function apiFetchSlow<T>(path: string): Promise<T> {
+  return apiFetch<T>(path, undefined, 25_000);
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -85,7 +90,7 @@ export async function getStats(): Promise<GlobalStats> {
 // ── Authenticated ─────────────────────────────────────────────────────────────
 
 export async function getAllGuildIds(): Promise<string[]> {
-  const res = await apiFetch<{ guilds: string[] }>("/api/guilds");
+  const res = await apiFetchSlow<{ guilds: string[] }>("/api/guilds");
   return res.guilds;
 }
 
