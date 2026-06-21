@@ -3,15 +3,36 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Shield, Settings, RefreshCw, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Shield, Settings, RefreshCw, Search, Activity, X } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { ADMIN_USER_ID } from '@/lib/admin';
 
 interface GuildInfo { name: string; icon: string | null; }
 
+interface GlobalAction {
+  guild_id: number; user_id: string; username: string; channel_id: string;
+  action: 'warned' | 'kicked' | 'banned' | 'timeout'; reason: string;
+  warn_count: number; timestamp: number;
+}
+
 const PAGE_SIZE = 24;
+
+const ACTION_META: Record<string, { label: string; color: string; bg: string }> = {
+  warned:  { label: 'Warned',   color: '#f0b232', bg: 'rgba(240,178,50,0.10)' },
+  kicked:  { label: 'Kicked',   color: '#f23f43', bg: 'rgba(242,63,67,0.10)' },
+  banned:  { label: 'Banned',   color: '#f23f43', bg: 'rgba(242,63,67,0.14)' },
+  timeout: { label: 'Timeout',  color: '#5865f2', bg: 'rgba(88,101,242,0.10)' },
+};
+
+function relTime(ts: number) {
+  const d = Math.floor(Date.now() / 1000) - ts;
+  if (d < 60) return `${d}s ago`;
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  return `${Math.floor(d / 86400)}d ago`;
+}
 
 export default function AdminPanel() {
   const { data: session, status } = useSession();
@@ -23,6 +44,11 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('');
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Live feed state
+  const [feedOpen, setFeedOpen] = useState(false);
+  const [feedActions, setFeedActions] = useState<GlobalAction[]>([]);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
@@ -41,7 +67,6 @@ export default function AdminPanel() {
         if (d.error === 'Bot API unreachable') { setApiError(true); setLoading(false); return; }
         setGuilds(d.guilds ?? []);
         setLoading(false);
-        // Fetch names + icons in background — don't block render
         fetch('/api/admin/guilds/info')
           .then(r => r.json())
           .then(d => setGuildInfos(d.guilds ?? {}))
@@ -50,11 +75,26 @@ export default function AdminPanel() {
       .catch(() => { setApiError(true); setLoading(false); });
   }, []);
 
+  const fetchFeed = useCallback(() => {
+    setFeedLoading(true);
+    fetch('/api/admin/actions')
+      .then(r => r.json())
+      .then(d => { setFeedActions(d.actions ?? []); setFeedLoading(false); })
+      .catch(() => setFeedLoading(false));
+  }, []);
+
   useEffect(() => {
     if (status === 'authenticated' && session.user?.id === ADMIN_USER_ID) fetchGuilds();
   }, [status, session, fetchGuilds]);
 
-  // Reset display count when search changes
+  // Auto-refresh feed every 5s when open
+  useEffect(() => {
+    if (!feedOpen) return;
+    fetchFeed();
+    const iv = setInterval(fetchFeed, 5000);
+    return () => clearInterval(iv);
+  }, [feedOpen, fetchFeed]);
+
   useEffect(() => { setDisplayCount(PAGE_SIZE); }, [search]);
 
   const filtered = guilds.filter((id) => {
@@ -65,7 +105,6 @@ export default function AdminPanel() {
   const visible = filtered.slice(0, displayCount);
   const hasMore = displayCount < filtered.length;
 
-  // Infinite scroll via IntersectionObserver
   useEffect(() => {
     if (!sentinelRef.current || !hasMore) return;
     const obs = new IntersectionObserver(
@@ -100,10 +139,22 @@ export default function AdminPanel() {
                 {loading ? 'Loading servers…' : `${filtered.length} of ${guilds.length} servers`}
               </p>
             </div>
-            <button onClick={fetchGuilds} disabled={loading}
-              style={{ width: 36, height: 36, borderRadius: 8, background: '#18181b', border: '1px solid #2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <RefreshCw size={14} color="#6d6f78" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setFeedOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', height: 36, borderRadius: 8, background: feedOpen ? 'rgba(88,101,242,0.15)' : '#18181b', border: `1px solid ${feedOpen ? 'rgba(88,101,242,0.4)' : '#2e2e36'}`, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: feedOpen ? '#7289da' : '#949ba4' }}>
+                <Activity size={14} />
+                Live Feed
+                {feedActions.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 99, padding: '1px 6px', marginLeft: 2 }}>
+                    {feedActions.length}
+                  </span>
+                )}
+              </button>
+              <button onClick={fetchGuilds} disabled={loading}
+                style={{ width: 36, height: 36, borderRadius: 8, background: '#18181b', border: '1px solid #2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <RefreshCw size={14} color="#6d6f78" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -172,7 +223,6 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              {/* Infinite scroll sentinel */}
               {hasMore && (
                 <div ref={sentinelRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, marginTop: 8 }}>
                   {Array.from({ length: Math.min(PAGE_SIZE, filtered.length - displayCount) }).map((_, i) => (
@@ -190,6 +240,102 @@ export default function AdminPanel() {
           )}
         </motion.div>
       </main>
+
+      {/* Live Feed Slide-over */}
+      <AnimatePresence>
+        {feedOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setFeedOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, background: '#111113', borderLeft: '1px solid #1e1e22', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
+
+              {/* Drawer header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid #1e1e22', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(88,101,242,0.15)', border: '1px solid rgba(88,101,242,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Activity size={13} color="#7289da" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#f2f3f5' }}>Global Live Feed</div>
+                    <div style={{ fontSize: 11, color: '#52535a', marginTop: 1 }}>
+                      {feedLoading ? 'Refreshing…' : `${feedActions.length} recent actions · auto-refresh 5s`}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setFeedOpen(false)}
+                  style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: '1px solid #2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <X size={13} color="#6d6f78" />
+                </button>
+              </div>
+
+              {/* Feed list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                {feedActions.length === 0 && !feedLoading && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
+                    <Activity size={32} color="#2e2e36" />
+                    <p style={{ fontSize: 13, color: '#52535a' }}>No moderation actions yet</p>
+                  </div>
+                )}
+                {feedActions.map((a, i) => {
+                  const meta = ACTION_META[a.action] ?? ACTION_META.warned;
+                  const guildId = String(a.guild_id);
+                  const info = guildInfos[guildId];
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 20px', borderBottom: '1px solid #18181b', transition: 'background 0.1s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#18181b')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                      {/* Server icon */}
+                      <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                        {info?.icon ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={`https://cdn.discordapp.com/icons/${guildId}/${info.icon}.webp?size=32`} alt=""
+                            style={{ width: 28, height: 28, borderRadius: 7 }} />
+                        ) : (
+                          <div style={{ width: 28, height: 28, borderRadius: 7, background: `hsl(${parseInt(guildId.slice(-3)) % 360}, 55%, 30%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Shield size={11} color="#fff" strokeWidth={2} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>
+                            {a.username}
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: meta.color, background: meta.bg, padding: '1px 7px', borderRadius: 99, flexShrink: 0 }}>
+                            {meta.label}
+                          </span>
+                          {a.action === 'warned' && (
+                            <span style={{ fontSize: 10, color: '#52535a', flexShrink: 0 }}>#{a.warn_count}</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6d6f78', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.reason}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10, color: '#3e3e4a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {info?.name ?? guildId}
+                          </span>
+                          <span style={{ fontSize: 10, color: '#3e3e4a', flexShrink: 0 }}>·</span>
+                          <span style={{ fontSize: 10, color: '#3e3e4a', flexShrink: 0 }}>{relTime(a.timestamp)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

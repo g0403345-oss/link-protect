@@ -314,6 +314,17 @@ async def guild_actions(request: Request, guild_id: str, limit: int = 50):
     return {"actions": [dict(r) for r in rows]}
 
 
+@app.get("/api/actions")
+@require_auth
+async def all_actions(request: Request, limit: int = Query(default=200)):
+    rows = _get_conn().execute(
+        "SELECT guild_id, user_id, username, channel_id, action, reason, warn_count, timestamp "
+        "FROM actions ORDER BY timestamp DESC LIMIT ?",
+        (min(limit, 500),)
+    ).fetchall()
+    return {"actions": [dict(r) for r in rows]}
+
+
 @app.get("/api/guild/{guild_id}/discord-channels")
 @require_auth
 async def discord_channels(request: Request, guild_id: str):
