@@ -25,27 +25,26 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let userGuilds: DiscordGuild[];
-    try {
-      userGuilds = await getUserGuilds(session.accessToken);
-    } catch (err) {
-      console.error('[API /guilds] Failed to fetch user guilds:', err);
+    // Fetch user guilds + bot guild IDs in parallel
+    const [userGuildsResult, botIdsResult] = await Promise.allSettled([
+      getUserGuilds(session.accessToken),
+      getAllGuildIds(),
+    ]);
+
+    if (userGuildsResult.status === 'rejected') {
+      console.error('[API /guilds] Failed to fetch user guilds:', userGuildsResult.reason);
       return NextResponse.json({ error: 'Failed to fetch guilds from Discord' }, { status: 502 });
     }
+
+    const userGuilds = userGuildsResult.value;
+    const botGuildIds = new Set<string>(
+      botIdsResult.status === 'fulfilled' ? botIdsResult.value : []
+    );
 
     // Filter to guilds where user has Manage Guild permission
     const manageableGuilds = userGuilds.filter(
       (g) => g.owner || hasManageGuild(g.permissions)
     );
-
-    // Get bot's guild IDs from DB
-    let botGuildIds: Set<string>;
-    try {
-      const ids = await getAllGuildIds();
-      botGuildIds = new Set(ids);
-    } catch {
-      botGuildIds = new Set();
-    }
 
     const enriched: EnrichedGuild[] = manageableGuilds.map((guild) => ({
       id: guild.id,

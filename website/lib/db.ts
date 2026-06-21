@@ -14,17 +14,23 @@ function authHeaders() {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BOT_API_URL}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
-    // No caching — always fresh from bot server
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`Bot API ${path} → ${res.status}: ${text}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${BOT_API_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new Error(`Bot API ${path} → ${res.status}: ${text}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
