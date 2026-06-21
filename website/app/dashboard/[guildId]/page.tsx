@@ -160,6 +160,7 @@ export default function GuildDashboard() {
   const guildId = params.guildId;
 
   const [section, setSection] = useState<Section>('overview');
+  const [selectedUser, setSelectedUser] = useState<{ id: string; warns: number; reasons: string[] } | null>(null);
   const [data, setData] = useState<ServerData | null>(null);
   const [stats, setStats] = useState<GuildStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -244,7 +245,7 @@ export default function GuildDashboard() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
       <Navbar />
 
       {/* Breadcrumb bar */}
@@ -259,8 +260,8 @@ export default function GuildDashboard() {
         <span style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace', marginLeft: 'auto' }}>{guildId}</span>
       </div>
 
-      {/* Mobile section tab strip — hidden on desktop */}
-      <div className="mobile-only" style={{ overflowX: 'auto', gap: 6, padding: '10px 16px', background: '#111113', borderBottom: '1px solid #1e1e22', scrollbarWidth: 'none' }}>
+      {/* Mobile section tab strip — hidden on desktop, sticky below breadcrumb */}
+      <div className="mobile-only" style={{ overflowX: 'auto', gap: 6, padding: '10px 16px', background: '#111113', borderBottom: '1px solid #1e1e22', scrollbarWidth: 'none', position: 'sticky', top: 104, zIndex: 30 }}>
         {NAV.map(({ id, label, icon: Icon }) => {
           const active = section === id;
           return (
@@ -419,14 +420,18 @@ export default function GuildDashboard() {
                           {entries.map(([userId, ud]) => {
                             const u = ud as { Warn?: number; reason?: string[] };
                             const w = u.Warn ?? 0;
+                            const reasons = Array.isArray(u.reason) ? u.reason : [];
                             const color = w >= (warn.ban ?? 999) ? '#f23f43' : w >= (warn.kick ?? 999) ? '#f0b232' : '#5865f2';
                             return (
-                              <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8 }}>
+                              <div key={userId} onClick={() => setSelectedUser({ id: userId, warns: w, reasons })}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#52535a'; (e.currentTarget as HTMLElement).style.background = '#232329'; }}
+                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; (e.currentTarget as HTMLElement).style.background = '#18181b'; }}>
                                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78', flexShrink: 0 }}>{userId.slice(-2)}</div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <p style={{ fontSize: 12, color: '#949ba4', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userId}</p>
-                                  {Array.isArray(u.reason) && u.reason.length > 0 && (
-                                    <p style={{ fontSize: 11, color: '#52535a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.reason[u.reason.length - 1]}</p>
+                                  {reasons.length > 0 && (
+                                    <p style={{ fontSize: 11, color: '#52535a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reasons[reasons.length - 1]}</p>
                                   )}
                                 </div>
                                 <span style={{ fontSize: 12, fontWeight: 700, color, background: `${color}18`, padding: '3px 8px', borderRadius: 99, flexShrink: 0 }}>{w} warns</span>
@@ -557,6 +562,69 @@ export default function GuildDashboard() {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Warning detail modal */}
+      <AnimatePresence>
+        {selectedUser && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setSelectedUser(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+              {/* Modal header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #1e1e22', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78' }}>{selectedUser.id.slice(-2)}</div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', fontFamily: 'monospace' }}>{selectedUser.id}</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: '#52535a', marginLeft: 36 }}>{selectedUser.warns} warning{selectedUser.warns !== 1 ? 's' : ''} total</span>
+                </div>
+                <button onClick={() => setSelectedUser(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52535a', padding: 4, display: 'flex' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#f2f3f5')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#52535a')}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Warning list */}
+              <div style={{ overflowY: 'auto', padding: '12px 20px', flex: 1 }}>
+                {selectedUser.reasons.length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#52535a', textAlign: 'center', padding: '20px 0' }}>No reasons recorded</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {selectedUser.reasons.map((reason, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8 }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(88,101,242,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#5865f2', flexShrink: 0 }}>{i + 1}</div>
+                        <span style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.5 }}>{reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid #1e1e22', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button onClick={() => setSelectedUser(null)}
+                  style={{ padding: '8px 14px', fontSize: 13, fontWeight: 500, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer' }}>
+                  Close
+                </button>
+                <button onClick={async () => {
+                    await patch(`warn.${selectedUser.id}`, undefined, 'Warnings reset');
+                    setSelectedUser(null);
+                    fetchData();
+                  }}
+                  disabled={saving !== null}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: '#fff', background: '#f23f43', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: saving !== null ? 0.5 : 1 }}>
+                  <Trash2 size={13} /> Reset warnings
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toasts */}
       <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>

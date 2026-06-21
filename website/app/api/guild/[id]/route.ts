@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getUserGuilds, hasManageGuild } from '@/lib/discord';
 import { getServerData, patchSetting, type ServerData } from '@/lib/db';
+import { isAdmin } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +28,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { id } = await params;
-    const hasAccess = await verifyAccess(id, session.accessToken);
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!isAdmin(session.user?.id)) {
+      const hasAccess = await verifyAccess(id, session.accessToken);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
     const data = await getServerData(id);
     if (!data) {
@@ -52,9 +55,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { id } = await params;
-    const hasAccess = await verifyAccess(id, session.accessToken);
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!isAdmin(session.user?.id)) {
+      const hasAccess = await verifyAccess(id, session.accessToken);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     let body: { path: string; value: unknown };

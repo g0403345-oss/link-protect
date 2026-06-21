@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
-import { LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
+import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE } from '@/lib/discord';
 
 export default function Navbar() {
@@ -95,6 +96,15 @@ export default function Navbar() {
                     <LayoutDashboard size={14} />
                     Dashboard
                   </Link>
+                  {isAdmin(session.user?.id) && (
+                    <Link href="/dashboard/admin" onClick={() => setMenuOpen(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', fontSize: 13, fontWeight: 500, color: '#f0b232', textDecoration: 'none', borderRadius: 6, transition: 'background 0.1s' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(240,178,50,0.08)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                      <Shield size={14} />
+                      Admin Panel
+                    </Link>
+                  )}
                   <div style={{ height: 1, background: '#2e2e36', margin: '4px 0' }} />
                   <button onClick={() => { setMenuOpen(false); signOut({ callbackUrl: '/' }); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', fontSize: 13, fontWeight: 500, color: '#f23f43', background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', borderRadius: 6, transition: 'background 0.1s' }}
