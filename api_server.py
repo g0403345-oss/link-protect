@@ -12,13 +12,16 @@ import time
 from functools import wraps
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+import httpx
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ── Config ──────────────────────────────────────────────────────────────────
 DB_PATH = os.environ.get("BOT_DB_PATH", "bot.sqlite3")
 API_SECRET = os.environ.get("BOT_API_SECRET", "change-me-in-production")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+DISCORD_API = "https://discord.com/api/v10"
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 app = FastAPI(title="Link Protect API", docs_url=None, redoc_url=None)
@@ -165,6 +168,7 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "silent",
         "warn.kick", "warn.ban", "warn.timeout.warnings", "warn.timeout.time",
         "log.Activated", "log.log-channel", "log.link", "log.onlylink",
+        "channel.channel", "channel.category", "channel.member", "channel.role",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
@@ -240,6 +244,69 @@ async def reset_user_warns(request: Request, guild_id: str, user_id: str):
         del data["warn"][user_id]
         _save_server(guild_id, data)
     return {"ok": True}
+
+
+@app.get("/api/guild/{guild_id}/discord-channels")
+@require_auth
+async def discord_channels(request: Request, guild_id: str):
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=503, detail="Bot token not configured")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{DISCORD_API}/guilds/{guild_id}/channels",
+            headers={"Authorization": f"Bot {BOT_TOKEN}"},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Discord API error")
+    channels = resp.json()
+    return {"channels": sorted([
+        {"id": c["id"], "name": c["name"], "type": c["type"],
+         "position": c.get("position", 0), "parent_id": c.get("parent_id")}
+        for c in channels
+    ], key=lambda c: c["position"])}
+
+
+@app.get("/api/guild/{guild_id}/discord-roles")
+@require_auth
+async def discord_roles(request: Request, guild_id: str):
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=503, detail="Bot token not configured")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{DISCORD_API}/guilds/{guild_id}/roles",
+            headers={"Authorization": f"Bot {BOT_TOKEN}"},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Discord API error")
+    roles = resp.json()
+    return {"roles": sorted([
+        {"id": r["id"], "name": r["name"], "color": r["color"], "position": r["position"]}
+        for r in roles if r["name"] != "@everyone"
+    ], key=lambda r: -r["position"])}
+
+
+@app.get("/api/guild/{guild_id}/discord-members/search")
+@require_auth
+async def discord_members_search(request: Request, guild_id: str, q: str = Query(default="")):
+    if not BOT_TOKEN or len(q) < 1:
+        return {"members": []}
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{DISCORD_API}/guilds/{guild_id}/members/search",
+            params={"query": q, "limit": 25},
+            headers={"Authorization": f"Bot {BOT_TOKEN}"},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        return {"members": []}
+    members = resp.json()
+    return {"members": [
+        {"id": m["user"]["id"], "username": m["user"]["username"],
+         "avatar": m["user"].get("avatar"), "nick": m.get("nick")}
+        for m in members
+    ]}
 
 
 if __name__ == "__main__":

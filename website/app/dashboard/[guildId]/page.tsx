@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
+import PickerList from '@/components/PickerList';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
@@ -101,55 +102,6 @@ function NumberInput({ label, description, value, icon, color, onSave, saving }:
   );
 }
 
-function AccessList({ title, description, icon, items, placeholder, onSave, saving }: {
-  title: string; description: string; icon: React.ReactNode; items: string[];
-  placeholder: string; onSave: (items: string[]) => void; saving: boolean;
-}) {
-  const [newItem, setNewItem] = useState('');
-  const add = () => {
-    const t = newItem.trim();
-    if (!t || items.includes(t)) return;
-    onSave([...items, t]);
-    setNewItem('');
-  };
-  return (
-    <Card title={`${title} (${items.length})`}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#52535a', marginBottom: 12, fontSize: 12 }}>
-        {icon} {description}
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input type="text" value={newItem} placeholder={placeholder}
-          onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && add()}
-          style={{ flex: 1, padding: '8px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', fontSize: 13, fontFamily: 'monospace', outline: 'none' }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}
-        />
-        <button onClick={add} disabled={!newItem.trim() || saving}
-          style={{ padding: '8px 14px', background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: (!newItem.trim() || saving) ? 0.4 : 1 }}>
-          <Plus size={14} />
-        </button>
-      </div>
-      {items.length === 0 ? (
-        <p style={{ fontSize: 12, color: '#52535a', textAlign: 'center', padding: '12px 0' }}>Nothing whitelisted yet</p>
-      ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {items.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 6, fontSize: 12, fontFamily: 'monospace', color: '#949ba4' }}>
-              {item}
-              <button onClick={() => onSave(items.filter((_, j) => j !== i))}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52535a', display: 'flex', padding: 0 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#f23f43')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#52535a')}>
-                <X size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
 
 /* ── main ──────────────────────────────────────────────────── */
 
@@ -453,10 +405,10 @@ export default function GuildDashboard() {
                     <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
                     <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted items bypass all link restrictions. Add Discord IDs (18-digit numbers).</p>
                   </div>
-                  <AccessList title="Whitelisted Channels" description="Links are allowed in these channels" icon={<Lock size={13} color="#5865f2" />} items={channel.channel} placeholder="Channel ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.channel', v, 'Whitelisted channels')} saving={saving === 'channel.channel'} />
-                  <AccessList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#9b59b6" />} items={channel.category ?? []} placeholder="Category ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
-                  <AccessList title="Whitelisted Members" description="These users can post any links" icon={<Users size={13} color="#23a55a" />} items={channel.member} placeholder="User ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.member', v, 'Whitelisted members')} saving={saving === 'channel.member'} />
-                  <AccessList title="Whitelisted Roles" description="Members with these roles can post any links" icon={<Shield size={13} color="#f0b232" />} items={channel.role} placeholder="Role ID (e.g. 123456789012345678)" onSave={(v) => patch('channel.role', v, 'Whitelisted roles')} saving={saving === 'channel.role'} />
+                  <PickerList title="Whitelisted Channels" description="Links are allowed in these channels" icon={<Lock size={13} color="#5865f2" />} pickerType="channel" guildId={guildId} value={channel.channel} onSave={(v) => patch('channel.channel', v, 'Whitelisted channels')} saving={saving === 'channel.channel'} />
+                  <PickerList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#9b59b6" />} pickerType="category" guildId={guildId} value={channel.category ?? []} onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
+                  <PickerList title="Whitelisted Members" description="These users can post any links" icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId} value={channel.member} onSave={(v) => patch('channel.member', v, 'Whitelisted members')} saving={saving === 'channel.member'} />
+                  <PickerList title="Whitelisted Roles" description="Members with these roles can post any links" icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId} value={channel.role} onSave={(v) => patch('channel.role', v, 'Whitelisted roles')} saving={saving === 'channel.role'} />
                 </div>
               )}
 

@@ -10,6 +10,7 @@ ExecStart=/usr/bin/python3 -m uvicorn api_server:app --host 127.0.0.1 --port 300
 Restart=always
 RestartSec=5
 Environment=BOT_API_SECRET=linkprotect-api-secret-2026
+# Set BOT_TOKEN on the server directly — do NOT commit the token here
 
 [Install]
 WantedBy=multi-user.target
