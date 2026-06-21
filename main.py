@@ -297,8 +297,9 @@ async def _boot_sync_once():
 bot.loop.create_task(_boot_sync_once())
 API_KEY = '6d4d6172480f35c0246c23707521c5d37b91317741e6f262a1052ee770d18dcf'
 
+_SKIP_COGS = {'shared', 'logger'}
 for filename in os.listdir('./cogs'):
-    if filename.endswith('.py'):
+    if filename.endswith('.py') and filename[:-3] not in _SKIP_COGS:
         bot.load_extension(f'cogs.{filename[:-3]}')
         print(f"loaded cogs.{filename[:-3]}")
 
@@ -680,12 +681,21 @@ async def _help(ctx):
 async def _update(ctx):
     await ctx.defer()
     embed = discord.Embed(
-        title="🔄 Update — Version 2.1.0",
-        description="05.06.2026",
+        title="🔄 Update — Version 2.2.0",
+        description="21.06.2026",
         color=discord.Color.dark_blue(),
     )
     embed.add_field(
-        name="✨ New Commands",
+        name="✨ New Features",
+        value="```"
+              " • Category Whitelist — whitelist entire Discord categories\n"
+              "   so all channels inside are exempt from link restrictions.\n"
+              "   Configure via /dashboard on the web or the website.\n"
+              " • Malware scanner now respects the channel/category whitelist```",
+        inline=False,
+    )
+    embed.add_field(
+        name="✨ New Commands (v2.1.0)",
         value="```"
               " • /ping          — Show bot latency (gateway + API)\n"
               " • /stats         — Server count, user count, uptime\n"
@@ -924,7 +934,7 @@ async def _dashboard(ctx):
     safe_data = await fetch(f"{base}/safe", {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
         "invite": False, "twitch": False, "bit": False, "nitro": False, "steam": False})
-    channel_data = await fetch(f"{base}/channel", {"channel": [], "member": [], "role": []})
+    channel_data = await fetch(f"{base}/channel", {"channel": [], "category": [], "member": [], "role": []})
     link_data = await fetch(f"{base}/link", {"links": 0})
     kick = warn_data.get("kick", 3)
     ban = warn_data.get("ban", 5)
@@ -947,10 +957,13 @@ async def _dashboard(ctx):
     embed.add_field(name="All Links:", value=f"{status(protect_data['all'])} `- {'ON' if protect_data['all'] else 'OFF'}`", inline=False)
     embed.add_field(name="``Sending permission``", value=f" ", inline=False)
     channels = channel_data.get("channel", [])
+    categories = channel_data.get("category", [])
     roles = channel_data.get("role", [])
     members = channel_data.get("member", [])
     embed.add_field(name="Enabled Channels:",
                     value="```❌ - Empty```" if not channels else ", ".join([f"<#{c}>" for c in channels]), inline=True)
+    embed.add_field(name="Enabled Categories:",
+                    value="```❌ - Empty```" if not categories else ", ".join([f"`{c}`" for c in categories]), inline=True)
     embed.add_field(name="Enabled Roles:",
                     value="```❌ - Empty```" if not roles else ", ".join([f"<@&{c}>" for c in roles]), inline=True)
     embed.add_field(name="Enabled Members:",
