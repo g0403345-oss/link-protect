@@ -284,30 +284,24 @@ async def discord_guild_info(request: Request, guild_id: str):
 @app.get("/api/guilds/discord-info")
 @require_auth
 async def all_guilds_discord_info(request: Request):
-    rows = _get_conn().execute("SELECT guild_id FROM servers").fetchall()
-    guild_ids = [str(r["guild_id"]) for r in rows]
     if not BOT_TOKEN:
-        return {"guilds": {gid: {"name": gid, "icon": None} for gid in guild_ids}}
+        rows = _get_conn().execute("SELECT guild_id FROM servers").fetchall()
+        return {"guilds": {str(r["guild_id"]): {"name": None, "icon": None} for r in rows}}
 
+    # Single Discord call — GET /users/@me/guilds returns all bot guilds with name+icon
     async with httpx.AsyncClient() as client:
-        async def fetch_guild(gid: str):
-            try:
-                resp = await client.get(
-                    f"{DISCORD_API}/guilds/{gid}",
-                    headers={"Authorization": f"Bot {BOT_TOKEN}"},
-                    timeout=5,
-                )
-                if resp.status_code == 200:
-                    g = resp.json()
-                    return gid, {"name": g["name"], "icon": g.get("icon")}
-            except Exception:
-                pass
-            return gid, {"name": gid, "icon": None}
-
-        import asyncio as _asyncio
-        results = await _asyncio.gather(*[fetch_guild(gid) for gid in guild_ids])
-
-    return {"guilds": dict(results)}
+        try:
+            resp = await client.get(
+                f"{DISCORD_API}/users/@me/guilds?limit=200",
+                headers={"Authorization": f"Bot {BOT_TOKEN}"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                guilds = resp.json()
+                return {"guilds": {g["id"]: {"name": g["name"], "icon": g.get("icon")} for g in guilds}}
+        except Exception:
+            pass
+    return {"guilds": {}}
 
 
 @app.get("/api/guild/{guild_id}/actions")
