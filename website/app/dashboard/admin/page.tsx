@@ -19,6 +19,7 @@ export default function AdminPanel() {
   const [guilds, setGuilds] = useState<string[]>([]);
   const [guildInfos, setGuildInfos] = useState<Record<string, GuildInfo>>({});
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
   const [search, setSearch] = useState('');
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -32,10 +33,12 @@ export default function AdminPanel() {
 
   const fetchGuilds = useCallback(() => {
     setLoading(true);
+    setApiError(false);
     setDisplayCount(PAGE_SIZE);
     fetch('/api/admin/guilds')
       .then((r) => r.json())
       .then((d) => {
+        if (d.error === 'Bot API unreachable') { setApiError(true); setLoading(false); return; }
         setGuilds(d.guilds ?? []);
         setLoading(false);
         // Fetch names + icons in background — don't block render
@@ -44,7 +47,7 @@ export default function AdminPanel() {
           .then(d => setGuildInfos(d.guilds ?? {}))
           .catch(() => {});
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setApiError(true); setLoading(false); });
   }, []);
 
   useEffect(() => {
@@ -111,6 +114,16 @@ export default function AdminPanel() {
               onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
               onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')} />
           </div>
+
+          {/* API unreachable error */}
+          {apiError && !loading && (
+            <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, marginBottom: 16 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#f87171', margin: 0 }}>Bot-API nicht erreichbar</p>
+              <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+                Der API-Service auf dem Pi ist vermutlich down. Bitte <code style={{ background: '#1e1e22', padding: '1px 5px', borderRadius: 4 }}>sudo systemctl restart linkprotect-api.service</code> ausführen.
+              </p>
+            </div>
+          )}
 
           {/* Loading skeletons */}
           {loading && (

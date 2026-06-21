@@ -11,6 +11,11 @@ export async function GET() {
   if (!isAdmin(session?.user?.id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  const guilds = await getAllGuildIds();
-  return NextResponse.json({ guilds });
+  try {
+    const guilds = await getAllGuildIds();
+    return NextResponse.json({ guilds });
+  } catch (err) {
+    console.error('[API /admin/guilds] Bot API unreachable:', err);
+    return NextResponse.json({ error: 'Bot API unreachable', guilds: [] }, { status: 503 });
+  }
 }
