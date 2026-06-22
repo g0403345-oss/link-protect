@@ -325,6 +325,48 @@ async def all_actions(request: Request, limit: int = Query(default=200)):
     return {"actions": [dict(r) for r in rows]}
 
 
+@app.get("/api/admin/user/{user_id}")
+@require_auth
+async def admin_user_info(request: Request, user_id: str):
+    # All actions for this user across all guilds
+    rows = _get_conn().execute(
+        "SELECT guild_id, action, reason, warn_count, timestamp FROM actions "
+        "WHERE user_id=? ORDER BY timestamp DESC LIMIT 300",
+        (user_id,)
+    ).fetchall()
+    actions = [dict(r) for r in rows]
+
+    # Current warn state per guild from servers table
+    guild_ids = list({str(r["guild_id"]) for r in rows})
+    guild_warns: dict = {}
+    for gid in guild_ids:
+        row = _get_conn().execute("SELECT data FROM servers WHERE guild_id=?", (int(gid),)).fetchone()
+        if row:
+            data = json.loads(row["data"])
+            udata = data.get("warn", {}).get(user_id)
+            if isinstance(udata, dict):
+                guild_warns[gid] = {"count": udata.get("Warn", 0), "reasons": udata.get("reason", [])}
+            elif isinstance(udata, int):
+                guild_warns[gid] = {"count": udata, "reasons": []}
+
+    # Discord user profile via REST (no intents required)
+    discord_user = None
+    if BOT_TOKEN:
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(
+                    f"{DISCORD_API}/users/{user_id}",
+                    headers={"Authorization": f"Bot {BOT_TOKEN}"},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    discord_user = resp.json()
+            except Exception:
+                pass
+
+    return {"user_id": user_id, "discord": discord_user, "actions": actions, "guild_warns": guild_warns}
+
+
 @app.get("/api/guild/{guild_id}/discord-channels")
 @require_auth
 async def discord_channels(request: Request, guild_id: str):
