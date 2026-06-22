@@ -664,7 +664,10 @@ export default function GuildDashboard() {
                   Close
                 </button>
                 <button onClick={async () => {
-                    await patch(`warn.${selectedUser.id}`, undefined, 'Warnings reset');
+                    try {
+                      const res = await fetch(`/api/guild/${guildId}/warns/${selectedUser.id}`, { method: 'DELETE' });
+                      if (res.ok) { addToast('success', 'Warnings reset'); } else { addToast('error', 'Reset failed'); }
+                    } catch { addToast('error', 'Reset failed'); }
                     setSelectedUser(null);
                     fetchData();
                   }}
