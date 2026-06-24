@@ -2,8 +2,64 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Shield, ArrowRight, Check, ExternalLink } from 'lucide-react';
+import { Shield, ArrowRight, Check, ExternalLink, Smartphone, Bell, Lock } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
+
+/* ── "Now on iOS" app showcase ───────────────────────────────── */
+function PhoneShot({ src, alt, raised }: { src: string; alt: string; raised?: boolean }) {
+  return (
+    <div style={{ flex: '0 0 auto', width: 'min(236px, 72vw)', transform: raised ? 'translateY(-22px)' : 'none' }}>
+      <div style={{ borderRadius: 36, overflow: 'hidden', border: '1px solid #2e2e36', background: '#000', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', lineHeight: 0 }}>
+        <Image src={src} alt={alt} width={1206} height={2622} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      </div>
+    </div>
+  );
+}
+
+function AppSection() {
+  const features = [
+    { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 14 blockers, apply presets, set warning thresholds and blacklists — right from your phone.' },
+    { icon: Bell, title: 'Instant push alerts', desc: 'Know the moment the bot goes offline or a protection rule fires in one of your servers.' },
+    { icon: Lock, title: 'Face ID locked', desc: 'Your moderation panel stays private behind Face ID — plus a Home Screen widget for live status.' },
+  ];
+  return (
+    <section style={{ padding: '100px 24px', borderTop: '1px solid #18181b', background: '#0b0b0d' }}>
+      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <Smartphone size={12} /> Now on iOS
+          </div>
+          <h2 className="cta-title" style={{ fontSize: 48, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 16, lineHeight: 1.05 }}>
+            Your whole server,<br />in your pocket.
+          </h2>
+          <p style={{ fontSize: 17, color: '#6d6f78', maxWidth: 440, margin: '0 auto 30px', lineHeight: 1.6 }}>
+            Manage protection, watch live activity and get push alerts — anywhere. Free, sign in with Discord, no extra account.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center' }}><AppStoreBadge /></div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <PhoneShot src="/app/servers.png" alt="Server list in the Link Protect iOS app" />
+          <PhoneShot src="/app/overview.png" alt="Server protection overview in the Link Protect iOS app" raised />
+          <PhoneShot src="/app/blockers.png" alt="Link blockers configuration in the Link Protect iOS app" />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginTop: 64 }}>
+          {features.map(({ icon: Icon, title, desc }) => (
+            <div key={title} style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 22 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <Icon size={17} color="#7289da" />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>{title}</div>
+              <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55 }}>{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 import Navbar from '@/components/Navbar';
 import { BOT_INVITE, SUPPORT_SERVER, APP_STORE_URL } from '@/lib/discord';
 
@@ -417,15 +473,6 @@ export default function LandingClient() {
                 Dashboard
               </Link>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 36 }}>
-              <div style={{ display: 'flex' }}>
-                {['#f23f43', '#f0b232', '#23a55a', '#5865f2', '#9146ff'].map((c, i) => (
-                  <div key={c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: '2px solid #0e0e10', marginLeft: i ? -8 : 0 }} />
-                ))}
-              </div>
-              <span style={{ fontSize: 13, color: '#52535a' }}>Trusted by <strong style={{ color: '#949ba4' }}>6,495+ servers</strong></span>
-            </div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 32 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }} style={{ display: 'flex', justifyContent: 'center' }}>
@@ -503,6 +550,9 @@ export default function LandingClient() {
           </div>
         </div>
       </section>
+
+      {/* APP */}
+      <AppSection />
 
       {/* CTA */}
       <section style={{ padding: '96px 24px', textAlign: 'center' }}>
