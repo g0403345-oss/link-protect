@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Shield, ArrowRight, Check, ExternalLink } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
@@ -197,26 +196,113 @@ function Feature({ badge, title, description, bullets, visual, flip = false }: {
 }
 
 /* ── Warning flow visual ─────────────────────────────────────── */
-function WarnFlow() {
+/* ── Interactive: click a link, watch it get scanned ─────────── */
+function LinkScannerVisual() {
+  const samples = [
+    { label: 'Nitro scam', text: 'discord.gift/free-nitro-x9f2', bad: true, verdict: 'Nitro scam blocked' },
+    { label: 'Phishing',   text: 'grabify.link/r/track9b',       bad: true, verdict: 'IP grabber / phishing blocked' },
+    { label: 'Invite',     text: 'discord.gg/random-server',     bad: true, verdict: 'Discord invite blocked' },
+    { label: 'Safe link',  text: 'github.com/your/project',      bad: false, verdict: 'Allowed — clean link' },
+  ];
+  const [sel, setSel] = useState(0);
+  const [scanning, setScanning] = useState(false);
+  const s = samples[sel];
+  const pick = (i: number) => { setSel(i); setScanning(true); window.setTimeout(() => setScanning(false), 700); };
+
   return (
-    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Warning escalation</div>
-      {[
-        { label: '1–2 warnings', action: 'Warn only', color: '#f0b232', bar: 20 },
-        { label: '3–4 warnings', action: 'Timeout', color: '#f0b232', bar: 50 },
-        { label: '5 warnings', action: 'Auto-kick', color: '#f23f43', bar: 75 },
-        { label: '10 warnings', action: 'Permanent ban', color: '#f23f43', bar: 100 },
-      ].map(({ label, action, color, bar }) => (
-        <div key={label}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 12, color: '#6d6f78' }}>{label}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color }}>{action}</span>
-          </div>
-          <div style={{ height: 4, background: '#2e2e36', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${bar}%`, background: color, borderRadius: 99 }} />
-          </div>
+    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Try the scanner — tap a link</div>
+
+      {/* message bubble */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#f0b232', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#111' }}>J</div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0b232', marginBottom: 2 }}>Jake</div>
+          <span style={{ fontSize: 13, color: '#5865f2', background: 'rgba(88,101,242,0.08)', padding: '2px 5px', borderRadius: 3, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{s.text}</span>
         </div>
-      ))}
+      </div>
+
+      {/* link picker chips */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {samples.map((x, i) => (
+          <button key={x.label} onClick={() => pick(i)}
+            style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
+              border: `1px solid ${sel === i ? '#5865f2' : '#2e2e36'}`,
+              background: sel === i ? 'rgba(88,101,242,0.15)' : 'transparent',
+              color: sel === i ? '#7289da' : '#949ba4' }}>
+            {x.label}
+          </button>
+        ))}
+      </div>
+
+      {/* verdict */}
+      <motion.div key={`${sel}-${scanning}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+        style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #2e2e36' }}>
+        {scanning ? (
+          <div style={{ padding: '10px 12px', background: '#1e1f22', fontSize: 12, color: '#6d6f78' }}>🔎 LinkProtect is scanning…</div>
+        ) : s.bad ? (
+          <div style={{ padding: '10px 12px', background: '#1e1f22', borderLeft: '3px solid #f23f43' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f23f43', marginBottom: 2 }}>🚫 {s.verdict}</div>
+            <div style={{ fontSize: 12, color: '#949ba4' }}>Message deleted · Jake — Warning 1/5</div>
+          </div>
+        ) : (
+          <div style={{ padding: '10px 12px', background: '#1e1f22', borderLeft: '3px solid #23a55a' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#23a55a', marginBottom: 2 }}>✓ {s.verdict}</div>
+            <div style={{ fontSize: 12, color: '#949ba4' }}>No action taken.</div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ── Interactive: warning escalation simulator ───────────────── */
+function WarnSimulator() {
+  const [w, setW] = useState(1);
+  const action =
+    w >= 10 ? { label: 'Permanent ban', color: '#f23f43', icon: '🔨' } :
+    w >= 5  ? { label: 'Auto-kick',     color: '#f23f43', icon: '👢' } :
+    w >= 3  ? { label: 'Timeout',       color: '#f0b232', icon: '⏳' } :
+              { label: 'Warning only',  color: '#f0b232', icon: '⚠️' };
+  const nextAt = w >= 10 ? null : w >= 5 ? 10 : w >= 3 ? 5 : 3;
+  const pct = nextAt ? Math.min(100, (w / nextAt) * 100) : 100;
+
+  return (
+    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Warning simulator</div>
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 44, fontWeight: 900, color: '#f2f3f5', lineHeight: 1, letterSpacing: '-0.04em' }}>{w}</div>
+          <div style={{ fontSize: 12, color: '#52535a', marginTop: 4 }}>warning{w === 1 ? '' : 's'}</div>
+        </div>
+        <motion.div key={action.label} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.2 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: action.color, background: `${action.color}1a`, border: `1px solid ${action.color}40`, padding: '6px 12px', borderRadius: 99 }}>
+          <span>{action.icon}</span>{action.label}
+        </motion.div>
+      </div>
+
+      <div>
+        <div style={{ height: 6, background: '#2e2e36', borderRadius: 99, overflow: 'hidden' }}>
+          <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.3 }} style={{ height: '100%', background: action.color, borderRadius: 99 }} />
+        </div>
+        <div style={{ fontSize: 11, color: '#52535a', marginTop: 6 }}>
+          {nextAt ? `${nextAt - w} more → ${w >= 5 ? 'ban' : w >= 3 ? 'kick' : 'timeout'}` : 'Maximum penalty reached'}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => setW((v) => Math.min(12, v + 1))}
+          style={{ flex: 1, padding: '9px 14px', fontSize: 13, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+          + Add warning
+        </button>
+        <button onClick={() => setW(1)}
+          style={{ padding: '9px 14px', fontSize: 13, fontWeight: 600, background: 'transparent', color: '#949ba4', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer' }}>
+          Reset
+        </button>
+      </div>
+
+      <div style={{ fontSize: 11, color: '#3e3e4a' }}>Thresholds (your rules): timeout at 3 · kick at 5 · ban at 10</div>
     </div>
   );
 }
@@ -347,14 +433,7 @@ export default function LandingClient() {
               'Custom domain blacklist per server',
               'Zero false positives on normal messages',
             ]}
-            visual={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4, overflow: 'hidden' }}>
-                  <Image src="/ss-embeds.png" alt="Bot moderation embeds in action" width={560} height={320} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
-                </div>
-                <p style={{ fontSize: 12, color: '#52535a', textAlign: 'center' }}>Real bot output — NSFW removal + automatic timeout</p>
-              </div>
-            }
+            visual={<LinkScannerVisual />}
           />
 
           <Feature
@@ -367,19 +446,7 @@ export default function LandingClient() {
               'Per-user warning history with reasons logged',
               'One-click warning reset for individual users',
             ]}
-            visual={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="feature-images-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4 }}>
-                    <Image src="/ss-nsfw.png" alt="NSFW warning embed" width={280} height={120} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
-                  </div>
-                  <div style={{ background: '#111113', border: '1px solid #2e2e36', borderRadius: 10, padding: 4 }}>
-                    <Image src="/ss-timeout.png" alt="Timeout embed" width={280} height={120} style={{ width: '100%', height: 'auto', borderRadius: 7, display: 'block' }} />
-                  </div>
-                </div>
-                <WarnFlow />
-              </div>
-            }
+            visual={<WarnSimulator />}
             flip
           />
 
