@@ -5,7 +5,25 @@ import { motion, useInView } from 'framer-motion';
 import { Shield, ArrowRight, Check, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
+import { BOT_INVITE, SUPPORT_SERVER, APP_STORE_URL } from '@/lib/discord';
+
+/* ── "Download on the App Store" badge ───────────────────────── */
+function AppStoreBadge() {
+  return (
+    <a href={APP_STORE_URL} target="_blank" rel="noreferrer"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '10px 18px', background: '#000', border: '1px solid #2e2e36', borderRadius: 12, textDecoration: 'none', transition: 'border-color 0.15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52535a')}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}>
+      <svg width="22" height="22" viewBox="0 0 384 512" fill="#fff" aria-hidden="true">
+        <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+      </svg>
+      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+        <span style={{ fontSize: 10, color: '#b5bac1', fontWeight: 500 }}>Download on the</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>App Store</span>
+      </span>
+    </a>
+  );
+}
 
 /* ── Discord window mockup ───────────────────────────────────── */
 function DiscordMockup() {
@@ -391,6 +409,7 @@ export default function LandingClient() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>
                 Add to Discord — Free <ArrowRight size={15} />
               </a>
+              <AppStoreBadge />
               <Link href="/dashboard"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 600, color: '#949ba4', borderRadius: 10, textDecoration: 'none', border: '1px solid #2e2e36', transition: 'border-color 0.15s, color 0.15s' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#52535a'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
@@ -504,6 +523,7 @@ export default function LandingClient() {
               onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>
               Add to Discord — It&apos;s free <ArrowRight size={15} />
             </a>
+            <AppStoreBadge />
             <a href={SUPPORT_SERVER} target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 26px', fontSize: 15, fontWeight: 600, color: '#949ba4', borderRadius: 10, textDecoration: 'none', border: '1px solid #2e2e36', transition: 'border-color 0.15s, color 0.15s' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#52535a'; e.currentTarget.style.color = '#f2f3f5'; }}
@@ -523,8 +543,15 @@ export default function LandingClient() {
             </div>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#52535a' }}>LinkProtect</span>
           </div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            {[{ label: 'Support', href: SUPPORT_SERVER }, { label: 'Invite', href: BOT_INVITE }, { label: 'Dashboard', href: '/dashboard' }].map(({ label, href }) => (
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Privacy', href: '/privacy' },
+              { label: 'Terms', href: '/terms' },
+              { label: 'iOS App', href: APP_STORE_URL },
+              { label: 'Support', href: SUPPORT_SERVER },
+              { label: 'Invite', href: BOT_INVITE },
+              { label: 'Dashboard', href: '/dashboard' },
+            ].map(({ label, href }) => (
               <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}
                 style={{ fontSize: 13, color: '#52535a', textDecoration: 'none', transition: 'color 0.15s' }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = '#949ba4')}
@@ -533,7 +560,7 @@ export default function LandingClient() {
               </a>
             ))}
           </div>
-          <span style={{ fontSize: 12, color: '#2e2e36' }}>© 2026 LinkProtect · v2.1.0</span>
+          <span style={{ fontSize: 12, color: '#2e2e36' }}>© 2026 Link Protect</span>
         </div>
       </footer>
     </div>
