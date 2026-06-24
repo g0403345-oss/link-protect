@@ -68,9 +68,12 @@ export interface ServerData {
 }
 
 export interface GlobalStats {
-  servers: number;
-  warnings: number;
-  warnedUsers: number;
+  servers: number;       // live bot guild count
+  watchedUsers: number;  // total members across all bot guilds
+  warned: number;        // lifetime warnings issued
+  kicked: number;        // lifetime kicks
+  banned: number;        // lifetime bans
+  timeouts: number;      // lifetime timeouts
 }
 
 export interface GuildStats {

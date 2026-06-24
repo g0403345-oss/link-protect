@@ -8,25 +8,6 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
 
-/* ── count-up hook ──────────────────────────────────────────── */
-function useCountUp(target: number, active: boolean) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let start: number | null = null;
-    const duration = 1400;
-    const step = (ts: number) => {
-      if (!start) start = ts;
-      const p = Math.min((ts - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(ease * target));
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [active, target]);
-  return val;
-}
-
 /* ── Discord window mockup ───────────────────────────────────── */
 function DiscordMockup() {
   const [phase, setPhase] = useState<'idle' | 'typing' | 'blocked'>('idle');
@@ -122,13 +103,66 @@ function DiscordMockup() {
   );
 }
 
-/* ── Stat number ─────────────────────────────────────────────── */
-function Stat({ value, suffix, label, active }: { value: number; suffix: string; label: string; active: boolean }) {
-  const count = useCountUp(value, active);
+/* ── Live stats (polls /api/stats) ───────────────────────────── */
+interface LiveStatsData {
+  servers: number; watchedUsers: number; warned: number; kicked: number; banned: number; timeouts: number;
+}
+
+function fmtStat(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + 'M';
+  return n.toLocaleString('en-US');
+}
+
+function LiveNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0);
+  const prev = useRef(0);
+  useEffect(() => {
+    const from = prev.current, to = value, dur = 900;
+    let start: number | null = null;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(from + (to - from) * ease));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    prev.current = value;
+  }, [value]);
+  return <>{fmtStat(display)}</>;
+}
+
+function LiveStats() {
+  const [s, setS] = useState<LiveStatsData | null>(null);
+  useEffect(() => {
+    let on = true;
+    const load = () =>
+      fetch('/api/stats').then((r) => r.json()).then((d) => { if (on && !d.error) setS(d); }).catch(() => {});
+    load();
+    const id = setInterval(load, 10000); // live: refresh every 10s
+    return () => { on = false; clearInterval(id); };
+  }, []);
+
+  const items = [
+    { key: 'servers', value: s?.servers ?? 0, label: 'Active servers', color: '#5865f2', suffix: '+', live: true },
+    { key: 'watched', value: s?.watchedUsers ?? 0, label: 'Users protected', color: '#23a55a', suffix: '' },
+    { key: 'warned', value: s?.warned ?? 0, label: 'Warnings issued', color: '#f0b232', suffix: '' },
+  ];
+
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 52, fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.04em', lineHeight: 1 }}>{count.toLocaleString()}{suffix}</div>
-      <div style={{ fontSize: 13, color: '#52535a', marginTop: 6, fontWeight: 500 }}>{label}</div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '36px 56px', maxWidth: 960, margin: '0 auto' }}>
+      <style>{`@keyframes lpPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+      {items.map((it) => (
+        <div key={it.key} style={{ textAlign: 'center', minWidth: 110 }}>
+          <div style={{ fontSize: 48, fontWeight: 900, color: it.color, letterSpacing: '-0.04em', lineHeight: 1 }}>
+            <LiveNumber value={it.value} />{it.suffix}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
+            {it.live && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', animation: 'lpPulse 1.6s ease-in-out infinite' }} />}
+            <span style={{ fontSize: 13, color: '#52535a', fontWeight: 500 }}>{it.label}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -237,7 +271,6 @@ const BLOCKERS = [
 /* ── Main ─────────────────────────────────────────────────────── */
 export default function LandingClient() {
   const statsRef = useRef(null);
-  const statsInView = useInView(statsRef, { once: true, margin: '-60px' });
 
   return (
     <div style={{ background: '#0e0e10', minHeight: '100vh', color: '#f2f3f5' }}>
@@ -296,13 +329,9 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* STATS */}
+      {/* STATS (live) */}
       <section ref={statsRef} style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px' }}>
-        <div className="stats-3col" style={{ maxWidth: 700, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, alignItems: 'center' }}>
-          <Stat value={6495} suffix="+" label="Active servers" active={statsInView} />
-          <div className="stats-divider" style={{ width: 1, height: 56, background: '#2e2e36', margin: '0 auto' }} />
-          <Stat value={14} suffix="" label="Protection shields" active={statsInView} />
-        </div>
+        <LiveStats />
       </section>
 
       {/* FEATURES */}

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const stats = getStats();
+    const stats = await getStats();
     return NextResponse.json(stats, {
       headers: {
         'Cache-Control': 'no-store',
