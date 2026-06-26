@@ -72,10 +72,37 @@ export default function AdminPanel() {
   const [userDetail, setUserDetail] = useState<UserDetail | null>(null);
   const [userLoading, setUserLoading] = useState(false);
 
+  // Global config — redirect settings commands to web/app
+  const [lockCommands, setLockCommands] = useState(false);
+  const [lockSaving, setLockSaving] = useState(false);
+
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
     if (status === 'authenticated' && session.user?.id !== ADMIN_USER_ID) router.push('/dashboard');
   }, [status, session, router]);
+
+  useEffect(() => {
+    if (status === 'authenticated' && session.user?.id === ADMIN_USER_ID) {
+      fetch('/api/admin/config').then(r => r.json())
+        .then(d => setLockCommands(!!d.lockCommands)).catch(() => {});
+    }
+  }, [status, session]);
+
+  const toggleLockCommands = useCallback(async (next: boolean) => {
+    setLockSaving(true);
+    setLockCommands(next); // optimistic
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lockCommands: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setLockCommands(!next); // revert
+    } finally {
+      setLockSaving(false);
+    }
+  }, []);
 
   const fetchGuilds = useCallback(() => {
     setLoading(true); setApiError(false); setDisplayCount(PAGE_SIZE);
@@ -316,6 +343,25 @@ export default function AdminPanel() {
                 <RefreshCw size={14} color="#6d6f78" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
               </button>
             </div>
+          </div>
+
+          {/* Global config: redirect settings commands to web/app */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', marginBottom: 20, borderRadius: 10, background: lockCommands ? 'rgba(88,101,242,0.08)' : '#111113', border: `1px solid ${lockCommands ? 'rgba(88,101,242,0.35)' : '#1e1e22'}` }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: lockCommands ? 'rgba(88,101,242,0.15)' : 'rgba(148,155,164,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Settings size={16} color={lockCommands ? '#5865f2' : '#6d6f78'} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f2f3f5' }}>Redirect settings commands</div>
+              <div style={{ fontSize: 12, color: '#6d6f78', marginTop: 2 }}>
+                When on, Discord settings commands (enable/disable, warn-kick, channel rules…) stop working and reply with a link to the dashboard &amp; app. Moderation commands keep working.
+              </div>
+            </div>
+            <button
+              role="switch" aria-checked={lockCommands} disabled={lockSaving}
+              onClick={() => toggleLockCommands(!lockCommands)}
+              style={{ position: 'relative', width: 46, height: 26, borderRadius: 99, flexShrink: 0, border: 'none', cursor: lockSaving ? 'wait' : 'pointer', background: lockCommands ? '#5865f2' : '#3a3a42', transition: 'background 0.2s', opacity: lockSaving ? 0.6 : 1 }}>
+              <span style={{ position: 'absolute', top: 3, left: lockCommands ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </button>
           </div>
 
           {/* Search */}
