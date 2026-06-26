@@ -14,7 +14,7 @@ export function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar />
 
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '120px 24px 96px' }}>

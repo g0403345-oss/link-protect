@@ -433,7 +433,7 @@ export default function LandingClient() {
   const statsRef = useRef(null);
 
   return (
-    <div style={{ background: '#0e0e10', minHeight: '100vh', color: '#f2f3f5' }}>
+    <div style={{ background: 'transparent', minHeight: '100vh', color: '#f2f3f5' }}>
       <Navbar />
 
       {/* HERO */}
@@ -585,7 +585,7 @@ export default function LandingClient() {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ borderTop: '1px solid #18181b', padding: '28px 24px', background: '#0e0e10' }}>
+      <footer style={{ borderTop: '1px solid #18181b', padding: '28px 24px', background: 'transparent' }}>
         <div className="footer-row" style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 22, height: 22, borderRadius: 6, background: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

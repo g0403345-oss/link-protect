@@ -193,7 +193,7 @@ export default function GuildDashboard() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 36, height: 36, border: '2px solid #5865f2', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -202,7 +202,7 @@ export default function GuildDashboard() {
 
   if (!data) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <p style={{ color: '#f23f43', marginBottom: 12, fontSize: 14 }}>Could not load server settings</p>
           <Link href="/dashboard" style={{ color: '#5865f2', fontSize: 13 }}>← Back to dashboard</Link>
@@ -230,7 +230,7 @@ export default function GuildDashboard() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
       <Navbar />
 
       {/* Breadcrumb bar */}

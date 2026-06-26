@@ -24,7 +24,15 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--bg);
+  /* Link Protect branded background — matches the iOS app's "Link Protect"
+     style: near-black base with a blurple glow top-left and a purple glow
+     bottom-right. Fixed so it stays put while content scrolls. */
+  background-color: #0a0a0c;
+  background-image:
+    radial-gradient(60% 50% at 6% 0%, rgba(91, 108, 255, 0.16), transparent 60%),
+    radial-gradient(55% 50% at 100% 100%, rgba(139, 127, 240, 0.13), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;

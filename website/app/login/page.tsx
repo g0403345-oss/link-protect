@@ -30,7 +30,7 @@ function LoginContent() {
   }, [status, router]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} className="dot-grid">
+    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} className="dot-grid">
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 60% at 50% 50%, rgba(88,101,242,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} style={{ width: '100%', maxWidth: 360, position: 'relative' }}>
@@ -84,7 +84,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0e0e10' }} />}>
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: 'transparent' }} />}>
       <LoginContent />
     </Suspense>
   );

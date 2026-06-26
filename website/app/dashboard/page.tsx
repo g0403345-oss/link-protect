@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
   if (status === 'unauthenticated') {
     return (
-      <div style={{ minHeight: '100vh', background: '#0e0e10' }} className="dot-grid">
+      <div style={{ minHeight: '100vh', background: 'transparent' }} className="dot-grid">
         <Navbar />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
           <div style={{ textAlign: 'center', maxWidth: 360 }}>
@@ -53,7 +53,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar />
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '88px 24px 60px' }}>

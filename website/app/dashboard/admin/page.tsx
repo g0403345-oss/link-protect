@@ -163,7 +163,7 @@ export default function AdminPanel() {
   }, [hasMore, visible.length]);
 
   if (status === 'loading' || (status === 'authenticated' && session.user?.id !== ADMIN_USER_ID)) {
-    return <div style={{ minHeight: '100vh', background: '#0e0e10' }} />;
+    return <div style={{ minHeight: '100vh', background: 'transparent' }} />;
   }
 
   // ── User detail panel content ────────────────────────────────────────────────
@@ -308,7 +308,7 @@ export default function AdminPanel() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0e0e10' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar />
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '88px 24px 60px' }}>
