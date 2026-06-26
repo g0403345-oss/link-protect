@@ -14,6 +14,7 @@ import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import PickerList from '@/components/PickerList';
 import ChannelRules from '@/components/ChannelRules';
+import TrendsChart from '@/components/TrendsChart';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
@@ -565,6 +566,7 @@ export default function GuildDashboard() {
                         <StatCard label="Kick threshold" value={stats.kickThreshold} icon={TrendingUp} color="#f0b232" />
                         <StatCard label="Ban threshold" value={stats.banThreshold} icon={Ban} color="#f23f43" />
                       </div>
+                      <TrendsChart guildId={guildId} />
                       <Card title="Top Warned Users">
                         {stats.topWarned.length === 0 ? (
                           <div style={{ textAlign: 'center', padding: '20px 0' }}>
