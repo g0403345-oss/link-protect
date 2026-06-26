@@ -65,6 +65,14 @@ export interface ServerData {
     [userId: string]: unknown;
   };
   safe: Record<string, unknown>;
+  decay?: { enabled: boolean; days: number };
+  overrides?: Record<string, ChannelOverride>;
+}
+
+export interface ChannelOverride {
+  mode: 'default' | 'off' | 'custom';
+  protect?: Partial<ServerData['protect']>;
+  silent?: boolean;
 }
 
 export interface GlobalStats {
@@ -136,4 +144,19 @@ export async function getGuildStats(guildId: string): Promise<GuildStats> {
 
 export async function resetUserWarns(guildId: string, userId: string): Promise<void> {
   await apiFetch(`/api/guild/${guildId}/warns/${userId}`, { method: "DELETE" });
+}
+
+export async function setChannelOverride(
+  guildId: string,
+  channelId: string,
+  body: ChannelOverride
+): Promise<void> {
+  await apiFetch(`/api/guild/${guildId}/override/${channelId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function removeChannelOverride(guildId: string, channelId: string): Promise<void> {
+  await apiFetch(`/api/guild/${guildId}/override/${channelId}`, { method: "DELETE" });
 }

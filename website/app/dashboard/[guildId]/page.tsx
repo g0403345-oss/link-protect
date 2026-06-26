@@ -8,14 +8,16 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
+  Hourglass, Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import PickerList from '@/components/PickerList';
+import ChannelRules from '@/components/ChannelRules';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'warnings' | 'access' | 'blacklist' | 'stats' | 'log';
+type Section = 'overview' | 'blockers' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log';
 
 interface GuildAction {
   user_id: string; username: string; channel_id: string;
@@ -213,15 +215,18 @@ export default function GuildDashboard() {
   const warn = data.warn ?? {};
   const channel = data.channel ?? { channel: [], category: [], member: [], role: [] };
   const links = data.link?.links ?? [];
+  const decay = data.decay ?? { enabled: false, days: 30 };
+  const overrides = data.overrides ?? {};
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
-    { id: 'overview',  label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
-    { id: 'blockers',  label: 'Link Blockers',  icon: AlertTriangle, desc: 'What gets blocked' },
-    { id: 'warnings',  label: 'Warnings',       icon: Ban,           desc: 'Kick & ban thresholds' },
-    { id: 'access',    label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
-    { id: 'blacklist', label: 'Blacklist',       icon: List,          desc: 'Custom blocked domains' },
-    { id: 'stats',     label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
-    { id: 'log',       label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
+    { id: 'overview',     label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
+    { id: 'blockers',     label: 'Link Blockers',  icon: AlertTriangle, desc: 'What gets blocked' },
+    { id: 'warnings',     label: 'Warnings',       icon: Ban,           desc: 'Kick, ban & decay' },
+    { id: 'channelrules', label: 'Channel Rules',  icon: Target,        desc: 'Per-channel behaviour' },
+    { id: 'access',       label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
+    { id: 'blacklist',    label: 'Blacklist',       icon: List,          desc: 'Custom blocked domains' },
+    { id: 'stats',        label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
+    { id: 'log',          label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
   ];
 
   return (
@@ -395,6 +400,36 @@ export default function GuildDashboard() {
                       <NumberInput label="Duration (minutes)" description="How long the timeout lasts when triggered" value={warn.timeout?.time ?? 0} icon={<Clock size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('warn.timeout.time', v, 'Timeout duration')} saving={saving === 'warn.timeout.time'} />
                     </div>
                   </Card>
+                  <Card title="Warning Decay">
+                    <ToggleSwitch
+                      checked={!!decay.enabled}
+                      onChange={(v) => patch('decay.enabled', v, 'Warning decay')}
+                      label="Auto-expire old warnings"
+                      description="Warnings are forgiven after a while, so a single old mistake doesn't count forever"
+                      disabled={saving === 'decay.enabled'}
+                    />
+                    {decay.enabled && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', maxWidth: 220 }}>
+                        <NumberInput
+                          label="Expire after (days)"
+                          description="A warning is removed once it's older than this many days"
+                          value={decay.days ?? 30}
+                          icon={<Hourglass size={14} color="#23a55a" />}
+                          color="#23a55a"
+                          onSave={(v) => patch('decay.days', Math.max(1, v), 'Decay window')}
+                          saving={saving === 'decay.days'}
+                        />
+                      </div>
+                    )}
+                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: 'rgba(35,165,90,0.06)', border: '1px solid rgba(35,165,90,0.15)', borderRadius: 8 }}>
+                      <Info size={13} color="#23a55a" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: '#6d6f78' }}>
+                        {decay.enabled
+                          ? `Each warning is timestamped. Once it's older than ${decay.days ?? 30} day(s) it's automatically removed and stops counting toward kick/ban. Expired warnings are cleaned up hourly.`
+                          : 'When off, warnings are kept until you reset them manually. Turn this on so well-behaved members are gradually forgiven.'}
+                      </p>
+                    </div>
+                  </Card>
                   {(() => {
                     const entries = Object.entries(warn).filter(([k]) => !['kick', 'ban', 'timeout'].includes(k));
                     if (entries.length === 0) return (
@@ -433,6 +468,19 @@ export default function GuildDashboard() {
                       </Card>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* CHANNEL RULES */}
+              {section === 'channelrules' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SectionHeader title="Channel Rules" description="Make individual channels behave differently from the rest of the server" icon={Target} />
+                  <ChannelRules
+                    guildId={guildId}
+                    overrides={overrides}
+                    onSaved={fetchData}
+                    addToast={addToast}
+                  />
                 </div>
               )}
 
