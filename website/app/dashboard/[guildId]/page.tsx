@@ -15,6 +15,7 @@ import ToggleSwitch from '@/components/ToggleSwitch';
 import PickerList from '@/components/PickerList';
 import ChannelRules from '@/components/ChannelRules';
 import TrendsChart from '@/components/TrendsChart';
+import TeamAccess from '@/components/TeamAccess';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
@@ -488,7 +489,8 @@ export default function GuildDashboard() {
               {/* ACCESS */}
               {section === 'access' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <SectionHeader title="Access Control" description="Whitelist channels, members, or roles from link restrictions" icon={Lock} />
+                  <SectionHeader title="Access Control" description="Whitelist channels, members, or roles — and grant dashboard access" icon={Lock} />
+                  <TeamAccess guildId={guildId} addToast={addToast} />
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
                     <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
                     <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted items bypass all link restrictions. Add Discord IDs (18-digit numbers).</p>

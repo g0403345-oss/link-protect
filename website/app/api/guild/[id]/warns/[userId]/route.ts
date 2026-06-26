@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { getUserGuilds, hasManageGuild } from '@/lib/discord';
-import { isAdmin } from '@/lib/admin';
+import { canAccessGuild } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,21 +10,10 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const { id, userId } = await params;
-
-  if (!isAdmin(session.user?.id)) {
-    try {
-      const guilds = await getUserGuilds(session.accessToken);
-      const guild = guilds.find(g => g.id === id);
-      if (!guild || (!guild.owner && !hasManageGuild(guild.permissions))) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    } catch {
-      return NextResponse.json({ error: 'Failed to verify access' }, { status: 502 });
-    }
+  const access = await canAccessGuild(id);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.status === 401 ? 'Unauthorized' : 'Forbidden' }, { status: access.status });
   }
 
   const controller = new AbortController();

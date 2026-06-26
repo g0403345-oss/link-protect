@@ -11,8 +11,20 @@ async function verifyAccess(guildId: string, accessToken: string): Promise<boole
   try {
     const guilds = await getUserGuilds(accessToken);
     const guild = guilds.find((g) => g.id === guildId);
-    if (!guild) return false;
-    return guild.owner || hasManageGuild(guild.permissions);
+    if (guild && (guild.owner || hasManageGuild(guild.permissions))) return true;
+    // Delegated dashboard editor: resolve this user's id, check the guild's team list.
+    const meRes = await fetch('https://discord.com/api/v10/users/@me', {
+      headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store',
+    });
+    if (!meRes.ok) return false;
+    const userId = (await meRes.json()).id as string;
+    const res = await fetch(
+      `${process.env.BOT_API_URL ?? 'http://localhost:3001'}/api/guild/${guildId}/editors`,
+      { headers: { Authorization: `Bearer ${process.env.BOT_API_SECRET ?? 'change-me-in-production'}` }, cache: 'no-store' },
+    );
+    if (!res.ok) return false;
+    const d = await res.json();
+    return (d.editors ?? []).some((e: { id: string }) => e.id === userId);
   } catch {
     return false;
   }
