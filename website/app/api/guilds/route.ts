@@ -6,6 +6,9 @@ import { getAllGuildIds } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+const BOT_API_URL = process.env.BOT_API_URL ?? 'http://localhost:3001';
+const BOT_API_SECRET = process.env.BOT_API_SECRET ?? 'change-me-in-production';
+
 export interface EnrichedGuild {
   id: string;
   name: string;
@@ -56,6 +59,33 @@ export async function GET() {
       botPresent: botGuildIds.has(guild.id),
       approximate_member_count: guild.approximate_member_count,
     }));
+
+    // Add servers the user was granted delegated access to (editor) but doesn't
+    // manage on Discord — otherwise they'd never see them in their server list.
+    try {
+      const userId = session.user?.id;
+      if (userId) {
+        const res = await fetch(`${BOT_API_URL}/api/user/${userId}/editor-guilds`, {
+          headers: { Authorization: `Bearer ${BOT_API_SECRET}` }, cache: 'no-store',
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const have = new Set(enriched.map((g) => g.id));
+          for (const g of (d.guilds ?? []) as { id: string; name: string | null; icon: string | null }[]) {
+            if (have.has(g.id)) continue;
+            enriched.push({
+              id: g.id,
+              name: g.name ?? g.id,
+              icon: g.icon,
+              iconUrl: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.webp?size=128` : '',
+              owner: false,
+              permissions: '0',
+              botPresent: true,
+            });
+          }
+        }
+      }
+    } catch { /* editor guilds are best-effort */ }
 
     // Sort: bot present first, then by name
     enriched.sort((a, b) => {
