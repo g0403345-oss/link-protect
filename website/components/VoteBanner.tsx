@@ -46,13 +46,11 @@ export default function VoteBanner() {
     return () => clearInterval(t);
   }, []);
 
-  // Only trust a precise cooldown when we know the real vote time (webhook).
-  // A `synced` vote came from top.gg's /check (no timestamp), so we don't block
-  // voting on it or show a countdown — top.gg enforces the real 12h window.
+  // Show the remaining cooldown whenever the user is inside their 12h window.
+  // Times are accurate: the top.gg webhook records the exact vote time, and the
+  // /check fallback detects a vote within ~60s, so canVoteAt is reliable.
   const inCooldown = !!v && now < v.canVoteAt;
-  const showCountdown = inCooldown && !v!.synced;
-  const votedRecently = inCooldown && !!v!.synced;
-  const canVote = !showCountdown;
+  const canVote = !inCooldown;
   const meta = rankMeta(v?.rank);
   const accent = meta?.color ?? '#5865f2';
 
@@ -89,11 +87,9 @@ export default function VoteBanner() {
             {v?.supporter && <SupporterBadge />}
           </div>
           <p style={{ fontSize: 12.5, color: '#c4c6cc', marginTop: 2 }}>
-            {showCountdown
+            {inCooldown
               ? `Thanks for voting! 🎉 You can vote again in ${fmt(v!.canVoteAt - now)}.`
-              : votedRecently
-                ? 'Thanks for voting! 🎉 top.gg will let you vote again once your 12h cooldown is up.'
-                : 'Your vote keeps Link Protect free — and earns a ♥ Supporter badge + a spot on the home leaderboard.'}
+              : 'Your vote keeps Link Protect free — and earns a ♥ Supporter badge + a spot on the home leaderboard.'}
           </p>
         </div>
 
@@ -106,7 +102,7 @@ export default function VoteBanner() {
             boxShadow: canVote ? '0 6px 18px rgba(88,101,242,0.4)' : undefined,
           }}
         >
-          {showCountdown ? `Vote in ${fmt(v!.canVoteAt - now)}` : <>Vote now <ArrowRight size={14} /></>}
+          {inCooldown ? `Vote in ${fmt(v!.canVoteAt - now)}` : <>Vote now <ArrowRight size={14} /></>}
         </a>
       </div>
     </div>
