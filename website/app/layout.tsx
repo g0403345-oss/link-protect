@@ -4,6 +4,7 @@ import { Providers } from './providers';
 import Footer from '@/components/Footer';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://link-protect.com'),
@@ -47,6 +48,11 @@ export default function RootLayout({
         <Footer />
         <Analytics />
         <SpeedInsights />
+        <Script
+          src="https://support-chatbot-nine.vercel.app/widget.js"
+          data-site="linkprotect"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
