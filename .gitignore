@@ -21,6 +21,7 @@ bot.sqlite3-wal
 
 # Raw screenshot files (already copied to website/public/)
 *.webp
+!website/public/*.webp
 Bildschirmfoto*
 firebase_key.json
 .vercel
