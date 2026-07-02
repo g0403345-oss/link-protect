@@ -948,7 +948,10 @@ TOPGG_TOKEN = os.environ.get(
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijg4ODM5MDg4OTg5Mjg5MjY4NCIsImJvdCI6dHJ1ZSwiaWF0IjoxNjM2NjU1NTM2fQ.txNDT50-BQ1z7Uuwjqhen6vbCXX9IQ2gLWtbUHOVgmM",
 )
 _topgg_poll: dict[str, float] = {}
-_TOPGG_POLL_COOLDOWN = 600.0  # don't re-poll a given user more than every 10 min
+# Re-poll a user at most once a minute. Short enough that when someone votes and
+# returns to the site their vote is picked up quickly (the webhook is the fast
+# path; this is the fallback when it isn't delivering).
+_TOPGG_POLL_COOLDOWN = 60.0
 
 
 async def _maybe_sync_topgg_vote(user_id: str) -> None:
