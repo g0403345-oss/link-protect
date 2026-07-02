@@ -1,0 +1,3 @@
+/* English base. Keys equal their values, so the source literals render as-is.
+   This file registers English as a supported localization. */
+"Link Protect" = "Link Protect";

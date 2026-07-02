@@ -23,3 +23,4 @@ bot.sqlite3-wal
 *.webp
 Bildschirmfoto*
 firebase_key.json
+.vercel

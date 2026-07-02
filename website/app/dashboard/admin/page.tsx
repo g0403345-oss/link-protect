@@ -4,9 +4,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Settings, RefreshCw, Search, Activity, X, ChevronLeft, AlertTriangle, Ban, Clock, Hash } from 'lucide-react';
+import { Shield, Settings, RefreshCw, Search, Activity, X, ChevronLeft, AlertTriangle, Ban, Clock, Hash, ShieldAlert, List, Flag } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import AdminThreatData from '@/components/AdminThreatData';
+import AdminReports from '@/components/AdminReports';
 import { ADMIN_USER_ID } from '@/lib/admin';
 
 interface GuildInfo { name: string; icon: string | null; }
@@ -75,6 +77,9 @@ export default function AdminPanel() {
   // Global config — redirect settings commands to web/app
   const [lockCommands, setLockCommands] = useState(false);
   const [lockSaving, setLockSaving] = useState(false);
+
+  // Active admin tab
+  const [view, setView] = useState<'servers' | 'threats' | 'reports'>('servers');
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
@@ -345,6 +350,29 @@ export default function AdminPanel() {
             </div>
           </div>
 
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1e22' }}>
+            {([
+              { id: 'servers', label: 'Servers', icon: List },
+              { id: 'threats', label: 'Threat Data', icon: ShieldAlert },
+              { id: 'reports', label: 'Reports', icon: Flag },
+            ] as const).map(t => {
+              const active = view === t.id;
+              return (
+                <button key={t.id} onClick={() => setView(t.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 14px', background: 'none', border: 'none', borderBottom: `2px solid ${active ? '#5865f2' : 'transparent'}`, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: active ? '#f2f3f5' : '#6d6f78', marginBottom: -1 }}>
+                  <t.icon size={14} color={active ? '#5865f2' : '#52535a'} /> {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {view === 'threats' && <AdminThreatData />}
+
+          {view === 'reports' && <AdminReports />}
+
+          {view === 'servers' && (
+          <>
           {/* Global config: redirect settings commands to web/app */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', marginBottom: 20, borderRadius: 10, background: lockCommands ? 'rgba(88,101,242,0.08)' : '#111113', border: `1px solid ${lockCommands ? 'rgba(88,101,242,0.35)' : '#1e1e22'}` }}>
             <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: lockCommands ? 'rgba(88,101,242,0.15)' : 'rgba(148,155,164,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -436,6 +464,8 @@ export default function AdminPanel() {
                 <p style={{ textAlign: 'center', fontSize: 12, color: '#2e2e36', marginTop: 24 }}>All {filtered.length} servers loaded</p>
               )}
             </>
+          )}
+          </>
           )}
         </motion.div>
       </main>

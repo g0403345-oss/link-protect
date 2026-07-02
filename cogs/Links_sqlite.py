@@ -1,7 +1,8 @@
 import asyncio
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, db
+from .shared import (get_settings, apply_warn, is_whitelisted, db, resolve_channel,
+                     link_allowlisted, extract_urls)
 
 
 class BlacklistLinkProtection(commands.Cog):
@@ -15,6 +16,7 @@ class BlacklistLinkProtection(commands.Cog):
 
         guild_id = str(message.guild.id)
         settings = await get_settings(guild_id)
+        settings = resolve_channel(settings, message.channel)
 
         log_s = settings.get("log", {})
         if log_s.get("onlylink") and str(message.channel.id) == str(log_s.get("link", 0)):
@@ -28,6 +30,12 @@ class BlacklistLinkProtection(commands.Cog):
             return
 
         if is_whitelisted(message, settings):
+            return
+
+        # A trusted (allowlisted) domain overrides the custom blacklist: if every
+        # URL in the message is on the server's allowlist, let it through.
+        urls = [u for u, _ in extract_urls(message.content)]
+        if urls and all(link_allowlisted(u, settings) for u in urls):
             return
 
         try:

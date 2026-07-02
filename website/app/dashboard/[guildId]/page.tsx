@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target,
+  Hourglass, Target, History, HelpCircle, UserX,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -16,15 +16,24 @@ import PickerList from '@/components/PickerList';
 import ChannelRules from '@/components/ChannelRules';
 import TrendsChart from '@/components/TrendsChart';
 import TeamAccess from '@/components/TeamAccess';
+import WarnLogConfig from '@/components/WarnLogConfig';
+import MemberModeration from '@/components/MemberModeration';
+import DashboardTour from '@/components/DashboardTour';
+import ReportForm from '@/components/ReportForm';
+import VoteBanner from '@/components/VoteBanner';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log';
+type Section = 'overview' | 'blockers' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit';
 
 interface GuildAction {
   user_id: string; username: string; channel_id: string;
   action: 'warned' | 'kicked' | 'banned' | 'timeout';
   reason: string; warn_count: number; timestamp: number;
+}
+
+interface AuditEntry {
+  userId: string; username: string | null; path: string; description: string; timestamp: number;
 }
 
 interface Toast { id: number; type: 'success' | 'error'; message: string; }
@@ -42,9 +51,9 @@ function useToast() {
 
 /* ── sub-components ────────────────────────────────────────── */
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, tourId }: { title: string; children: React.ReactNode; tourId?: string }) {
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
+    <div data-tour={tourId} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
       </div>
@@ -123,14 +132,55 @@ export default function GuildDashboard() {
 
   const [section, setSection] = useState<Section>('overview');
   const [selectedUser, setSelectedUser] = useState<{ id: string; warns: number; reasons: string[] } | null>(null);
+  const [modalBusy, setModalBusy] = useState<string | null>(null);
+  const [modalConfirm, setModalConfirm] = useState<string | null>(null);
   const [data, setData] = useState<ServerData | null>(null);
   const [stats, setStats] = useState<GuildStats | null>(null);
   const [guildInfo, setGuildInfo] = useState<{ name: string; icon: string | null } | null>(null);
   const [actions, setActions] = useState<GuildAction[]>([]);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [newLink, setNewLink] = useState('');
+  const [newAllow, setNewAllow] = useState('');
   const { toasts, addToast } = useToast();
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [tourRun, setTourRun] = useState(false);
+  const tourChecked = useRef(false);
+  // Tour completion is stored per Discord account (server-side) so it follows
+  // the user across devices and re-logins, not just this browser's localStorage.
+  const [flagsReady, setFlagsReady] = useState(false);
+  const tourSeenRemote = useRef(false);
+
+  const closeTour = useCallback(() => {
+    setTourRun(false);
+    tourSeenRemote.current = true;
+    try { localStorage.setItem('lp_tour_v1', '1'); } catch { /* ignore */ }
+    fetch('/api/me/flags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tourSeen: true }),
+    }).catch(() => { /* best-effort — localStorage still covers this browser */ });
+  }, []);
+
+  // Resolve warned-user IDs → Discord names so lists/modals never show raw IDs.
+  const resolveUsers = useCallback(async (ids: string[]) => {
+    const missing = Array.from(new Set(ids)).filter((id) => id && !(id in userNames));
+    if (missing.length === 0) return;
+    const map: Record<string, string> = {};
+    for (let i = 0; i < missing.length; i += 50) {
+      const chunk = missing.slice(i, i + 50);
+      try {
+        const res = await fetch(`/api/guild/${guildId}/discord-members/resolve?ids=${chunk.join(',')}`);
+        if (!res.ok) continue;
+        const d = await res.json();
+        for (const m of (d.members ?? []) as { id: string; username: string; nick?: string }[]) {
+          map[m.id] = m.nick ?? m.username;
+        }
+      } catch { /* ignore */ }
+    }
+    if (Object.keys(map).length) setUserNames((prev) => ({ ...prev, ...map }));
+  }, [guildId, userNames]);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/dashboard');
@@ -160,6 +210,13 @@ export default function GuildDashboard() {
     } catch { /* silent */ }
   }, [guildId]);
 
+  const fetchAudit = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/guild/${guildId}/audit`);
+      if (res.ok) { const d = await res.json(); setAudit(d.entries ?? []); }
+    } catch { /* silent */ }
+  }, [guildId]);
+
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-info`)
       .then(r => r.json()).then(d => setGuildInfo(d)).catch(() => {});
@@ -167,12 +224,46 @@ export default function GuildDashboard() {
 
   useEffect(() => { if (status === 'authenticated') { fetchData(); fetchStats(); fetchActions(); } }, [status, fetchData, fetchStats, fetchActions]);
 
+  // Load the per-account "tour seen" flag before deciding whether to auto-launch.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetch('/api/me/flags')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.tourSeen) tourSeenRemote.current = true; })
+      .catch(() => { /* fall back to localStorage */ })
+      .finally(() => setFlagsReady(true));
+  }, [status]);
+
+  // Auto-launch the guided tour the first time a user opens any server dashboard.
+  // Only after both the settings and the account flag have loaded, so a user who
+  // finished the tour on another device / browser never sees it again.
+  useEffect(() => {
+    if (!data || !flagsReady || tourChecked.current) return;
+    tourChecked.current = true;
+    let seen = tourSeenRemote.current;
+    try { if (localStorage.getItem('lp_tour_v1')) seen = true; } catch { /* ignore */ }
+    if (!seen) setTourRun(true);
+  }, [data, flagsReady]);
+
+  // Resolve names for warned users (settings data) and top-warned (stats).
+  useEffect(() => {
+    if (!data?.warn) return;
+    const ids = Object.keys(data.warn).filter((k) => !['kick', 'ban', 'timeout'].includes(k));
+    if (ids.length) resolveUsers(ids);
+  }, [data, resolveUsers]);
+  useEffect(() => {
+    if (stats?.topWarned?.length) resolveUsers(stats.topWarned.map((u) => u.userId));
+  }, [stats, resolveUsers]);
+
   // Auto-refresh actions every 5 s when the log tab is active
   useEffect(() => {
     if (section !== 'log') return;
     const id = setInterval(fetchActions, 5000);
     return () => clearInterval(id);
   }, [section, fetchActions]);
+
+  // Load the audit log when its tab opens
+  useEffect(() => { if (section === 'audit') fetchAudit(); }, [section, fetchAudit]);
 
   const patch = useCallback(async (path: string, value: unknown, label?: string) => {
     setSaving(path);
@@ -192,6 +283,29 @@ export default function GuildDashboard() {
     } catch { addToast('error', 'Failed to save'); }
     finally { setSaving(null); }
   }, [guildId, addToast]);
+
+  // Remote moderation: warn / timeout / kick / ban a member straight from the
+  // dashboard. Warn escalates per the configured thresholds (server-side).
+  const moderate = useCallback(async (
+    action: 'warn' | 'timeout' | 'kick' | 'ban',
+    userId: string, username?: string, opts?: { reason?: string; minutes?: number },
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/guild/${guildId}/moderate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, username, action, reason: opts?.reason, minutes: opts?.minutes }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { addToast('error', d?.error ?? 'Action failed'); return false; }
+      const past = { warn: 'warned', timeout: 'timed out', kick: 'kicked', ban: 'banned' }[action];
+      let msg = `${username ?? 'Member'} ${past}`;
+      if (d.escalated) msg += ` → ${d.escalated === 'ban' ? 'banned' : d.escalated === 'kick' ? 'kicked' : 'timed out'}`;
+      addToast('success', msg);
+      if (d.escalationError) addToast('error', `Couldn't escalate: ${d.escalationError}`);
+      fetchData(); fetchStats();
+      return true;
+    } catch { addToast('error', 'Could not reach the server'); return false; }
+  }, [guildId, addToast, fetchData, fetchStats]);
 
   if (loading) {
     return (
@@ -217,7 +331,9 @@ export default function GuildDashboard() {
   const warn = data.warn ?? {};
   const channel = data.channel ?? { channel: [], category: [], member: [], role: [] };
   const links = data.link?.links ?? [];
+  const allow = data.link?.allow ?? [];
   const decay = data.decay ?? { enabled: false, days: 30 };
+  const raid = data.raid ?? { enabled: false, threshold: 5, window: 10, timeout_minutes: 60 };
   const overrides = data.overrides ?? {};
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
@@ -229,6 +345,7 @@ export default function GuildDashboard() {
     { id: 'blacklist',    label: 'Blacklist',       icon: List,          desc: 'Custom blocked domains' },
     { id: 'stats',        label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
     { id: 'log',          label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
+    { id: 'audit',        label: 'Audit Log',      icon: History,       desc: 'Who changed what' },
   ];
 
   return (
@@ -255,7 +372,16 @@ export default function GuildDashboard() {
             {guildInfo?.name ?? 'Server Settings'}
           </span>
         </div>
-        <span style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace', marginLeft: 'auto' }}>{guildId}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ReportForm guildId={guildId} />
+          <button onClick={() => setTourRun(true)} title="Take the dashboard tour"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; (e.currentTarget as HTMLElement).style.borderColor = '#5865f2'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#949ba4'; (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; }}>
+            <HelpCircle size={13} /> <span className="crumb-btn-label">Tour</span>
+          </button>
+          <span className="crumb-id" style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace' }}>{guildId}</span>
+        </div>
       </div>
 
       {/* Mobile section tab strip — hidden on desktop, sticky below breadcrumb */}
@@ -273,7 +399,7 @@ export default function GuildDashboard() {
 
       <div style={{ display: 'flex', flex: 1 }}>
         {/* Sidebar */}
-        <aside className="guild-sidebar" style={{ width: 220, background: '#111113', borderRight: '1px solid #1e1e22', flexShrink: 0, position: 'sticky', top: 104, height: 'calc(100vh - 104px)', overflowY: 'auto', padding: '12px 8px' }}>
+        <aside data-tour="nav" className="guild-sidebar" style={{ width: 220, background: '#111113', borderRight: '1px solid #1e1e22', flexShrink: 0, position: 'sticky', top: 104, height: 'calc(100vh - 104px)', overflowY: 'auto', padding: '12px 8px' }}>
           {NAV.map(({ id, label, icon: Icon, desc }) => {
             const active = section === id;
             return (
@@ -291,6 +417,7 @@ export default function GuildDashboard() {
 
         {/* Content */}
         <main className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+          <div style={{ marginBottom: 20 }}><VoteBanner /></div>
           <AnimatePresence mode="wait">
             <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
 
@@ -298,7 +425,7 @@ export default function GuildDashboard() {
               {section === 'overview' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Overview" description="Quick summary of your server's protection status" icon={Shield} />
-                  <div className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <div data-tour="overview-stats" className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
@@ -341,7 +468,7 @@ export default function GuildDashboard() {
               {section === 'blockers' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Link Blockers" description="Toggle which types of links are blocked in your server" icon={AlertTriangle} />
-                  <Card title="Platform Blockers">
+                  <Card title="Platform Blockers" tourId="blockers">
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {[
                         { key: 'all',     label: 'Block All Links',      description: 'Block every external link (overrides all others)' },
@@ -368,7 +495,7 @@ export default function GuildDashboard() {
                       ))}
                     </div>
                   </Card>
-                  <Card title="Silent Mode">
+                  <Card title="Silent Mode" tourId="silent">
                     <ToggleSwitch
                       checked={!!data.silent}
                       onChange={(v) => patch('silent', v, 'Silent mode')}
@@ -383,6 +510,26 @@ export default function GuildDashboard() {
                       </div>
                     )}
                   </Card>
+                  <Card title="Raid Protection" tourId="raid">
+                    <ToggleSwitch
+                      checked={!!raid.enabled}
+                      onChange={(v) => patch('raid.enabled', v, 'Raid protection')}
+                      label="Auto-defend against raids"
+                      description="When many members post the same link within seconds (hijacked accounts / raids), delete them and time out the accounts automatically — one alarm instead of dozens of warnings."
+                      disabled={saving === 'raid.enabled'}
+                    />
+                    {raid.enabled && (
+                      <div className="thresholds-3col" style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                        <NumberInput label="Trigger at" description="Distinct members posting the same link" value={raid.threshold ?? 5} icon={<Users size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('raid.threshold', Math.max(2, v), 'Raid threshold')} saving={saving === 'raid.threshold'} />
+                        <NumberInput label="Within (seconds)" description="Time window for the burst" value={raid.window ?? 10} icon={<Clock size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('raid.window', Math.max(2, v), 'Raid window')} saving={saving === 'raid.window'} />
+                        <NumberInput label="Timeout (minutes)" description="How long offenders are muted" value={raid.timeout_minutes ?? 60} icon={<Hourglass size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('raid.timeout_minutes', Math.max(1, v), 'Raid timeout')} saving={saving === 'raid.timeout_minutes'} />
+                      </div>
+                    )}
+                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: 'rgba(242,63,67,0.06)', border: '1px solid rgba(242,63,67,0.15)', borderRadius: 8 }}>
+                      <Info size={13} color="#f23f43" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: '#6d6f78' }}>Trusted (allowlisted) domains and whitelisted members never trigger this. Make sure Link Protect has <b>Moderate Members</b> so timeouts work.</p>
+                    </div>
+                  </Card>
                 </div>
               )}
 
@@ -390,7 +537,7 @@ export default function GuildDashboard() {
               {section === 'warnings' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Warning System" description="Configure automatic actions when users accumulate warnings" icon={Ban} />
-                  <Card title="Action Thresholds">
+                  <Card title="Action Thresholds" tourId="thresholds">
                     <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
                       <NumberInput label="Kick threshold" description="User is kicked at this many warnings (0 = disabled)" value={warn.kick ?? 0} icon={<TrendingUp size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('warn.kick', v, 'Kick threshold')} saving={saving === 'warn.kick'} />
                       <NumberInput label="Ban threshold" description="User is banned at this many warnings (0 = disabled)" value={warn.ban ?? 0} icon={<Ban size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('warn.ban', v, 'Ban threshold')} saving={saving === 'warn.ban'} />
@@ -402,7 +549,7 @@ export default function GuildDashboard() {
                       <NumberInput label="Duration (minutes)" description="How long the timeout lasts when triggered" value={warn.timeout?.time ?? 0} icon={<Clock size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('warn.timeout.time', v, 'Timeout duration')} saving={saving === 'warn.timeout.time'} />
                     </div>
                   </Card>
-                  <Card title="Warning Decay">
+                  <Card title="Warning Decay" tourId="decay">
                     <ToggleSwitch
                       checked={!!decay.enabled}
                       onChange={(v) => patch('decay.enabled', v, 'Warning decay')}
@@ -455,12 +602,12 @@ export default function GuildDashboard() {
                                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
                                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#52535a'; (e.currentTarget as HTMLElement).style.background = '#232329'; }}
                                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; (e.currentTarget as HTMLElement).style.background = '#18181b'; }}>
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78', flexShrink: 0 }}>{userId.slice(-2)}</div>
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78', flexShrink: 0 }}>{(userNames[userId] ?? userId).slice(0, 2).toUpperCase()}</div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={{ fontSize: 12, color: '#949ba4', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userId}</p>
-                                  {reasons.length > 0 && (
-                                    <p style={{ fontSize: 11, color: '#52535a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reasons[reasons.length - 1]}</p>
-                                  )}
+                                  <p style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userNames[userId] ?? userId}</p>
+                                  <p style={{ fontSize: 11, color: '#52535a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {reasons.length > 0 ? reasons[reasons.length - 1] : userId}
+                                  </p>
                                 </div>
                                 <span style={{ fontSize: 12, fontWeight: 700, color, background: `${color}18`, padding: '3px 8px', borderRadius: 99, flexShrink: 0 }}>{w} warns</span>
                               </div>
@@ -470,6 +617,12 @@ export default function GuildDashboard() {
                       </Card>
                     );
                   })()}
+                  <Card title="Moderate a Member">
+                    <p style={{ fontSize: 12, color: '#6d6f78', marginBottom: 14 }}>
+                      Search any member and warn, time out, kick or ban them — without opening Discord.
+                    </p>
+                    <MemberModeration guildId={guildId} onToast={addToast} onChanged={() => { fetchData(); fetchStats(); }} />
+                  </Card>
                 </div>
               )}
 
@@ -477,12 +630,14 @@ export default function GuildDashboard() {
               {section === 'channelrules' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Channel Rules" description="Make individual channels behave differently from the rest of the server" icon={Target} />
-                  <ChannelRules
-                    guildId={guildId}
-                    overrides={overrides}
-                    onSaved={fetchData}
-                    addToast={addToast}
-                  />
+                  <div data-tour="channelrules">
+                    <ChannelRules
+                      guildId={guildId}
+                      overrides={overrides}
+                      onSaved={fetchData}
+                      addToast={addToast}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -490,7 +645,9 @@ export default function GuildDashboard() {
               {section === 'access' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Access Control" description="Whitelist channels, members, or roles — and grant dashboard access" icon={Lock} />
-                  <TeamAccess guildId={guildId} addToast={addToast} />
+                  <div data-tour="access">
+                    <TeamAccess guildId={guildId} addToast={addToast} />
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
                     <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
                     <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted items bypass all link restrictions. Add Discord IDs (18-digit numbers).</p>
@@ -499,6 +656,47 @@ export default function GuildDashboard() {
                   <PickerList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#9b59b6" />} pickerType="category" guildId={guildId} value={channel.category ?? []} onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
                   <PickerList title="Whitelisted Members" description="These users can post any links" icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId} value={channel.member} onSave={(v) => patch('channel.member', v, 'Whitelisted members')} saving={saving === 'channel.member'} />
                   <PickerList title="Whitelisted Roles" description="Members with these roles can post any links" icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId} value={channel.role} onSave={(v) => patch('channel.role', v, 'Whitelisted roles')} saving={saving === 'channel.role'} />
+
+                  <Card title={`Allowlisted Domains (${allow.length})`} tourId="allowlist">
+                    <p style={{ fontSize: 12, color: '#52535a', marginBottom: 14 }}>
+                      Trusted domains that bypass blocking — including malware/phishing detection. Add a
+                      domain (e.g. <span style={{ fontFamily: 'monospace', color: '#949ba4' }}>example.com</span>); its subdomains are covered too.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                      <input type="text" value={newAllow} onChange={(e) => setNewAllow(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && newAllow.trim()) { patch('link.allow', [...allow, newAllow.trim().toLowerCase()], 'Allowlist'); setNewAllow(''); } }}
+                        placeholder="Enter trusted domain (e.g. youtube.com)"
+                        style={{ flex: 1, padding: '9px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = '#23a55a')}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}
+                      />
+                      <button onClick={() => { if (newAllow.trim()) { patch('link.allow', [...allow, newAllow.trim().toLowerCase()], 'Allowlist'); setNewAllow(''); } }}
+                        disabled={!newAllow.trim() || saving === 'link.allow'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: '#23a55a', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: (!newAllow.trim() || saving === 'link.allow') ? 0.4 : 1 }}>
+                        <Plus size={14} /> Add
+                      </button>
+                    </div>
+                    {allow.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <CheckCircle2 size={22} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
+                        <p style={{ fontSize: 13, color: '#52535a' }}>No trusted domains yet</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {allow.map((dom, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7 }}>
+                            <span style={{ fontSize: 13, color: '#23a55a', fontFamily: 'monospace' }}>{dom}</span>
+                            <button onClick={() => patch('link.allow', allow.filter((_, j) => j !== i), 'Allowlist')}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52535a', padding: 4, transition: 'color 0.15s' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#f23f43')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#52535a')}>
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
                 </div>
               )}
 
@@ -506,7 +704,7 @@ export default function GuildDashboard() {
               {section === 'blacklist' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Custom Blacklist" description="Add specific domains or URLs to always block" icon={List} />
-                  <Card title={`Blacklisted Links (${links.length})`}>
+                  <Card title={`Blacklisted Links (${links.length})`} tourId="blacklist">
                     <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                       <input type="text" value={newLink} onChange={(e) => setNewLink(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && newLink.trim()) { patch('link.links', [...links, newLink.trim()], 'Blacklist'); setNewLink(''); } }}
@@ -562,7 +760,7 @@ export default function GuildDashboard() {
                     </div>
                   ) : (
                     <>
-                      <div className="stats-4col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div data-tour="stats" className="stats-4col" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         <StatCard label="Total warnings" value={stats.totalWarnings} icon={AlertTriangle} color="#f0b232" />
                         <StatCard label="Users warned" value={stats.warnedUsers} icon={Users} color="#5865f2" />
                         <StatCard label="Kick threshold" value={stats.kickThreshold} icon={TrendingUp} color="#f0b232" />
@@ -583,7 +781,7 @@ export default function GuildDashboard() {
                                   {i + 1}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={{ fontSize: 12, color: '#949ba4', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.userId}</p>
+                                  <p style={{ fontSize: 12, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userNames[user.userId] ?? user.userId}</p>
                                   {user.reasons.length > 0 && <p style={{ fontSize: 11, color: '#52535a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.reasons[user.reasons.length - 1]}</p>}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -627,7 +825,14 @@ export default function GuildDashboard() {
                         <RefreshCw size={13} color="#6d6f78" />
                       </button>
                     </div>
-                    <Card title={`Recent Actions (${actions.length})`}>
+                    <WarnLogConfig
+                      guildId={guildId}
+                      channelId={data.log?.['log-channel'] ?? 0}
+                      activated={!!data.log?.Activated}
+                      onPatch={patch}
+                      saving={saving}
+                    />
+                    <Card title={`Recent Actions (${actions.length})`} tourId="log">
                       {actions.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '32px 0' }}>
                           <Activity size={28} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
@@ -662,6 +867,43 @@ export default function GuildDashboard() {
                 );
               })()}
 
+              {/* AUDIT LOG */}
+              {section === 'audit' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <SectionHeader title="Audit Log" description="Who changed which setting, and when — via dashboard, app or commands" icon={History} />
+                    <button onClick={fetchAudit} style={{ padding: '7px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer' }}>
+                      <RefreshCw size={13} color="#6d6f78" />
+                    </button>
+                  </div>
+                  <Card title={`Recent Changes (${audit.length})`} tourId="audit">
+                    {audit.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                        <History size={28} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
+                        <p style={{ fontSize: 13, color: '#52535a' }}>No setting changes recorded yet</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {audit.map((e, i) => {
+                          const who = e.username ?? `User …${e.userId.slice(-4)}`;
+                          const s = Math.floor(Date.now() / 1000 - e.timestamp);
+                          const rel = s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago`;
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
+                              <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#6d6f78', flexShrink: 0, marginTop: 1 }}>{who.slice(0, 2).toUpperCase()}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: 13, color: '#f2f3f5', fontWeight: 500 }}>{e.description}</p>
+                                <p style={{ fontSize: 11, color: '#52535a', marginTop: 2 }}>{who} · {rel}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              )}
+
             </motion.div>
           </AnimatePresence>
         </main>
@@ -680,8 +922,8 @@ export default function GuildDashboard() {
               <div style={{ padding: '16px 20px', borderBottom: '1px solid #1e1e22', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78' }}>{selectedUser.id.slice(-2)}</div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', fontFamily: 'monospace' }}>{selectedUser.id}</span>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78' }}>{(userNames[selectedUser.id] ?? selectedUser.id).slice(0, 2).toUpperCase()}</div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', fontFamily: userNames[selectedUser.id] ? 'inherit' : 'monospace' }}>{userNames[selectedUser.id] ?? selectedUser.id}</span>
                   </div>
                   <span style={{ fontSize: 12, color: '#52535a', marginLeft: 36 }}>{selectedUser.warns} warning{selectedUser.warns !== 1 ? 's' : ''} total</span>
                 </div>
@@ -707,6 +949,38 @@ export default function GuildDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Quick moderation actions */}
+              <div style={{ padding: '4px 20px 0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {([
+                  { kind: 'warn', label: 'Warn', color: '#5865f2', Icon: AlertTriangle, destructive: false },
+                  { kind: 'timeout', label: 'Timeout', color: '#5865f2', Icon: Clock, destructive: false },
+                  { kind: 'kick', label: 'Kick', color: '#f0b232', Icon: UserX, destructive: true },
+                  { kind: 'ban', label: 'Ban', color: '#f23f43', Icon: Ban, destructive: true },
+                ] as const).map(({ kind, label, color, Icon, destructive }) => {
+                  const confirming = modalConfirm === kind;
+                  const busy = modalBusy === kind;
+                  return (
+                    <button key={kind} disabled={modalBusy !== null}
+                      onClick={async () => {
+                        if (destructive && !confirming) {
+                          setModalConfirm(kind);
+                          setTimeout(() => setModalConfirm((c) => (c === kind ? null : c)), 3500);
+                          return;
+                        }
+                        setModalConfirm(null); setModalBusy(kind);
+                        const uname = userNames[selectedUser.id] ?? selectedUser.id;
+                        const ok = await moderate(kind, selectedUser.id, uname);
+                        setModalBusy(null);
+                        if (ok && (kind === 'kick' || kind === 'ban')) setSelectedUser(null);
+                      }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '9px 4px', fontSize: 11, fontWeight: 600, borderRadius: 8, cursor: modalBusy ? 'default' : 'pointer', color: confirming ? '#fff' : color, background: confirming ? color : `${color}14`, border: `1px solid ${confirming ? color : `${color}40`}`, opacity: modalBusy && !busy ? 0.4 : 1 }}>
+                      <Icon size={14} />
+                      {busy ? '…' : confirming ? 'Confirm?' : label}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Modal footer */}
@@ -745,6 +1019,8 @@ export default function GuildDashboard() {
           ))}
         </AnimatePresence>
       </div>
+
+      <DashboardTour run={tourRun} onClose={closeTour} onSectionChange={(s) => setSection(s as Section)} />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

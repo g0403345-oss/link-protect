@@ -103,6 +103,24 @@ def _save_server(guild_id:int, data:dict):
             (guild_id, json.dumps(data))
         )
 
+def _queue_push_event(guild_id):
+    """Record a config-change event so the API server can push a 'settings
+    changed' alert to the owner's phone. Fire-and-forget: never let a failure
+    here break the actual settings write."""
+    try:
+        with _get_conn() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS push_events ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, "
+                "kind TEXT NOT NULL DEFAULT 'settings_changed', ts INTEGER NOT NULL)"
+            )
+            conn.execute(
+                "INSERT INTO push_events(guild_id, kind, ts) VALUES(?, 'settings_changed', ?)",
+                (str(guild_id), int(time.time()))
+            )
+    except Exception:
+        pass
+
 class DBRef:
     def __init__(self, path:str):
         # normalize
@@ -158,6 +176,8 @@ class DBRef:
                 keys = parts[3:]
                 data = _deep_set(data, keys, value)
                 _save_server(gid, data)
+                if keys and keys[0] != "warn":
+                    _queue_push_event(gid)
                 return
             else:
                 raise ValueError("Invalid servers path")
@@ -182,6 +202,8 @@ class DBRef:
                 keys = parts[3:]
                 data = _deep_delete(data, keys)
                 _save_server(gid, data)
+                if keys and keys[0] != "warn":
+                    _queue_push_event(gid)
                 return
         # other -> kv
         with _get_conn() as conn:
@@ -220,6 +242,8 @@ class DBRef:
                         parent = parent[k]
                     parent[keys[-1]] = values
                 _save_server(gid, data)
+                if keys and keys[0] != "warn":
+                    _queue_push_event(gid)
                 return
             else:
                 raise ValueError("Invalid servers path")
@@ -297,6 +321,88 @@ async def _boot_sync_once():
 bot.loop.create_task(_boot_sync_once())
 API_KEY = '6d4d6172480f35c0246c23707521c5d37b91317741e6f262a1052ee770d18dcf'
 
+# ── Command redirect mode ─────────────────────────────────────────────────────
+# When the super-admin turns this on (admin panel on web/app → kv config:lock_commands),
+# every settings command stops applying and instead points users to the dashboard/app.
+# Moderation and info commands keep working.
+SETTINGS_COMMANDS = {
+    # blockers
+    "enable-google", "disable-google", "enable-youtube", "disable-youtube",
+    "enable-nsfw", "disable-nsfw", "enable-gif", "disable-gif",
+    "enable-invite", "disable-invite", "enable-bitly", "disable-bitly",
+    "enable-nitro", "disable-nitro", "enable-twitch", "disable-twitch",
+    "enable-steam", "disable-steam", "enable-all", "disable-all",
+    "enable-malware-secure", "disable-malware-secure",
+    "enable-silent-mode", "disable-silent-mode",
+    # access control
+    "enable-channel", "disable-channel", "enable-member", "disable-member",
+    "enable-role", "disable-role", "enable-only-link", "disable-only-link",
+    # warning configuration
+    "warn-kick", "warn-ban", "warn-timeout", "warn-decay",
+    # per-channel rules (channel-rules stays — it's read-only)
+    "channel-mode", "channel-block", "channel-reset",
+    # logging + blacklist
+    "enable-warn-log", "disable-warn-log", "link-enable", "link-disable",
+}
+
+_redirect_cache = {"value": False, "ts": 0.0}
+
+def _redirect_enabled() -> bool:
+    """Read the kv flag config:lock_commands (cached 5 s)."""
+    now = time.monotonic()
+    if now - _redirect_cache["ts"] < 5.0:
+        return _redirect_cache["value"]
+    val = False
+    try:
+        with _get_conn() as conn:
+            row = conn.execute("SELECT value FROM kv WHERE path=?", ("config:lock_commands",)).fetchone()
+        if row:
+            val = json.loads(row[0]) in (True, 1, "1", "true")
+    except Exception:
+        val = False
+    _redirect_cache.update(value=val, ts=now)
+    return val
+
+
+def _redirect_embed(ctx) -> discord.Embed:
+    gid = ctx.guild.id if ctx.guild else ""
+    e = discord.Embed(
+        title="⚙️ Settings have moved",
+        description=(
+            "Configuration commands are disabled. Manage **Link Protect** from the "
+            "web dashboard or the iOS app — it's faster, clearer, and shows exactly "
+            "what each setting does."),
+        color=0x5B6CFF,
+    )
+    e.add_field(name="🌐 Web Dashboard",
+                value=f"**[link-protect.com/dashboard/{gid}](https://link-protect.com/dashboard/{gid})**",
+                inline=False)
+    e.add_field(name="📱 iOS App",
+                value="Download on the **[App Store](https://apps.apple.com/de/app/link-protect-server-guard/id6783911538)**", inline=False)
+    e.set_footer(text="Moderation commands (warn, kick, stats…) still work here.")
+    return e
+
+
+@bot.check
+async def _settings_redirect_check(ctx) -> bool:
+    """Global slash-command gate: blocks settings commands when redirect mode is on."""
+    name = getattr(getattr(ctx, "command", None), "name", "") or ""
+    if name in SETTINGS_COMMANDS and _redirect_enabled():
+        try:
+            await ctx.respond(embed=_redirect_embed(ctx), ephemeral=True)
+        except Exception:
+            pass
+        return False
+    return True
+
+
+@bot.event
+async def on_application_command_error(ctx, error):
+    # The redirect check raises CheckFailure after already responding — swallow it.
+    if isinstance(error, commands.CheckFailure):
+        return
+    raise error
+
 _SKIP_COGS = {'shared', 'logger'}
 for filename in os.listdir('./cogs'):
     if filename.endswith('.py') and filename[:-3] not in _SKIP_COGS:
@@ -328,6 +434,49 @@ def find_urls(message):
 async def update_topgg_stats():
     await post_stats()
 
+
+@tasks.loop(seconds=30)
+async def heartbeat():
+    """Write a liveness timestamp + the bot's real guild/member counts so the
+    API/website show accurate live numbers (and can fire a 'bot offline' push)."""
+    try:
+        guild_count = len(bot.guilds)
+        member_count = sum((g.member_count or 0) for g in bot.guilds)
+        with _get_conn() as conn:
+            for path, val in (
+                ("bot:heartbeat", int(time.time())),
+                ("bot:guild_count", guild_count),
+                ("bot:member_count", member_count),
+            ):
+                conn.execute(
+                    "INSERT INTO kv(path, value) VALUES(?, ?) "
+                    "ON CONFLICT(path) DO UPDATE SET value=excluded.value",
+                    (path, str(val)),
+                )
+    except Exception:
+        pass
+
+@tasks.loop(hours=1)
+async def decay_warns():
+    """Expire warnings older than each guild's configured decay window."""
+    try:
+        from cogs.shared import prune_decayed_warns
+        with _get_conn() as conn:
+            rows = conn.execute("SELECT guild_id, data FROM servers").fetchall()
+        for gid, raw in rows:
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+            decay = data.get("decay") or {}
+            if not decay.get("enabled"):
+                continue
+            if prune_decayed_warns(data, int(decay.get("days", 0) or 0)):
+                _save_server(int(gid), data)
+    except Exception as e:
+        print(f"[decay] {e}")
+
+
 @bot.event
 async def on_shard_ready(shard_id: int):
     print(f"✅ Shard {shard_id} ready")
@@ -339,6 +488,10 @@ async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,
             name="https://norecoil.de"))
     update_topgg_stats.start()
+    if not heartbeat.is_running():
+        heartbeat.start()
+    if not decay_warns.is_running():
+        decay_warns.start()
 
 
 
@@ -603,137 +756,147 @@ async def nootification_error(ctx, error):
 @bot.slash_command(name="help", description="Get all commands and information")
 async def _help(ctx):
     await ctx.defer()
-    embed = discord.Embed(title="📖 Link Protect — Commands", color=0x7a7aff)
+    embed = discord.Embed(
+        title="📖 Link Protect — All Commands",
+        description="Everything you can configure. Most settings are also available on the "
+                    "**[web dashboard](https://link-protect.com/dashboard)** and in the **iOS app**.",
+        color=0x7a7aff,
+    )
     embed.add_field(
-        name="🔒 Link Blocker",
+        name="🔒 Link Blockers",
         value="```"
-              "/enable-<type>     Enable a blocker (google, youtube, nsfw, gif,\n"
-              "                   invite, bitly, nitro, twitch, steam, all)\n"
-              "/disable-<type>    Disable a blocker\n"
-              "/enable-malware-secure   Scan links for malware\n"
-              "/disable-malware-secure  Disable malware scan\n"
-              "/dashboard         Show all current settings```",
+              "/enable-all  · /disable-all            Block every link\n"
+              "/enable-google · /disable-google\n"
+              "/enable-youtube · /disable-youtube\n"
+              "/enable-nsfw · /disable-nsfw\n"
+              "/enable-gif · /disable-gif\n"
+              "/enable-invite · /disable-invite       discord.gg invites\n"
+              "/enable-bitly · /disable-bitly         URL shorteners\n"
+              "/enable-nitro · /disable-nitro         Nitro scams\n"
+              "/enable-twitch · /disable-twitch\n"
+              "/enable-steam · /disable-steam\n"
+              "/enable-malware-secure · /disable-...  Malware/phishing scan\n"
+              "/enable-silent-mode · /disable-...     Warn via DM, not chat```",
         inline=False,
     )
     embed.add_field(
-        name="📋 Blacklist",
+        name="🎯 Per-Channel Rules",
         value="```"
-              "/link-disable <url>   Add a link to the blacklist\n"
-              "/link-enable  <url>   Remove a link from the blacklist\n"
-              "/list-blacklist       Show all blacklisted links```",
+              "/channel-mode  #ch <default|off|custom>  How a channel behaves\n"
+              "/channel-block #ch <type> <on|off>       One blocker per channel\n"
+              "/channel-rules #ch                       Show what's blocked & why\n"
+              "/channel-reset #ch                       Back to server settings```",
         inline=False,
     )
     embed.add_field(
-        name="🚪 Access Control",
+        name="🚪 Access Control (whitelist)",
         value="```"
-              "/enable-channel  #channel   Allow links in this channel\n"
-              "/disable-channel #channel   Remove channel exception\n"
-              "/enable-member   @user      Allow user to send links\n"
-              "/disable-member  @user      Remove user exception\n"
-              "/enable-role     @role      Allow role to send links\n"
-              "/disable-role    @role      Remove role exception\n"
-              "/enable-only-link  #channel Only allow links in channel\n"
-              "/disable-only-link          Disable only-link mode```",
+              "/enable-channel  · /disable-channel  #ch    Exempt a channel\n"
+              "/enable-member   · /disable-member   @user  Exempt a user\n"
+              "/enable-role     · /disable-role     @role  Exempt a role\n"
+              "/enable-only-link · /disable-only-link #ch  Only-links channel```",
         inline=False,
     )
     embed.add_field(
         name="⚠️ Warning System",
         value="```"
-              "/warn @user [reason]     Manually warn a user\n"
-              "/warnings @user          Show warnings for a user\n"
-              "/warn-delete @user <#>   Delete specific warning\n"
-              "/warn-reset @user        Reset ALL warnings for a user\n"
-              "/warn-delete-server      Delete all warnings on server\n"
-              "/warn-kick <number>      Kicks after X warnings (0 = off)\n"
-              "/warn-ban  <number>      Bans after X warnings (0 = off)\n"
-              "/warn-timeout <warns> <min>  Timeout after X warnings\n"
-              "/enable-warn-log  #ch    Log warns/kicks/bans to channel\n"
-              "/disable-warn-log        Stop logging```",
+              "/warn @user [reason]        Manually warn a user\n"
+              "/warnings @user             Show a user's warnings\n"
+              "/warn-delete @user <#>      Delete one warning\n"
+              "/warn-reset @user           Reset all of a user's warnings\n"
+              "/warn-delete-server         Reset every warning on the server\n"
+              "/warn-kick <number>         Kick after X warnings (0 = off)\n"
+              "/warn-ban  <number>         Ban after X warnings (0 = off)\n"
+              "/warn-timeout <warns> <min> Timeout after X warnings\n"
+              "/warn-decay <days>          Auto-expire old warnings (0 = off)```",
         inline=False,
     )
     embed.add_field(
-        name="🛠️ Utility",
+        name="📋 Blacklist & Logging",
         value="```"
-              "/ping        Show bot latency\n"
-              "/stats       Bot statistics\n"
-              "/check-link  Manually scan a link for malware\n"
-              "/dashboard   Full settings overview\n"
-              "/invite      Invite Link Protect\n"
-              "/support     Join the support server\n"
-              "/update      Latest bot updates```",
+              "/link-disable <url>     Block a specific link\n"
+              "/link-enable  <url>     Unblock it again\n"
+              "/list-blacklist         Show all blacklisted links\n"
+              "/enable-warn-log  #ch   Log warns/kicks/bans to a channel\n"
+              "/disable-warn-log       Stop logging```",
+        inline=False,
+    )
+    embed.add_field(
+        name="🛠️ Info & Utility",
+        value="```"
+              "/dashboard    Current settings + web/app links\n"
+              "/modstats     Moderation statistics for this server\n"
+              "/stats        Global bot statistics\n"
+              "/ping         Show bot latency\n"
+              "/check-link <url>   Manually scan a URL for malware\n"
+              "/invite       Invite Link Protect to a server\n"
+              "/support      Join the support server\n"
+              "/update       Latest updates\n"
+              "/help         This message```",
         inline=False,
     )
     embed.add_field(
         name="⚠️ IMPORTANT",
-        value="Make sure **Link Protect** has the **highest role** in your server so it can delete messages and kick/ban members.",
+        value="Give **Link Protect** the **highest role** so it can delete messages and kick/ban members.",
         inline=False,
     )
     embed.add_field(name="Support Server", value="[Click to join](https://discord.gg/BjDC9t329E)", inline=True)
-    embed.add_field(
-        name="Try VIP CASINO MASTER",
-        value="[Click to Invite](https://discord.com/oauth2/authorize?client_id=1370064293697163326&permissions=2147608640&integration_type=0&scope=bot)",
-        inline=True,
-    )
+    embed.add_field(name="Web Dashboard", value="[Open dashboard](https://link-protect.com/dashboard)", inline=True)
     await ctx.respond(embed=embed)
+
+
+# The two most recent changelog entries (newest first). Keep this list at
+# length 2 — /update intentionally only shows the latest two releases.
+_CHANGELOG = [
+    {
+        "version": "2.3.0",
+        "date": "26.06.2026",
+        "fields": [
+            ("✨ New Features",
+             " • Warning Decay — old warnings can now expire automatically\n"
+             "   after a set number of days (/warn-decay).\n"
+             " • Per-Channel Rules — give one channel its own rules: follow\n"
+             "   the server, turn protection off, or pick custom blockers\n"
+             "   (/channel-mode, /channel-block, /channel-rules).\n"
+             " • iOS app: pick your app background in Settings."),
+            ("🐞 Bug Fixes",
+             " • Fixed 'database is locked' errors under load.\n"
+             " • Kick/ban failures now explain why (owner / perms / role)\n"
+             "   and show the fix directly in the warning.\n"
+             " • Warnings now show how many remain until kick/ban."),
+        ],
+    },
+    {
+        "version": "2.2.0",
+        "date": "21.06.2026",
+        "fields": [
+            ("✨ New Features",
+             " • Category Whitelist — whitelist entire Discord categories\n"
+             "   so all channels inside are exempt from link restrictions.\n"
+             " • Malware scanner now respects the channel/category whitelist."),
+        ],
+    },
+]
 
 
 @bot.slash_command(name="update", description="Show latest updates from Link Protect Bot")
 async def _update(ctx):
     await ctx.defer()
+    latest = _CHANGELOG[0]
     embed = discord.Embed(
-        title="🔄 Update — Version 2.2.0",
-        description="21.06.2026",
+        title=f"🔄 Update — Version {latest['version']}",
+        description=f"The two most recent updates · latest {latest['date']}",
         color=discord.Color.dark_blue(),
     )
-    embed.add_field(
-        name="✨ New Features",
-        value="```"
-              " • Category Whitelist — whitelist entire Discord categories\n"
-              "   so all channels inside are exempt from link restrictions.\n"
-              "   Configure via /dashboard on the web or the website.\n"
-              " • Malware scanner now respects the channel/category whitelist```",
-        inline=False,
-    )
-    embed.add_field(
-        name="✨ New Commands (v2.1.0)",
-        value="```"
-              " • /ping          — Show bot latency (gateway + API)\n"
-              " • /stats         — Server count, user count, uptime\n"
-              " • /warn-reset    — Reset ALL warnings for a specific user\n"
-              " • /check-link    — Manually scan any URL for malware```",
-        inline=False,
-    )
-    embed.add_field(
-        name="⚡ Performance",
-        value="```"
-              " • 10× faster message processing\n"
-              "   All 14 detection modules now share a single cached\n"
-              "   database read instead of 28 separate queries per message.\n"
-              " • Removed unnecessary 16-shard overhead\n"
-              " • top.gg stat posting no longer blocks the event loop```",
-        inline=False,
-    )
-    embed.add_field(
-        name="🐞 Bug Fixes",
-        value="```"
-              " • All-link blocker no longer fires on normal text\n"
-              "   (was matching any word containing a dot, e.g. 'v2.0')\n"
-              " • NSFW filter now URL-only — no longer triggered by\n"
-              "   innocent words like 'lesbian' or 'anal' in conversation\n"
-              " • Nitro filter now requires an actual suspicious URL,\n"
-              "   not just the phrase 'free discord nitro' in chat\n"
-              " • Kick/ban error message now mentions role hierarchy fix\n"
-              " • Malware scanner no longer blocks the bot on slow APIs```",
-        inline=False,
-    )
-    embed.add_field(
-        name="⭐ Other",
-        value="```"
-              " • /help completely rewritten with all commands\n"
-              " • Warn embed now shows remaining warns until kick/ban\n"
-              " • Log embeds include channel mention and message content```",
-        inline=False,
-    )
+    for entry in _CHANGELOG[:2]:
+        embed.add_field(
+            name=f"━━━ Version {entry['version']} · {entry['date']} ━━━",
+            value="​",
+            inline=False,
+        )
+        for name, body in entry["fields"]:
+            embed.add_field(name=name, value="```" + body + "```", inline=False)
+    embed.set_footer(text="Older changes are no longer shown here.")
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="ping", description="Show bot latency")
@@ -984,11 +1147,20 @@ async def _dashboard(ctx):
         embed.set_footer(text="Need help? Join the support server /support")
     embed.set_image(
         url="https://cdn.discordapp.com/attachments/1377248736916279347/1447212422111821986/image.png?ex=6936cd19&is=69357b99&hm=0ac66dc59a09896070c4426e97554dbaecac289c79609ba0b14b2799fd60454f&")
+    embed.add_field(
+        name="``Web Dashboard``",
+        value=f"Manage all your settings on the website:\n🌐 **[link-protect.com](https://link-protect.com/dashboard/{guild_id})**",
+        inline=False)
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(
+        label="Open Web Dashboard",
+        url=f"https://link-protect.com/dashboard/{guild_id}",
+        emoji="🌐"))
     try:
         if deferred:
-            await ctx.followup.send(embed=embed)
+            await ctx.followup.send(embed=embed, view=view)
         else:
-            await ctx.respond(embed=embed)
+            await ctx.respond(embed=embed, view=view)
     except discord.NotFound:
         print("[dashboard] interaction expired")
     except Exception as e:
@@ -2179,6 +2351,189 @@ async def _warnban(ctx, number: discord.Option(int, "Number of warnings before b
     await ctx.followup.send(embed=embed)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  WARNING DECAY  +  PER-CHANNEL RULE OVERRIDES
+# ══════════════════════════════════════════════════════════════════════════════
+
+# User-friendly labels for every blocker type (keep in sync with cogs.shared.PROTECT_KEYS).
+_BLOCKER_LABELS = {
+    "all": "All links", "nsfw": "NSFW", "nitro": "Nitro scams",
+    "malware": "Malware / Phishing", "invite": "Discord invites",
+    "youtube": "YouTube", "google": "Google", "gif": "GIFs",
+    "twitch": "Twitch", "steam": "Steam", "bit": "Shorteners (bit.ly)",
+}
+
+
+def _is_mod(ctx) -> bool:
+    return bool(ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator)
+
+
+async def _deny(ctx):
+    await ctx.followup.send(embed=discord.Embed(
+        title="⛔ ERROR",
+        description="You need `Manage Messages` or `Administrator` permissions to run this command.",
+        color=discord.Color.red()))
+
+
+@bot.slash_command(name="warn-decay",
+                   description="Auto-expire old warnings after a number of days (0 = turn off)")
+async def _warndecay(ctx, days: discord.Option(int, "Warnings older than this many days are removed automatically. 0 disables it.")):
+    await ctx.defer()
+    if not _is_mod(ctx):
+        return await _deny(ctx)
+    guild_id = str(ctx.guild.id)
+    ref = db.reference(f"/servers/{guild_id}/decay")
+    days = int(days)
+    if days <= 0:
+        ref.set({"enabled": False, "days": 0})
+        embed = discord.Embed(
+            title="🕒 Warning Decay — Off",
+            description="Old warnings will **no longer expire**. Every warning a member has is kept until you reset it manually.",
+            color=discord.Color.green())
+        return await ctx.followup.send(embed=embed)
+    if days > 3650:
+        days = 3650
+    ref.set({"enabled": True, "days": days})
+    embed = discord.Embed(
+        title="🕒 Warning Decay — On",
+        description=(
+            f"Warnings now **expire after {days} day(s)**.\n\n"
+            "**What this does:** each warning a member receives is remembered with the day it happened. "
+            f"Once a warning is older than {days} day(s) it is automatically removed and stops counting "
+            "toward kick/ban thresholds — so members who behave are gradually forgiven.\n\n"
+            "**Why use it:** it stops people being punished forever for one old mistake, and keeps your "
+            "warning list clean. Run `/warn-decay 0` to turn it off again."),
+        color=discord.Color.blurple())
+    embed.set_footer(text="Expired warnings are cleaned up automatically once per hour.")
+    await ctx.followup.send(embed=embed)
+
+
+def _ov_ref(guild_id: str):
+    return db.reference(f"/servers/{guild_id}/overrides")
+
+
+@bot.slash_command(name="channel-mode",
+                   description="Set how Link Protect behaves in one channel (default / off / custom)")
+async def _channelmode(
+        ctx,
+        channel: discord.Option(discord.TextChannel, "The channel to configure"),
+        mode: discord.Option(str, "default = follow server settings · off = ignore channel · custom = its own rules",
+                             choices=["default", "off", "custom"])):
+    await ctx.defer()
+    if not _is_mod(ctx):
+        return await _deny(ctx)
+    guild_id = str(ctx.guild.id)
+    cref = _ov_ref(guild_id).child(str(channel.id))
+    if mode == "default":
+        cref.delete()
+        desc = (f"{channel.mention} now **follows the server-wide settings** again. "
+                "Any custom rules for this channel were removed.")
+        color = discord.Color.green()
+    elif mode == "off":
+        cref.set({"mode": "off"})
+        desc = (f"Link Protect will now **completely ignore {channel.mention}**. "
+                "No links are blocked and no warnings are given here, no matter the server settings.")
+        color = discord.Color.orange()
+    else:  # custom
+        existing = cref.get() or {}
+        existing["mode"] = "custom"
+        existing.setdefault("protect", {})
+        cref.set(existing)
+        desc = (f"{channel.mention} now uses its **own custom rules**, independent of the server. "
+                "By default nothing is blocked here yet — turn individual blockers on with "
+                "`/channel-block`. Example: `/channel-block #" + channel.name + " invite on`.")
+        color = discord.Color.blurple()
+    embed = discord.Embed(title="⚙️ Channel Rules", description=desc, color=color)
+    await ctx.followup.send(embed=embed)
+
+
+@bot.slash_command(name="channel-block",
+                   description="Turn one blocker on/off for a single channel (uses that channel's custom rules)")
+async def _channelblock(
+        ctx,
+        channel: discord.Option(discord.TextChannel, "The channel to configure"),
+        blocker: discord.Option(str, "Which blocker to change", choices=list(_BLOCKER_LABELS.keys())),
+        state: discord.Option(str, "Turn it on or off in this channel", choices=["on", "off"])):
+    await ctx.defer()
+    if not _is_mod(ctx):
+        return await _deny(ctx)
+    guild_id = str(ctx.guild.id)
+    cref = _ov_ref(guild_id).child(str(channel.id))
+    ov = cref.get() or {}
+    if ov.get("mode") != "custom":
+        # Switching a channel to custom starts from a clean slate so its rules
+        # are fully independent of the server defaults.
+        ov = {"mode": "custom", "protect": {}}
+    ov.setdefault("protect", {})[blocker] = (state == "on")
+    cref.set(ov)
+    label = _BLOCKER_LABELS.get(blocker, blocker)
+    on = state == "on"
+    embed = discord.Embed(
+        title="⚙️ Channel Rules",
+        description=(f"**{label}** is now **{'ON ✅' if on else 'OFF ❌'}** in {channel.mention}.\n\n"
+                     f"This channel uses its **own custom rules** — only the blockers you switch on here apply, "
+                     "regardless of the server-wide settings. Use `/channel-rules` to see the full list, or "
+                     f"`/channel-mode #{channel.name} default` to make it follow the server again."),
+        color=discord.Color.green() if on else discord.Color.greyple())
+    await ctx.followup.send(embed=embed)
+
+
+@bot.slash_command(name="channel-rules",
+                   description="Show which links are blocked in a channel and why")
+async def _channelrules(ctx, channel: discord.Option(discord.TextChannel, "Channel to inspect")):
+    await ctx.defer()
+    guild_id = str(ctx.guild.id)
+    server = db.reference(f"/servers/{guild_id}").get() or {}
+    overrides = server.get("overrides") or {}
+    ov = overrides.get(str(channel.id))
+    cat_id = getattr(channel, "category_id", None)
+    source = "this channel"
+    if ov is None and cat_id and str(cat_id) in overrides:
+        ov = overrides[str(cat_id)]
+        source = "its category"
+
+    server_protect = server.get("protect", {})
+    if not ov or ov.get("mode", "default") == "default":
+        mode_line = "📋 **Follows server settings**" + ("" if source == "this channel" else f" (inherited from {source})")
+        active = [(_BLOCKER_LABELS[k], server_protect.get(k, False)) for k in _BLOCKER_LABELS]
+    elif ov.get("mode") == "off":
+        embed = discord.Embed(
+            title=f"⚙️ Rules for #{channel.name}",
+            description=("🚫 **Link Protect is OFF in this channel"
+                         + ("" if source == "this channel" else f" (inherited from {source})") + ".**\n\n"
+                         "Nothing is blocked and no warnings are given here. "
+                         f"Run `/channel-mode #{channel.name} default` to follow the server settings again."),
+            color=discord.Color.orange())
+        return await ctx.followup.send(embed=embed)
+    else:  # custom
+        mode_line = "🎯 **Custom rules**" + ("" if source == "this channel" else f" (inherited from {source})") + " — independent of the server"
+        cp = ov.get("protect", {})
+        active = [(_BLOCKER_LABELS[k], bool(cp.get(k, False))) for k in _BLOCKER_LABELS]
+
+    on = [lbl for lbl, v in active if v]
+    off = [lbl for lbl, v in active if not v]
+    embed = discord.Embed(title=f"⚙️ Rules for #{channel.name}", description=mode_line, color=discord.Color.blurple())
+    embed.add_field(name="✅ Blocked here", value=("\n".join(f"• {x}" for x in on) if on else "*Nothing*"), inline=True)
+    embed.add_field(name="❌ Allowed here", value=("\n".join(f"• {x}" for x in off) if off else "*Nothing*"), inline=True)
+    embed.set_footer(text="Change with /channel-block · reset with /channel-mode default")
+    await ctx.followup.send(embed=embed)
+
+
+@bot.slash_command(name="channel-reset",
+                   description="Remove a channel's custom rules so it follows the server again")
+async def _channelreset(ctx, channel: discord.Option(discord.TextChannel, "Channel to reset")):
+    await ctx.defer()
+    if not _is_mod(ctx):
+        return await _deny(ctx)
+    guild_id = str(ctx.guild.id)
+    _ov_ref(guild_id).child(str(channel.id)).delete()
+    embed = discord.Embed(
+        title="⚙️ Channel Rules",
+        description=f"{channel.mention} now **follows the server-wide settings** again. Any custom rules were removed.",
+        color=discord.Color.green())
+    await ctx.followup.send(embed=embed)
+
+
 @bot.slash_command(name="warn", description="Warn a user")
 async def warn_user(ctx, member: discord.Member,
                     reason: discord.Option(str, "Reason", required=False) = "No reason provided."):
@@ -2234,10 +2589,14 @@ async def warn_user(ctx, member: discord.Member,
             await ctx.followup.send(embed=embed_err)
     log_ref = db.reference(f"/servers/{guild_id}/log/log-channel")
     log_channel_id = log_ref.get()
-    if log_channel_id and log_channel_id != 0:
-        log_channel = bot.get_channel(log_channel_id)
+    # log-channel may be stored as an int (command) or a string (dashboard); get_channel needs an int.
+    if log_channel_id and str(log_channel_id) != "0":
+        try:
+            log_channel = bot.get_channel(int(log_channel_id))
+        except (ValueError, TypeError):
+            log_channel = None
         if log_channel:
-            log_embed = discord.Embed(title="[AUTO-MOD] User Warned",
+            log_embed = discord.Embed(title="User Warned",
                                       description=f"{ctx.author.mention} warned {member.mention} for:\n - {reason}",
                                       color=discord.Color.orange())
             await log_channel.send(embed=log_embed)

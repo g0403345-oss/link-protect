@@ -1,14 +1,18 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
-# Nitro scam: fake domains + suspicious URL patterns — NOT plain text keywords
+# Nitro scam: fake domains + suspicious URL patterns — NOT plain text keywords.
+# Scam tokens must appear in the HOST (before the first "/"), not anywhere in the
+# path — otherwise a legit meme URL like tenor.com/view/...no-discord-nitro... would
+# be mis-flagged. Real scams live on look-alike *domains* (discord-nitro.ru), so
+# [^/\s]* keeps the match inside the hostname.
 _RE = re.compile(
-    r"(?:https?://|www\.)\S*(?:"
+    r"(?:https?://|www\.)[^/\s]*(?:"
     r"discordgift|discordnitro|nitrogift|freegift|free-nitro|discord-nitro|"
     r"nitro-free|getnitro|claimnitro|nitroclaim|discordpremium|steampowered-gift"
-    r")\S*"
+    r")[^/\s]*"
     r"|(?:https?://|www\.)(?:[\w-]+\.){1,3}(?:xyz|top|site|tk|ml|ga|cf|gq|ru)/\S*(?:nitro|gift|free)\S*",
     re.IGNORECASE,
 )
@@ -31,6 +35,7 @@ class NitroProtect(commands.Cog):
 
         guild_id = str(message.guild.id)
         settings = await get_settings(guild_id)
+        settings = resolve_channel(settings, message.channel)
 
         log_s = settings.get("log", {})
         if log_s.get("onlylink") and str(message.channel.id) == str(log_s.get("link", 0)):

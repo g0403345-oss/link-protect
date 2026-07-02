@@ -1,0 +1,87 @@
+name: LinkProtect
+options:
+  bundleIdPrefix: com.linkprotect
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.5"
+    CURRENT_PROJECT_VERSION: "7"
+    DEVELOPMENT_TEAM: "9X2RZ57R5L"
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    GENERATE_INFOPLIST_FILE: NO
+
+targets:
+  LinkProtect:
+    type: application
+    platform: iOS
+    sources:
+      - path: LinkProtect
+      - path: Shared
+    dependencies:
+      - target: LinkProtectWidget
+      - target: LinkProtectWatch
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app
+        INFOPLIST_FILE: LinkProtect/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1" 
+        SUPPORTS_MACCATALYST: NO
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: LinkProtect/Resources/LinkProtect.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: LinkProtect/Resources/LinkProtect.release.entitlements
+
+  LinkProtectWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LinkProtectWidget
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app.widget
+        INFOPLIST_FILE: LinkProtectWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: LinkProtectWidget/LinkProtectWidget.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+
+  LinkProtectWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "9.0"
+    sources:
+      - path: LinkProtectWatch
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app.watchkitapp
+        INFOPLIST_FILE: LinkProtectWatch/Info.plist
+        TARGETED_DEVICE_FAMILY: "4"
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+# Explicit shared scheme so the app scheme always exists and is the default.
+schemes:
+  LinkProtect:
+    build:
+      targets:
+        LinkProtect: all
+    run:
+      config: Debug
+      language: en   # force English when running from Xcode (simulator/screenshots)
+      region: US
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

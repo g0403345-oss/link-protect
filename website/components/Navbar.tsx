@@ -3,13 +3,32 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
-import { BOT_INVITE } from '@/lib/discord';
+import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
+import { SupporterBadge, rankMeta } from '@/components/SupporterBadge';
 
 export default function Navbar() {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const inDashboard = pathname?.startsWith('/dashboard') ?? false;
+  // In the dashboard the marketing anchors are meaningless — show working,
+  // context-appropriate links instead. Elsewhere the anchors point at the
+  // landing page absolutely so they work from any route (e.g. /check).
+  const navLinks = inDashboard
+    ? [
+        { label: 'My servers', href: '/dashboard' },
+        { label: 'Link checker', href: '/check' },
+        { label: 'Support', href: SUPPORT_SERVER },
+      ]
+    : [
+        { label: 'Features', href: '/#features' },
+        { label: 'What we block', href: '/#blockers' },
+        { label: 'Link checker', href: '/check' },
+        { label: 'Support', href: SUPPORT_SERVER },
+      ];
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -30,6 +49,17 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Voter status drives the pill's medal colour + Supporter badge.
+  const [vote, setVote] = useState<{ rank: number | null; supporter: boolean } | null>(null);
+  useEffect(() => {
+    if (!session?.user?.id) { setVote(null); return; }
+    fetch('/api/me/vote')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && !d.error) setVote({ rank: d.rank ?? null, supporter: !!d.supporter }); })
+      .catch(() => {});
+  }, [session?.user?.id]);
+  const pillMeta = rankMeta(vote?.rank ?? null);
+
   return (
     <nav style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
@@ -49,20 +79,23 @@ export default function Navbar() {
 
         {/* Center links */}
         <div className="nav-center-links" style={{ display: 'flex', gap: 2, flex: 1 }}>
-          {[
-            { label: 'Features', href: '#features' },
-            { label: 'What we block', href: '#blockers' },
-            { label: 'Support', href: 'https://discord.gg/BjDC9t329E' },
-          ].map((link) => (
-            <a key={link.label} href={link.href}
-              target={link.href.startsWith('http') ? '_blank' : undefined}
-              rel={link.href.startsWith('http') ? 'noreferrer' : undefined}
-              style={{ padding: '6px 12px', fontSize: 14, fontWeight: 500, color: '#6d6f78', textDecoration: 'none', borderRadius: 6, transition: 'color 0.15s' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#f2f3f5')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#6d6f78')}>
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link) => {
+            const external = link.href.startsWith('http');
+            const active = !external && (pathname === link.href ||
+              (link.href === '/dashboard' && inDashboard));
+            const style: React.CSSProperties = { padding: '6px 12px', fontSize: 14, fontWeight: 500, color: active ? '#f2f3f5' : '#6d6f78', textDecoration: 'none', borderRadius: 6, transition: 'color 0.15s' };
+            const onEnter = (e: React.MouseEvent<HTMLElement>) => (e.currentTarget.style.color = '#f2f3f5');
+            const onLeave = (e: React.MouseEvent<HTMLElement>) => (e.currentTarget.style.color = active ? '#f2f3f5' : '#6d6f78');
+            return external ? (
+              <a key={link.label} href={link.href} target="_blank" rel="noreferrer" style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                {link.label}
+              </a>
+            ) : (
+              <Link key={link.label} href={link.href} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Right */}
@@ -70,9 +103,10 @@ export default function Navbar() {
           {session ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button onClick={() => setMenuOpen(!menuOpen)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s' }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52535a')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}>
+                className={pillMeta?.animated ? 'lp-gold-anim' : undefined}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: '#18181b', border: `1px solid ${pillMeta ? pillMeta.color : '#2e2e36'}`, borderRadius: 8, cursor: 'pointer', transition: 'border-color 0.15s', boxShadow: pillMeta ? `0 0 10px ${pillMeta.glow}` : undefined }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = pillMeta ? pillMeta.color : '#52535a')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = pillMeta ? pillMeta.color : '#2e2e36')}>
                 {session.user?.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={session.user.image} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />
@@ -84,6 +118,7 @@ export default function Navbar() {
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {session.user?.name}
                 </span>
+                {vote?.supporter && <SupporterBadge size={12} />}
                 <ChevronDown size={14} color="#6d6f78" style={{ transition: 'transform 0.15s', transform: menuOpen ? 'rotate(180deg)' : 'none' }} />
               </button>
 

@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
 # Pre-compiled: require http/https/ftp or www. (no bare-domain false positives)
 _RE = re.compile(
@@ -29,6 +29,7 @@ class All(commands.Cog):
 
         guild_id = str(message.guild.id)
         settings = await get_settings(guild_id)
+        settings = resolve_channel(settings, message.channel)
 
         # Skip if this is the "only-link" channel (handled by Link_sqlite cog)
         log_s = settings.get("log", {})

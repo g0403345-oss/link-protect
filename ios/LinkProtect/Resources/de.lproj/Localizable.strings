@@ -1,0 +1,213 @@
+/* Link Protect — German localization. */
+
+// ── Login ─────────────────────────────────────────────
+"Link Protect" = "Link Protect";
+"Continue with Discord" = "Mit Discord fortfahren";
+"Connecting…" = "Verbinde…";
+"Manage your Discord server's protection." = "Verwalte den Schutz deines Discord-Servers.";
+"Uses Discord to sign in. We only read your identity and server list — no messages, no personal data." = "Anmeldung über Discord. Wir lesen nur deine Identität und Serverliste — keine Nachrichten, keine persönlichen Daten.";
+
+// ── Server list ───────────────────────────────────────
+"Servers" = "Server";
+"Welcome back" = "Willkommen zurück";
+"Search servers" = "Server suchen";
+"No servers yet" = "Noch keine Server";
+"You need the “Manage Server” permission on a server that has the Link Protect bot. Invite it, then pull to refresh." = "Du brauchst die Berechtigung „Server verwalten“ auf einem Server mit dem Link-Protect-Bot. Lade ihn ein und zieh dann zum Aktualisieren.";
+"Invite the bot" = "Bot einladen";
+"Not protected yet" = "Noch nicht geschützt";
+"Add" = "Hinzufügen";
+"Try again" = "Erneut versuchen";
+"MANAGED" = "Verwaltet";
+"BOT NOT ADDED" = "Bot nicht hinzugefügt";
+
+// ── Config tabs ───────────────────────────────────────
+"Overview" = "Übersicht";
+"Blockers" = "Blocker";
+"Warnings" = "Verwarnungen";
+"Access" = "Zugriff";
+"Blacklist" = "Sperrliste";
+"Statistics" = "Statistik";
+"Activity" = "Aktivität";
+
+// ── Section headers (title + subtitle) ────────────────
+"Quick summary of your server's protection status" = "Kurzer Überblick über den Schutzstatus deines Servers";
+"Link Blockers" = "Link-Blocker";
+"Toggle which types of links are blocked in your server" = "Lege fest, welche Link-Typen auf deinem Server blockiert werden";
+"Warning System" = "Verwarnungssystem";
+"Configure automatic actions when users accumulate warnings" = "Automatische Aktionen ab einer bestimmten Verwarnungszahl";
+"Access Control" = "Zugriffskontrolle";
+"Whitelist channels, members or roles from link restrictions" = "Kanäle, Mitglieder oder Rollen von den Link-Regeln ausnehmen";
+"Custom Blacklist" = "Eigene Sperrliste";
+"Add specific domains or URLs to always block" = "Bestimmte Domains oder URLs immer blockieren";
+"Server Statistics" = "Server-Statistik";
+"Warning history and moderation data" = "Verwarnungsverlauf und Moderationsdaten";
+"Activity Log" = "Aktivitätsprotokoll";
+"Live moderation feed — refreshes every 5 seconds" = "Live-Feed — aktualisiert alle 5 Sekunden";
+
+// ── Card titles ───────────────────────────────────────
+"Quick Setup" = "Schnelleinrichtung";
+"Platform Blockers" = "Plattform-Blocker";
+"Silent Mode" = "Stiller Modus";
+"Active Protections" = "Aktive Schutzfunktionen";
+"Warning Thresholds" = "Verwarnungs-Schwellen";
+"Notifications" = "Benachrichtigungen";
+"Security" = "Sicherheit";
+"About" = "Über";
+"Action Thresholds" = "Aktions-Schwellen";
+"Timeout Duration" = "Timeout-Dauer";
+"Top Warned Users" = "Meist verwarnte Nutzer";
+"Recent Actions" = "Letzte Aktionen";
+"Whitelisted Channels" = "Erlaubte Kanäle";
+"Whitelisted Categories" = "Erlaubte Kategorien";
+"Whitelisted Members" = "Erlaubte Mitglieder";
+"Whitelisted Roles" = "Erlaubte Rollen";
+
+// ── Quick-setup presets ───────────────────────────────
+"Apply a preset, then fine-tune below." = "Voreinstellung wählen, dann unten feinjustieren.";
+"Minimal" = "Minimal";
+"Balanced" = "Ausgewogen";
+"Strict" = "Streng";
+"Only the dangerous stuff" = "Nur das Gefährliche";
+"Sensible defaults" = "Sinnvolle Standards";
+"Block everything risky" = "Alles Riskante blockieren";
+
+// ── Blocker toggles ───────────────────────────────────
+"Block All Links" = "Alle Links blockieren";
+"Block every external link (overrides all others)" = "Blockiert jeden externen Link (überschreibt alle anderen)";
+"NSFW Content" = "NSFW-Inhalte";
+"Block known adult / NSFW websites" = "Blockiert bekannte Erwachsenen-/NSFW-Seiten";
+"Nitro Scams" = "Nitro-Scams";
+"Block fake Discord Nitro scam links" = "Blockiert gefälschte Discord-Nitro-Scam-Links";
+"Malware / Phishing" = "Malware / Phishing";
+"Block known malware and phishing URLs" = "Blockiert bekannte Malware- und Phishing-URLs";
+"Discord Invites" = "Discord-Einladungen";
+"Block discord.gg invite links" = "Blockiert discord.gg-Einladungslinks";
+"YouTube" = "YouTube";
+"Block youtube.com and youtu.be links" = "Blockiert youtube.com- und youtu.be-Links";
+"Google" = "Google";
+"Block google.com links" = "Blockiert google.com-Links";
+"GIFs" = "GIFs";
+"Block GIF links (tenor, giphy, …)" = "Blockiert GIF-Links (tenor, giphy, …)";
+"Twitch" = "Twitch";
+"Block twitch.tv links" = "Blockiert twitch.tv-Links";
+"Steam" = "Steam";
+"Block Steam community and store links" = "Blockiert Steam-Community- und Store-Links";
+"bit.ly & shorteners" = "bit.ly & Kürzer";
+"Block URL shortener links" = "Blockiert URL-Kürzer-Links";
+"Delete links without a public warning — the user gets a DM instead" = "Links ohne öffentliche Warnung löschen — der Nutzer bekommt stattdessen eine DM";
+
+// ── Warning thresholds ────────────────────────────────
+"Kick threshold" = "Kick-Schwelle";
+"User is kicked at this many warnings (0 = disabled)" = "Kick ab so vielen Verwarnungen (0 = aus)";
+"Ban threshold" = "Bann-Schwelle";
+"User is banned at this many warnings (0 = disabled)" = "Bann ab so vielen Verwarnungen (0 = aus)";
+"Timeout threshold" = "Timeout-Schwelle";
+"User is timed out at this many warnings (0 = disabled)" = "Timeout ab so vielen Verwarnungen (0 = aus)";
+"Duration (minutes)" = "Dauer (Minuten)";
+"How long the timeout lasts when triggered" = "Wie lange der Timeout dauert";
+"Kick at" = "Kick bei";
+"Ban at" = "Bann bei";
+"Timeout at" = "Timeout bei";
+"No blockers active" = "Keine Blocker aktiv";
+"No warned users — server is clean!" = "Keine verwarnten Nutzer — alles sauber!";
+
+// ── Access control ────────────────────────────────────
+"Whitelisted items bypass all link restrictions." = "Erlaubte Einträge umgehen alle Link-Regeln.";
+"Links are allowed in these channels" = "Links sind in diesen Kanälen erlaubt";
+"Links are allowed under these categories" = "Links sind unter diesen Kategorien erlaubt";
+"These users can post any links" = "Diese Nutzer dürfen beliebige Links posten";
+"Members with these roles can post any links" = "Mitglieder mit diesen Rollen dürfen beliebige Links posten";
+"None whitelisted" = "Nichts erlaubt";
+
+// ── Statistics ────────────────────────────────────────
+"Warnings" = "Verwarnungen";
+"Users warned" = "Verwarnte Nutzer";
+"Blockers" = "Blocker";
+"Total warnings" = "Verwarnungen gesamt";
+"No warned users yet" = "Noch keine verwarnten Nutzer";
+"TOP REASONS" = "Top-Gründe";
+
+// ── Activity log ──────────────────────────────────────
+"Search user or reason" = "Nutzer oder Grund suchen";
+"All" = "Alle";
+"No moderation actions yet" = "Noch keine Moderationsaktionen";
+"Nothing matches your filter" = "Nichts passt zum Filter";
+
+// ── Blacklist ─────────────────────────────────────────
+"No links blacklisted yet" = "Noch keine Links gesperrt";
+
+// ── Settings ──────────────────────────────────────────
+"Account" = "Konto";
+"Done" = "Fertig";
+"Sign out" = "Abmelden";
+"Website" = "Website";
+"Support server" = "Support-Server";
+"Privacy Policy" = "Datenschutz";
+"Terms of Service" = "Nutzungsbedingungen";
+"Version" = "Version";
+"Enable notifications" = "Benachrichtigungen aktivieren";
+"Open iOS Settings" = "iOS-Einstellungen öffnen";
+"Get a push when something needs your attention — even with the app closed." = "Erhalte eine Mitteilung, wenn etwas deine Aufmerksamkeit braucht — auch bei geschlossener App.";
+"Notifications are turned off in iOS Settings. Enable them to receive alerts." = "Benachrichtigungen sind in den iOS-Einstellungen deaktiviert. Aktiviere sie, um Hinweise zu erhalten.";
+"Bot goes offline" = "Bot geht offline";
+"Know immediately if the bot stops protecting a server" = "Sofort erfahren, wenn der Bot einen Server nicht mehr schützt";
+"Protection rule triggered" = "Schutzregel ausgelöst";
+"A link was blocked or a member was actioned" = "Ein Link wurde blockiert oder ein Mitglied moderiert";
+"Server settings changed" = "Server-Einstellungen geändert";
+"Someone updated a server's configuration" = "Jemand hat die Konfiguration eines Servers geändert";
+"Alerts for this server" = "Hinweise für diesen Server";
+"Push you when a rule triggers or settings change here." = "Benachrichtigt dich, wenn hier eine Regel auslöst oder Einstellungen geändert werden.";
+
+// ── Admin / lock / misc ───────────────────────────────
+"Admin" = "Admin";
+"Search by name or ID" = "Nach Name oder ID suchen";
+"Locked" = "Gesperrt";
+"Authenticate to continue" = "Zum Fortfahren authentifizieren";
+"Reset warnings" = "Verwarnungen zurücksetzen";
+"Resetting…" = "Setze zurück…";
+"Close" = "Schließen";
+"No reasons recorded" = "Keine Gründe erfasst";
+
+// ── Channel Rules ─────────────────────────────────────
+"Channels" = "Kanäle";
+"Channel Rules" = "Kanal-Regeln";
+"Make individual channels behave differently from the rest of the server" = "Lass einzelne Kanäle sich anders verhalten als der restliche Server";
+"Every channel follows your server settings by default. Override one to turn Link Protect off there (e.g. a #links channel), or give it custom blockers — independent of the server." = "Jeder Kanal folgt standardmäßig deinen Server-Einstellungen. Übersteuere einen Kanal, um Link Protect dort auszuschalten (z. B. ein #links-Kanal) oder ihm eigene Blocker zu geben — unabhängig vom Server.";
+"Add a channel rule" = "Kanal-Regel hinzufügen";
+"No channel rules yet — every channel follows the server settings." = "Noch keine Kanal-Regeln — jeder Kanal folgt den Server-Einstellungen.";
+"Server" = "Server";
+"Off" = "Aus";
+"Custom" = "Eigene";
+"Only the blockers switched on here apply in this channel — server settings are ignored." = "Nur die hier aktivierten Blocker gelten in diesem Kanal — Server-Einstellungen werden ignoriert.";
+"Remove" = "Entfernen";
+"Link Protect ignores this channel — nothing is blocked and no warnings are given here." = "Link Protect ignoriert diesen Kanal — hier wird nichts blockiert und nicht verwarnt.";
+"This channel uses its own blockers, independent of the server." = "Dieser Kanal nutzt eigene Blocker, unabhängig vom Server.";
+"This channel follows your normal server-wide settings." = "Dieser Kanal folgt deinen normalen serverweiten Einstellungen.";
+"All Links" = "Alle Links";
+"Nitro Scams" = "Nitro-Scams";
+"Malware / Phishing" = "Malware / Phishing";
+"Discord Invites" = "Discord-Einladungen";
+"GIFs" = "GIFs";
+"Shorteners (bit.ly)" = "Kurz-URLs (bit.ly)";
+
+// ── Warning decay ─────────────────────────────────────
+"Warning Decay" = "Verwarnungs-Verfall";
+"Auto-expire old warnings" = "Alte Verwarnungen automatisch verfallen lassen";
+"Warnings are forgiven after a while, so one old mistake doesn't count forever" = "Verwarnungen werden nach einiger Zeit vergeben, damit ein alter Fehler nicht ewig zählt";
+"Expire after (days)" = "Verfällt nach (Tagen)";
+"A warning is removed once it's older than this many days" = "Eine Verwarnung wird entfernt, sobald sie älter als so viele Tage ist";
+"Each warning is timestamped. Once older than %lld day(s) it's removed automatically and stops counting toward kick/ban. Cleaned up hourly." = "Jede Verwarnung wird mit Datum gespeichert. Sobald sie älter als %lld Tag(e) ist, wird sie automatisch entfernt und zählt nicht mehr für Kick/Bann. Stündliche Bereinigung.";
+"When off, warnings stay until you reset them. Turn this on so well-behaved members are gradually forgiven." = "Ausgeschaltet bleiben Verwarnungen, bis du sie zurücksetzt. Aktiviere dies, damit brave Mitglieder nach und nach vergeben werden.";
+
+// ── Appearance ────────────────────────────────────────
+"Appearance" = "Erscheinungsbild";
+"Choose your app background." = "Wähle deinen App-Hintergrund.";
+"Midnight" = "Mitternacht";
+"Pure Black" = "Reines Schwarz";
+"Ocean" = "Ozean";
+"Sunset" = "Sonnenuntergang";
+"Aurora" = "Polarlicht";
+
+// ── Admin: command redirect ───────────────────────────
+"Redirect settings commands" = "Einstellungs-Befehle umleiten";
+"When on, Discord settings commands stop working and point users to the dashboard & app. Moderation commands keep working." = "Wenn aktiv, funktionieren Discord-Einstellungs-Befehle nicht mehr und verweisen auf Dashboard & App. Moderations-Befehle bleiben aktiv.";

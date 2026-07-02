@@ -38,6 +38,7 @@ export default function PickerList({ title, description, icon, pickerType, guild
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [roles, setRoles] = useState<DiscordRole[]>([]);
   const [memberResults, setMemberResults] = useState<DiscordMember[]>([]);
+  const [resolvedMembers, setResolvedMembers] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
 
@@ -96,6 +97,25 @@ export default function PickerList({ title, description, icon, pickerType, guild
 
   const handleOpen = () => { setOpen(true); loadItems(); };
 
+  // Load channel/role lists up-front so existing chips show names immediately,
+  // without the user having to open the dropdown.
+  useEffect(() => { loadItems(); }, [loadItems]);
+
+  // Resolve whitelisted member IDs → names so chips aren't raw IDs.
+  useEffect(() => {
+    if (pickerType !== 'member' || value.length === 0) return;
+    const missing = value.filter((id) => !(id in resolvedMembers));
+    if (missing.length === 0) return;
+    fetch(`/api/guild/${guildId}/discord-members/resolve?ids=${missing.join(',')}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, string> = {};
+        for (const m of (d.members ?? []) as DiscordMember[]) map[m.id] = m.nick ?? m.username;
+        if (Object.keys(map).length) setResolvedMembers((prev) => ({ ...prev, ...map }));
+      })
+      .catch(() => {});
+  }, [pickerType, value, guildId, resolvedMembers]);
+
   const resolveName = (id: string): string => {
     if (pickerType === 'channel') {
       const ch = channels.find(c => c.id === id);
@@ -108,7 +128,9 @@ export default function PickerList({ title, description, icon, pickerType, guild
       return roles.find(r => r.id === id)?.name ?? `@…${id.slice(-4)}`;
     }
     const m = memberResults.find(m => m.id === id);
-    return m ? (m.nick ?? m.username) : `@…${id.slice(-4)}`;
+    if (m) return m.nick ?? m.username;
+    if (resolvedMembers[id]) return resolvedMembers[id];
+    return `@…${id.slice(-4)}`;
   };
 
   const resolveRoleColor = (id: string) => {

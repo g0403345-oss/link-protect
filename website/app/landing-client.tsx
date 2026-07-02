@@ -5,6 +5,8 @@ import { motion, useInView } from 'framer-motion';
 import { Shield, ArrowRight, Check, ExternalLink, Smartphone, Bell, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import LinkChecker from '@/components/LinkChecker';
+import Leaderboard from '@/components/Leaderboard';
 
 /* ── "Now on iOS" app showcase ───────────────────────────────── */
 function PhoneShot({ src, alt, raised }: { src: string; alt: string; raised?: boolean }) {
@@ -437,7 +439,9 @@ export default function LandingClient() {
       <Navbar />
 
       {/* HERO */}
-      <section className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', padding: '100px 24px 80px', position: 'relative' }}>
+      <section className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', padding: '100px 24px 80px', position: 'relative', overflow: 'hidden' }}>
+        {/* Branded backdrop (top.gg-style), faded down into the page */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '90%', backgroundImage: 'url(/hero-bg.webp)', backgroundSize: 'cover', backgroundPosition: 'center -8%', opacity: 0.22, WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 45%, transparent 88%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 45%, transparent 88%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(88,101,242,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         <div className="hero-grid" style={{ maxWidth: 1120, margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', position: 'relative' }}>
@@ -484,6 +488,30 @@ export default function LandingClient() {
       {/* STATS (live) */}
       <section ref={statsRef} style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px' }}>
         <LiveStats />
+      </section>
+
+      {/* LINK CHECKER */}
+      <section style={{ padding: '80px 24px', borderBottom: '1px solid #18181b' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <Shield size={12} /> Free URL Checker
+          </div>
+          <h2 className="cta-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
+            Is this link safe?
+          </h2>
+          <p style={{ fontSize: 16, color: '#6d6f78', maxWidth: 440, margin: '0 auto 30px', lineHeight: 1.6 }}>
+            Paste any link to check it against our live threat database — built from real scams blocked
+            across thousands of Discord servers — plus Google Safe Browsing.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <LinkChecker />
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <Link href="/check" style={{ fontSize: 13, fontWeight: 600, color: '#7289da', textDecoration: 'none' }}>
+              Open the full checker →
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* FEATURES */}
@@ -554,6 +582,11 @@ export default function LandingClient() {
       {/* APP */}
       <AppSection />
 
+      {/* LEADERBOARD — vote reward */}
+      <section style={{ padding: '96px 24px', borderTop: '1px solid #18181b' }}>
+        <Leaderboard />
+      </section>
+
       {/* CTA */}
       <section style={{ padding: '96px 24px', textAlign: 'center' }}>
         <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
@@ -584,35 +617,6 @@ export default function LandingClient() {
         </motion.div>
       </section>
 
-      {/* FOOTER */}
-      <footer style={{ borderTop: '1px solid #18181b', padding: '28px 24px', background: 'transparent' }}>
-        <div className="footer-row" style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 22, height: 22, borderRadius: 6, background: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Shield size={12} color="#fff" strokeWidth={2.5} />
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#52535a' }}>LinkProtect</span>
-          </div>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Privacy', href: '/privacy' },
-              { label: 'Terms', href: '/terms' },
-              { label: 'iOS App', href: APP_STORE_URL },
-              { label: 'Support', href: SUPPORT_SERVER },
-              { label: 'Invite', href: BOT_INVITE },
-              { label: 'Dashboard', href: '/dashboard' },
-            ].map(({ label, href }) => (
-              <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}
-                style={{ fontSize: 13, color: '#52535a', textDecoration: 'none', transition: 'color 0.15s' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#949ba4')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#52535a')}>
-                {label}
-              </a>
-            ))}
-          </div>
-          <span style={{ fontSize: 12, color: '#2e2e36' }}>© 2026 Link Protect</span>
-        </div>
-      </footer>
     </div>
   );
 }

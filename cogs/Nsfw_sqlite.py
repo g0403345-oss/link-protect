@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
 # Only triggers on NSFW domains inside actual URLs — not on random words in chat
 _RE = re.compile(
@@ -31,6 +31,7 @@ class NsfwProtection(commands.Cog):
 
         guild_id = str(message.guild.id)
         settings = await get_settings(guild_id)
+        settings = resolve_channel(settings, message.channel)
 
         log_s = settings.get("log", {})
         if log_s.get("onlylink") and str(message.channel.id) == str(log_s.get("link", 0)):

@@ -102,6 +102,7 @@ input[type='number'] { -moz-appearance: textfield; }
   /* Landing — CTA / footer */
   .cta-title { font-size: 34px !important; line-height: 1.1 !important; }
   .footer-row { flex-direction: column !important; align-items: flex-start !important; }
+  .footer-grid { grid-template-columns: 1fr 1fr !important; gap: 24px !important; }
 
   /* Discord mockup — hide sidebars, keep chat only */
   .discord-sidebar { display: none !important; }
@@ -115,10 +116,27 @@ input[type='number'] { -moz-appearance: textfield; }
   .guild-main { padding: 16px !important; }
   .mobile-only { display: flex !important; }
 
+  /* Guild dashboard — breadcrumb: drop the long ID + button labels on phones */
+  .crumb-id { display: none !important; }
+  .crumb-btn-label { display: none !important; }
+
   /* Guild dashboard — grids */
   .stats-3col-dashboard { grid-template-columns: 1fr 1fr !important; }
   .stats-4col { grid-template-columns: 1fr 1fr !important; }
   .thresholds-3col { grid-template-columns: 1fr !important; gap: 20px !important; }
+}
+
+/* Animated gold treatment for the #1 voter (leaderboard, vote banner, nav pill) */
+@keyframes lp-gold-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.lp-gold-anim {
+  background: linear-gradient(90deg, rgba(255,215,0,0.12), rgba(255,236,150,0.32), rgba(255,215,0,0.12));
+  background-size: 200% 100%;
+  animation: lp-gold-shimmer 2.6s linear infinite;
+  border-color: #FFD700 !important;
+  box-shadow: 0 0 14px rgba(255,215,0,0.25);
 }
 
 /* Noise texture overlay */
