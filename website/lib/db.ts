@@ -232,6 +232,68 @@ export async function updateReport(id: number, body: { status?: string; promote?
   await apiFetch(`/api/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
+// ── Report threads (two-way conversation) ────────────────────────────────────
+
+export interface ReportMessage {
+  id: number;
+  sender: "user" | "admin";
+  userId: string | null;
+  username: string | null;
+  body: string;
+  createdAt: number;
+}
+
+export interface ReportThread {
+  report: Report;
+  messages: ReportMessage[];
+}
+
+export interface MyReport extends Report {
+  replyCount: number;
+  lastSender: "user" | "admin" | null;
+  lastAt: number;
+}
+
+export async function getReportThread(id: number): Promise<ReportThread> {
+  return apiFetch<ReportThread>(`/api/report/${id}`);
+}
+
+export async function postReportMessage(id: number, message: string): Promise<ReportThread> {
+  return apiFetch<ReportThread>(`/api/report/${id}/message`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function getMyReports(): Promise<{ reports: MyReport[] }> {
+  return apiFetch(`/api/my/reports`);
+}
+
+// ── Web notification centre ──────────────────────────────────────────────────
+
+export interface WebNotification {
+  id: number;
+  scope: "user" | "guild";
+  scopeId: string;
+  type: "report_new" | "report_reply" | "report_status" | "settings" | "warn";
+  title: string;
+  body: string | null;
+  reportId: number | null;
+  createdAt: number;
+  unread: boolean;
+}
+
+export async function getNotifications(
+  guildIds: string[]
+): Promise<{ notifications: WebNotification[]; unread: number; seenAt: number }> {
+  const q = guildIds.length ? `?guilds=${encodeURIComponent(guildIds.join(","))}` : "";
+  return apiFetch(`/api/notifications${q}`);
+}
+
+export async function markNotificationsSeen(): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/notifications/seen`, { method: "POST" });
+}
+
 // ── top.gg votes: leaderboard + supporter status ────────────────────────────────
 
 export interface LeaderboardEntry {

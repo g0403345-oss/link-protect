@@ -769,6 +769,9 @@ def _update_report(report_id: int, status=None, promote: bool = False) -> dict:
         if status not in _REPORT_STATUSES:
             raise HTTPException(status_code=400, detail="Invalid status")
         c.execute("UPDATE reports SET status=? WHERE id=?", (status, int(report_id)))
+        if status != row["status"]:
+            _notify("user", row["user_id"], "report_status",
+                    f"Your report was marked {status}", None, int(report_id))
     if promote and row["type"] == "malicious_link" and row["url"]:
         d = _domain_of(row["url"])
         cat = row["category"] if row["category"] in _CHECK_THREAT_CATS else "scam"
@@ -788,6 +791,9 @@ def _update_report(report_id: int, status=None, promote: bool = False) -> dict:
 async def post_report(request: Request, body: ReportBody):
     aid, aname = _web_actor(request)
     rid = _insert_report(aid, aname, body.guildId, body.type, body.url, body.category, body.message)
+    _notify("user", ADMIN_USER_ID, "report_new",
+            f"New {body.type.replace('_', ' ')} report",
+            (body.message or body.url or "").strip(), rid)
     return {"ok": True, "id": rid}
 
 
@@ -808,6 +814,9 @@ async def mobile_post_report(request: Request, body: ReportBody):
     user = await _discord_user(_bearer(request))
     rid = _insert_report(user["id"], user.get("username"), body.guildId,
                          body.type, body.url, body.category, body.message)
+    _notify("user", ADMIN_USER_ID, "report_new",
+            f"New {body.type.replace('_', ' ')} report",
+            (body.message or body.url or "").strip(), rid)
     return {"ok": True, "id": rid}
 
 
@@ -821,6 +830,188 @@ async def mobile_admin_reports(request: Request, status: str = "", type: str = "
 async def mobile_admin_patch_report(request: Request, report_id: int, body: ReportPatchBody):
     await _require_admin(request)
     return _update_report(report_id, body.status, bool(body.promote))
+
+
+# ── Report threads (two-way) + web notification centre ────────────────────────
+
+def _ensure_ticket_tables():
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS report_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_id INTEGER NOT NULL,
+        sender TEXT NOT NULL,            -- 'user' | 'admin'
+        user_id TEXT,
+        username TEXT,
+        body TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_rmsg_report ON report_messages (report_id, id)")
+    c.execute("""CREATE TABLE IF NOT EXISTS web_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL,             -- 'user' | 'guild'
+        scope_id TEXT NOT NULL,
+        type TEXT NOT NULL,              -- report_new|report_reply|report_status|settings|warn
+        title TEXT NOT NULL,
+        body TEXT,
+        report_id INTEGER,
+        created_at INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_wnotif ON web_notifications (scope, scope_id, id DESC)")
+    c.commit()
+
+_ensure_ticket_tables()
+
+
+def _notify(scope: str, scope_id, ntype: str, title: str, body: str | None = None, report_id: int | None = None) -> None:
+    """Record one in-app notification. Never raises. Keeps the last 300 per recipient."""
+    if not scope_id:
+        return
+    try:
+        c = _get_conn()
+        c.execute(
+            "INSERT INTO web_notifications(scope, scope_id, type, title, body, report_id, created_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (scope, str(scope_id), ntype, (title or "")[:120], ((body or "").strip()[:500] or None),
+             int(report_id) if report_id else None, int(time.time())),
+        )
+        c.execute(
+            "DELETE FROM web_notifications WHERE scope=? AND scope_id=? AND id NOT IN "
+            "(SELECT id FROM web_notifications WHERE scope=? AND scope_id=? ORDER BY id DESC LIMIT 300)",
+            (scope, str(scope_id), scope, str(scope_id)),
+        )
+        c.commit()
+    except Exception:
+        pass
+
+
+def _serialize_report(r) -> dict:
+    return {"id": r["id"], "userId": r["user_id"], "username": r["username"], "guildId": r["guild_id"],
+            "type": r["type"], "url": r["url"], "category": r["category"], "message": r["message"],
+            "status": r["status"], "createdAt": r["created_at"]}
+
+
+def _report_messages(report_id: int) -> list:
+    rows = _get_conn().execute(
+        "SELECT id, sender, user_id, username, body, created_at FROM report_messages "
+        "WHERE report_id=? ORDER BY id ASC", (int(report_id),),
+    ).fetchall()
+    return [{"id": r["id"], "sender": r["sender"], "userId": r["user_id"],
+             "username": r["username"], "body": r["body"], "createdAt": r["created_at"]} for r in rows]
+
+
+class ReportMessageBody(BaseModel):
+    message: str
+
+
+def _report_thread_guard(request: Request, report_id: int):
+    aid, aname = _web_actor(request)
+    row = _get_conn().execute("SELECT * FROM reports WHERE id=?", (int(report_id),)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    is_admin = str(aid) == str(ADMIN_USER_ID)
+    if not is_admin and str(aid) != str(row["user_id"] or ""):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return aid, aname, row, is_admin
+
+
+def _thread_payload(row) -> dict:
+    return {"report": _serialize_report(row), "messages": _report_messages(row["id"])}
+
+
+@app.get("/api/report/{report_id}")
+@require_auth
+async def get_report_thread(request: Request, report_id: int):
+    _, _, row, _ = _report_thread_guard(request, report_id)
+    return _thread_payload(row)
+
+
+@app.post("/api/report/{report_id}/message")
+@require_auth
+async def post_report_message(request: Request, report_id: int, body: ReportMessageBody):
+    aid, aname, row, is_admin = _report_thread_guard(request, report_id)
+    msg = (body.message or "").strip()[:2000]
+    if not msg:
+        raise HTTPException(status_code=400, detail="Empty message")
+    sender = "admin" if is_admin else "user"
+    c = _get_conn()
+    c.execute(
+        "INSERT INTO report_messages(report_id, sender, user_id, username, body, created_at) VALUES(?,?,?,?,?,?)",
+        (int(report_id), sender, str(aid), aname, msg, int(time.time())),
+    )
+    # An admin reply moves an untouched report to 'reviewed'.
+    if is_admin and row["status"] == "open":
+        c.execute("UPDATE reports SET status='reviewed' WHERE id=?", (int(report_id),))
+    c.commit()
+    preview = msg[:140]
+    if is_admin:
+        _notify("user", row["user_id"], "report_reply", "Support replied to your report", preview, report_id)
+    else:
+        _notify("user", ADMIN_USER_ID, "report_reply", f"New reply on report #{report_id}", preview, report_id)
+    row = c.execute("SELECT * FROM reports WHERE id=?", (int(report_id),)).fetchone()
+    return _thread_payload(row)
+
+
+@app.get("/api/my/reports")
+@require_auth
+async def my_reports(request: Request, limit: int = 100):
+    aid, _ = _web_actor(request)
+    if not aid:
+        return {"reports": []}
+    rows = _get_conn().execute(
+        "SELECT id, user_id, username, guild_id, type, url, category, message, status, created_at "
+        "FROM reports WHERE user_id=? ORDER BY id DESC LIMIT ?",
+        (str(aid), max(1, min(int(limit or 100), 200))),
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = _serialize_report(r)
+        last = _get_conn().execute(
+            "SELECT sender, created_at FROM report_messages WHERE report_id=? ORDER BY id DESC LIMIT 1", (r["id"],)
+        ).fetchone()
+        d["replyCount"] = _get_conn().execute(
+            "SELECT COUNT(*) AS c FROM report_messages WHERE report_id=?", (r["id"],)
+        ).fetchone()["c"]
+        d["lastSender"] = last["sender"] if last else None
+        d["lastAt"] = last["created_at"] if last else r["created_at"]
+        out.append(d)
+    return {"reports": out}
+
+
+def _list_notifications(aid: str, guild_ids: list, limit: int) -> dict:
+    seen = _kv_int(f"notif_seen:{aid}")
+    clauses, params = ["(scope='user' AND scope_id=?)"], [str(aid)]
+    gids = [g.strip() for g in guild_ids if g and g.strip()][:100]
+    if gids:
+        ph = ",".join("?" * len(gids))
+        clauses.append(f"(scope='guild' AND scope_id IN ({ph}))")
+        params.extend(gids)
+    rows = _get_conn().execute(
+        f"SELECT id, scope, scope_id, type, title, body, report_id, created_at FROM web_notifications "
+        f"WHERE {' OR '.join(clauses)} ORDER BY id DESC LIMIT ?",
+        (*params, max(1, min(int(limit or 50), 200))),
+    ).fetchall()
+    notifs = [{"id": r["id"], "scope": r["scope"], "scopeId": r["scope_id"], "type": r["type"],
+               "title": r["title"], "body": r["body"], "reportId": r["report_id"],
+               "createdAt": r["created_at"], "unread": r["created_at"] > seen} for r in rows]
+    return {"notifications": notifs, "unread": sum(1 for n in notifs if n["unread"]), "seenAt": seen}
+
+
+@app.get("/api/notifications")
+@require_auth
+async def get_notifications(request: Request, guilds: str = "", limit: int = 50):
+    aid, _ = _web_actor(request)
+    if not aid:
+        return {"notifications": [], "unread": 0, "seenAt": 0}
+    return _list_notifications(aid, guilds.split(",") if guilds else [], limit)
+
+
+@app.post("/api/notifications/seen")
+@require_auth
+async def seen_notifications(request: Request):
+    aid, _ = _web_actor(request)
+    if aid:
+        _kv_set(f"notif_seen:{aid}", int(time.time()))
+    return {"ok": True}
 
 
 # ── top.gg votes: supporter leaderboard + per-user status ─────────────────────
@@ -2497,6 +2688,7 @@ def _notify_settings_changed(guild_id: str, detail: str | None = None, actor: st
             body = f"{actor}: {detail}" if actor else detail
         else:
             body = f"Protection settings for {name} were updated."
+        _notify("guild", guild_id, "settings", f"{name} · settings changed", body)
         await _push_to_guild(guild_id, "settings_changed",
                              f"{name} · settings changed", body,
                              category="LP_SETTINGS", custom={"t": "settings", "guild_id": guild_id})
@@ -2593,11 +2785,63 @@ async def _bot_offline_loop():
             pass
 
 
+async def _web_notif_loop():
+    """Record in-app (web) notifications for new moderation actions (warnings/
+    kicks/bans/timeouts) and for settings changed via Discord commands. Runs
+    independently of push (APNs) so the web notification centre works even when
+    push isn't configured."""
+    try:
+        a_last = _get_conn().execute("SELECT MAX(id) AS m FROM actions").fetchone()["m"] or 0
+    except Exception:
+        a_last = 0
+    try:
+        p_last = _get_conn().execute("SELECT MAX(id) AS m FROM push_events").fetchone()["m"] or 0
+    except Exception:
+        p_last = 0
+    while True:
+        await asyncio.sleep(10)
+        try:
+            info = None
+            arows = _get_conn().execute(
+                "SELECT id, guild_id, username, action, reason FROM actions WHERE id > ? "
+                "ORDER BY id ASC LIMIT 100", (a_last,),
+            ).fetchall()
+            if arows:
+                info = await _bot_guilds_info()
+                for r in arows:
+                    a_last = r["id"]
+                    gid = str(r["guild_id"])
+                    gname = info.get(gid, {}).get("name") or "your server"
+                    verb = {"warned": "Warning", "kicked": "Kick", "banned": "Ban",
+                            "timeout": "Timeout"}.get(r["action"], "Action")
+                    _notify("guild", gid, "warn", f"{verb} · {gname}", f"{r['username']}: {r['reason']}")
+            prows = _get_conn().execute(
+                "SELECT id, guild_id FROM push_events WHERE id > ? AND kind='settings_changed' "
+                "ORDER BY id ASC LIMIT 100", (p_last,),
+            ).fetchall()
+            if prows:
+                if info is None:
+                    info = await _bot_guilds_info()
+                seen: set[str] = set()
+                for r in prows:
+                    p_last = r["id"]
+                    gid = str(r["guild_id"])
+                    if gid in seen:
+                        continue
+                    seen.add(gid)
+                    gname = info.get(gid, {}).get("name") or "your server"
+                    _notify("guild", gid, "settings", f"{gname} · settings changed",
+                            "Protection settings were updated via a Discord command.")
+        except Exception:
+            pass
+
+
 @app.on_event("startup")
 async def _start_background_tasks():
     asyncio.create_task(_action_push_loop())
     asyncio.create_task(_bot_offline_loop())
     asyncio.create_task(_settings_push_loop())
+    asyncio.create_task(_web_notif_loop())
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flag, X, ShieldAlert, ShieldOff, Bug, MessageSquare, CheckCircle2, Loader2 } from 'lucide-react';
@@ -24,12 +24,23 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guild, setGuild] = useState(guildId ?? '');
+  const [guilds, setGuilds] = useState<{ id: string; name: string }[]>([]);
+
+  // Load the user's servers so a report can be tied to a specific one.
+  useEffect(() => {
+    if (!open || guilds.length) return;
+    fetch('/api/guilds')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (Array.isArray(d)) setGuilds(d.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))); })
+      .catch(() => {});
+  }, [open, guilds.length]);
 
   const meta = TYPES.find((t) => t.id === type)!;
 
   const reset = () => {
     setType('malicious_link'); setUrl(''); setCategory('scam'); setMessage('');
-    setSubmitting(false); setDone(false); setError(null);
+    setSubmitting(false); setDone(false); setError(null); setGuild(guildId ?? '');
   };
   const close = () => { setOpen(false); setTimeout(reset, 200); };
 
@@ -47,7 +58,7 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
           url: meta.needsUrl ? url.trim() : undefined,
           category: type === 'malicious_link' ? category : undefined,
           message: message.trim() || undefined,
-          guildId,
+          guildId: guild || undefined,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -109,6 +120,23 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
                           </button>
                         );
                       })}
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#949ba4', display: 'block', marginBottom: 6 }}>
+                        Which server is this about? {type === 'bug' || type === 'false_positive' ? '' : '(optional)'}
+                      </label>
+                      <select value={guild} onChange={(e) => setGuild(e.target.value)} style={{ ...input, cursor: 'pointer' }}>
+                        <option value="">— Not about a specific server —</option>
+                        {guilds.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                      {guilds.length === 0 && (
+                        <p style={{ fontSize: 10.5, color: '#52535a', marginTop: 5 }}>
+                          Sign in and manage a server to attach it here.
+                        </p>
+                      )}
                     </div>
 
                     {meta.needsUrl && (

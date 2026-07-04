@@ -9,6 +9,7 @@ import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
 import { SupporterBadge, rankMeta } from '@/components/SupporterBadge';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -100,6 +101,7 @@ export default function Navbar() {
 
         {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {session && <NotificationBell isAdmin={isAdmin(session.user?.id)} />}
           {session ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button onClick={() => setMenuOpen(!menuOpen)}

@@ -6,6 +6,7 @@ import {
   Check, Archive, ExternalLink,
 } from 'lucide-react';
 import type { Report, ReportType } from '@/lib/db';
+import ReportThread from '@/components/ReportThread';
 
 const TYPE_META: Record<ReportType, { label: string; color: string; icon: typeof Bug }> = {
   malicious_link: { label: 'Malicious link', color: '#f23f43', icon: ShieldAlert },
@@ -34,6 +35,7 @@ export default function AdminReports() {
   const [status, setStatus] = useState('open');
   const [type, setType] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const fetchData = useCallback(() => {
     setLoading(true); setError(false);
@@ -133,7 +135,11 @@ export default function AdminReports() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11, color: '#52535a' }}>by {r.username ?? `…${r.userId.slice(-4)}`}{r.guildId ? ` · guild …${r.guildId.slice(-4)}` : ''}</span>
-                <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                  <button onClick={() => setOpenId(r.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#7289da' }}>
+                    <MessageSquare size={13} /> Reply
+                  </button>
                   {r.type === 'malicious_link' && (
                     <button onClick={() => act(r.id, { status: 'resolved', promote: true })} disabled={busy === r.id}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.4)', background: 'rgba(242,63,67,0.1)', color: '#f87171' }}>
@@ -154,6 +160,10 @@ export default function AdminReports() {
           );
         })}
       </div>
+      {openId !== null && (
+        <ReportThread reportId={openId} viewerIsAdmin
+          onClose={() => setOpenId(null)} onChanged={fetchData} />
+      )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
