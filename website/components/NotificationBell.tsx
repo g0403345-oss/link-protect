@@ -38,12 +38,25 @@ export default function NotificationBell({ isAdmin = false }: { isAdmin?: boolea
     } catch { /* ignore */ }
   }, []);
 
+  // Real-time via Server-Sent Events (no polling). The stream pushes the full
+  // list on connect and whenever a new ticket notification arrives; EventSource
+  // reconnects on its own when the ~50s upstream window ends.
   useEffect(() => {
-    fetchNotifs();
-    const id = setInterval(fetchNotifs, 30_000);
-    const onFocus = () => { if (document.visibilityState === 'visible') fetchNotifs(); };
-    document.addEventListener('visibilitychange', onFocus);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onFocus); };
+    fetchNotifs(); // instant first paint while the stream connects
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/notifications/stream');
+      es.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d && Array.isArray(d.notifications)) {
+            setItems(d.notifications);
+            setUnread(d.unread ?? 0);
+          }
+        } catch { /* heartbeat / non-JSON */ }
+      };
+    } catch { /* EventSource unsupported — fetchNotifs already ran */ }
+    return () => { es?.close(); };
   }, [fetchNotifs]);
 
   useEffect(() => {

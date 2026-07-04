@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getNotifications } from '@/lib/db';
-import { getManagedGuildIds } from '@/lib/guilds';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +11,7 @@ export async function GET() {
     return NextResponse.json({ notifications: [], unread: 0, seenAt: 0 });
   }
   try {
-    const guildIds = await getManagedGuildIds();
-    return NextResponse.json(await getNotifications(guildIds));
+    return NextResponse.json(await getNotifications());
   } catch {
     return NextResponse.json(
       { error: 'Bot API unreachable', notifications: [], unread: 0, seenAt: 0 },

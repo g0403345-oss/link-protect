@@ -283,11 +283,12 @@ export interface WebNotification {
   unread: boolean;
 }
 
-export async function getNotifications(
-  guildIds: string[]
-): Promise<{ notifications: WebNotification[]; unread: number; seenAt: number }> {
-  const q = guildIds.length ? `?guilds=${encodeURIComponent(guildIds.join(","))}` : "";
-  return apiFetch(`/api/notifications${q}`);
+export async function getNotifications(): Promise<{
+  notifications: WebNotification[];
+  unread: number;
+  seenAt: number;
+}> {
+  return apiFetch(`/api/notifications`);
 }
 
 export async function markNotificationsSeen(): Promise<{ ok: boolean }> {

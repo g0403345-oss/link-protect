@@ -72,6 +72,7 @@ export default function ReportThread({
   };
 
   const r = thread?.report;
+  const closed = !!r && (r.status === 'resolved' || r.status === 'dismissed');
   // "Mine" = messages I authored, shown on the right.
   const isMine = (m: ReportMessage) => (viewerIsAdmin ? m.sender === 'admin' : m.sender === 'user');
 
@@ -147,18 +148,24 @@ export default function ReportThread({
             </div>
           )}
 
-          {/* reply box */}
-          <div style={{ padding: 12, borderTop: '1px solid #1e1e22', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={viewerIsAdmin ? 'Reply to the reporter…' : 'Reply to support…'}
-              style={{ flex: 1, resize: 'none', maxHeight: 120, padding: '10px 12px', fontSize: 13.5, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 9, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit' }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')} onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')} />
-            <button onClick={send} disabled={sending || !text.trim()}
-              style={{ width: 40, height: 40, flex: 'none', borderRadius: 9, background: '#5865f2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: sending || !text.trim() ? 0.55 : 1 }}>
-              {sending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color="#fff" />}
-            </button>
-          </div>
+          {/* reply box — closed tickets are read-only for the reporter */}
+          {closed && !viewerIsAdmin ? (
+            <div style={{ padding: '14px 16px', borderTop: '1px solid #1e1e22', fontSize: 12.5, color: '#6d6f78', textAlign: 'center' }}>
+              This ticket was {r?.status} — you can no longer reply. Need more help? Open a new report.
+            </div>
+          ) : (
+            <div style={{ padding: 12, borderTop: '1px solid #1e1e22', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={viewerIsAdmin ? (closed ? 'Reply (ticket is closed)…' : 'Reply to the reporter…') : 'Reply to support…'}
+                style={{ flex: 1, resize: 'none', maxHeight: 120, padding: '10px 12px', fontSize: 13.5, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 9, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')} onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')} />
+              <button onClick={send} disabled={sending || !text.trim()}
+                style={{ width: 40, height: 40, flex: 'none', borderRadius: 9, background: '#5865f2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: sending || !text.trim() ? 0.55 : 1 }}>
+                {sending ? <Loader2 size={16} color="#fff" style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} color="#fff" />}
+              </button>
+            </div>
+          )}
         </motion.div>
       </motion.div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

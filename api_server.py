@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -929,6 +930,9 @@ async def get_report_thread(request: Request, report_id: int):
 @require_auth
 async def post_report_message(request: Request, report_id: int, body: ReportMessageBody):
     aid, aname, row, is_admin = _report_thread_guard(request, report_id)
+    # A closed ticket is read-only for the reporter; only an admin can still reply.
+    if not is_admin and row["status"] in ("resolved", "dismissed"):
+        raise HTTPException(status_code=409, detail="This ticket is closed.")
     msg = (body.message or "").strip()[:2000]
     if not msg:
         raise HTTPException(status_code=400, detail="Empty message")
@@ -977,18 +981,15 @@ async def my_reports(request: Request, limit: int = 100):
     return {"reports": out}
 
 
-def _list_notifications(aid: str, guild_ids: list, limit: int) -> dict:
+def _list_notifications(aid: str, limit: int = 50) -> dict:
+    """The notification centre is ticket-only — personal (user-scope) notifications
+    for the acting user. Logs/warnings/settings live in the per-guild audit log,
+    not here."""
     seen = _kv_int(f"notif_seen:{aid}")
-    clauses, params = ["(scope='user' AND scope_id=?)"], [str(aid)]
-    gids = [g.strip() for g in guild_ids if g and g.strip()][:100]
-    if gids:
-        ph = ",".join("?" * len(gids))
-        clauses.append(f"(scope='guild' AND scope_id IN ({ph}))")
-        params.extend(gids)
     rows = _get_conn().execute(
-        f"SELECT id, scope, scope_id, type, title, body, report_id, created_at FROM web_notifications "
-        f"WHERE {' OR '.join(clauses)} ORDER BY id DESC LIMIT ?",
-        (*params, max(1, min(int(limit or 50), 200))),
+        "SELECT id, scope, scope_id, type, title, body, report_id, created_at FROM web_notifications "
+        "WHERE scope='user' AND scope_id=? ORDER BY id DESC LIMIT ?",
+        (str(aid), max(1, min(int(limit or 50), 200))),
     ).fetchall()
     notifs = [{"id": r["id"], "scope": r["scope"], "scopeId": r["scope_id"], "type": r["type"],
                "title": r["title"], "body": r["body"], "reportId": r["report_id"],
@@ -998,11 +999,49 @@ def _list_notifications(aid: str, guild_ids: list, limit: int) -> dict:
 
 @app.get("/api/notifications")
 @require_auth
-async def get_notifications(request: Request, guilds: str = "", limit: int = 50):
+async def get_notifications(request: Request, limit: int = 50):
     aid, _ = _web_actor(request)
     if not aid:
         return {"notifications": [], "unread": 0, "seenAt": 0}
-    return _list_notifications(aid, guilds.split(",") if guilds else [], limit)
+    return _list_notifications(aid, limit)
+
+
+@app.get("/api/notifications/stream")
+@require_auth
+async def notifications_stream(request: Request):
+    """Server-Sent Events: pushes the notification list to the browser in real
+    time (no client polling). Emits the current state on connect, then again
+    whenever a new ticket notification lands. Ends after ~50s so the client
+    (EventSource) reconnects cleanly within serverless time limits."""
+    aid, _ = _web_actor(request)
+
+    async def gen():
+        if not aid:
+            yield "event: end\ndata: {}\n\n"
+            return
+        payload = _list_notifications(aid, 50)
+        last_id = max((n["id"] for n in payload["notifications"]), default=0)
+        yield f"data: {json.dumps(payload)}\n\n"
+        for i in range(50):
+            if await request.is_disconnected():
+                break
+            await asyncio.sleep(1)
+            try:
+                row = _get_conn().execute(
+                    "SELECT MAX(id) AS m FROM web_notifications WHERE scope='user' AND scope_id=?",
+                    (str(aid),),
+                ).fetchone()
+                mx = row["m"] or 0
+            except Exception:
+                mx = last_id
+            if mx > last_id:
+                last_id = mx
+                yield f"data: {json.dumps(_list_notifications(aid, 50))}\n\n"
+            elif i % 15 == 14:
+                yield ": ping\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 @app.post("/api/notifications/seen")
@@ -2688,7 +2727,6 @@ def _notify_settings_changed(guild_id: str, detail: str | None = None, actor: st
             body = f"{actor}: {detail}" if actor else detail
         else:
             body = f"Protection settings for {name} were updated."
-        _notify("guild", guild_id, "settings", f"{name} · settings changed", body)
         await _push_to_guild(guild_id, "settings_changed",
                              f"{name} · settings changed", body,
                              category="LP_SETTINGS", custom={"t": "settings", "guild_id": guild_id})
@@ -2785,63 +2823,11 @@ async def _bot_offline_loop():
             pass
 
 
-async def _web_notif_loop():
-    """Record in-app (web) notifications for new moderation actions (warnings/
-    kicks/bans/timeouts) and for settings changed via Discord commands. Runs
-    independently of push (APNs) so the web notification centre works even when
-    push isn't configured."""
-    try:
-        a_last = _get_conn().execute("SELECT MAX(id) AS m FROM actions").fetchone()["m"] or 0
-    except Exception:
-        a_last = 0
-    try:
-        p_last = _get_conn().execute("SELECT MAX(id) AS m FROM push_events").fetchone()["m"] or 0
-    except Exception:
-        p_last = 0
-    while True:
-        await asyncio.sleep(10)
-        try:
-            info = None
-            arows = _get_conn().execute(
-                "SELECT id, guild_id, username, action, reason FROM actions WHERE id > ? "
-                "ORDER BY id ASC LIMIT 100", (a_last,),
-            ).fetchall()
-            if arows:
-                info = await _bot_guilds_info()
-                for r in arows:
-                    a_last = r["id"]
-                    gid = str(r["guild_id"])
-                    gname = info.get(gid, {}).get("name") or "your server"
-                    verb = {"warned": "Warning", "kicked": "Kick", "banned": "Ban",
-                            "timeout": "Timeout"}.get(r["action"], "Action")
-                    _notify("guild", gid, "warn", f"{verb} · {gname}", f"{r['username']}: {r['reason']}")
-            prows = _get_conn().execute(
-                "SELECT id, guild_id FROM push_events WHERE id > ? AND kind='settings_changed' "
-                "ORDER BY id ASC LIMIT 100", (p_last,),
-            ).fetchall()
-            if prows:
-                if info is None:
-                    info = await _bot_guilds_info()
-                seen: set[str] = set()
-                for r in prows:
-                    p_last = r["id"]
-                    gid = str(r["guild_id"])
-                    if gid in seen:
-                        continue
-                    seen.add(gid)
-                    gname = info.get(gid, {}).get("name") or "your server"
-                    _notify("guild", gid, "settings", f"{gname} · settings changed",
-                            "Protection settings were updated via a Discord command.")
-        except Exception:
-            pass
-
-
 @app.on_event("startup")
 async def _start_background_tasks():
     asyncio.create_task(_action_push_loop())
     asyncio.create_task(_bot_offline_loop())
     asyncio.create_task(_settings_push_loop())
-    asyncio.create_task(_web_notif_loop())
 
 
 if __name__ == "__main__":
