@@ -35,6 +35,8 @@ enum DemoData {
         d.channel.role = ["400000000000000001"]
         d.log.activated = true
         d.log.logChannel = "300000000000000009"
+        d.scamguard.enabled = true
+        d.scamguard.joinCheck = true
         return d
     }
 

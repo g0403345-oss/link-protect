@@ -120,6 +120,23 @@ def _init_db():
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status, created_at DESC)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_reports_type ON reports (type, created_at DESC)")
+    # Scam Shield: accounts the bot has caught mass-posting scam content,
+    # shared across all servers (cross-server intel). Stores ONLY the user id +
+    # counts — no message content, no usernames.
+    c.execute("""CREATE TABLE IF NOT EXISTS flagged_users (
+        user_id TEXT PRIMARY KEY,
+        reason TEXT NOT NULL,
+        incidents INTEGER NOT NULL DEFAULT 0,
+        first_seen INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL
+    )""")
+    # Distinct (user, guild) pairs → on how many servers each account was caught.
+    c.execute("""CREATE TABLE IF NOT EXISTS flagged_user_guilds (
+        user_id TEXT NOT NULL,
+        guild_id INTEGER NOT NULL,
+        PRIMARY KEY (user_id, guild_id)
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_flagged_last ON flagged_users (last_seen DESC)")
     # top.gg votes — drives the public supporter leaderboard + vote reminders.
     # One row per user: lifetime total + this-month count (for the monthly board).
     c.execute("""CREATE TABLE IF NOT EXISTS votes (
@@ -168,6 +185,17 @@ _DEFAULT = {
     # response: their messages are deleted and they're timed out for
     # `timeout_minutes`, with one alarm instead of dozens of warnings.
     "raid": {"enabled": False, "threshold": 5, "window": 10, "timeout_minutes": 60},
+    # Scam Shield: ONE account posting the same scam (link/image/wall of text)
+    # into ≥ `channels` different channels within `window` seconds → messages are
+    # deleted and `action` (delete|timeout|kick|ban) is applied. Caught accounts
+    # are flagged in the cross-server intel DB. `join_check` additionally
+    # kicks/bans accounts already flagged on ≥ `min_servers` other servers the
+    # moment they join (or first post, if the join event isn't available).
+    "scamguard": {
+        "enabled": False, "channels": 3, "window": 60,
+        "action": "ban", "timeout_minutes": 60,
+        "join_check": False, "join_action": "kick", "min_servers": 2,
+    },
 }
 
 # The set of blocker keys a channel override can toggle (mirrors `protect`).
@@ -848,6 +876,50 @@ def flush_caught_sync(rows: list) -> None:
             (domain, int(guild_id)),
         )
     c.commit()
+
+
+# ── Scam Shield cross-server intel ───────────────────────────────────────────
+# Only the bot's own scam-blitz detection writes here (never keyword matches),
+# so a flag always means "this exact account mass-posted scam content live".
+
+def flag_scammer_sync(user_id: str, guild_id: int, reason: str) -> None:
+    c = _get_conn()
+    now = int(time.time())
+    c.execute(
+        "INSERT INTO flagged_users(user_id, reason, incidents, first_seen, last_seen) "
+        "VALUES(?,?,1,?,?) "
+        "ON CONFLICT(user_id) DO UPDATE SET "
+        "  incidents = incidents + 1, last_seen = excluded.last_seen",
+        (str(user_id), reason, now, now),
+    )
+    c.execute(
+        "INSERT OR IGNORE INTO flagged_user_guilds(user_id, guild_id) VALUES(?,?)",
+        (str(user_id), int(guild_id)),
+    )
+    c.commit()
+
+
+def get_flag_sync(user_id: str) -> dict | None:
+    """{'reason', 'incidents', 'guilds', 'first_seen', 'last_seen'} or None."""
+    c = _get_conn()
+    row = c.execute(
+        "SELECT reason, incidents, first_seen, last_seen FROM flagged_users WHERE user_id=?",
+        (str(user_id),),
+    ).fetchone()
+    if row is None:
+        return None
+    guilds = c.execute(
+        "SELECT COUNT(*) FROM flagged_user_guilds WHERE user_id=?", (str(user_id),)
+    ).fetchone()[0]
+    return {"reason": row[0], "incidents": row[1], "guilds": guilds,
+            "first_seen": row[2], "last_seen": row[3]}
+
+
+def load_flagged_ids_sync() -> set:
+    """All flagged user ids — small set, kept in memory by the cog so the
+    per-message membership test never touches the DB."""
+    c = _get_conn()
+    return {r[0] for r in c.execute("SELECT user_id FROM flagged_users").fetchall()}
 
 
 # ── shared warn helper ───────────────────────────────────────────────────────

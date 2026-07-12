@@ -291,6 +291,10 @@ async def safe_defer(ctx):
 
 intents = discord.Intents.default()
 intents.message_content = True
+# Scam Shield join check (privileged — must also be enabled in the Developer
+# Portal). Set LP_NO_MEMBERS_INTENT=1 to boot without it if Discord rejects the
+# identify; the Scam Shield cog then falls back to first-message checks.
+intents.members = os.environ.get("LP_NO_MEMBERS_INTENT") != "1"
 bot = commands.AutoShardedBot(command_prefix="!", intents=intents, sync_commands=False,
                               max_messages=0, chunk_guilds_at_startup=False)
 
@@ -399,7 +403,9 @@ async def _settings_redirect_check(ctx) -> bool:
 @bot.event
 async def on_application_command_error(ctx, error):
     # The redirect check raises CheckFailure after already responding — swallow it.
-    if isinstance(error, commands.CheckFailure):
+    # py-cord raises discord.errors.CheckFailure for slash-command checks, which is a
+    # different class than commands.CheckFailure, so catch both.
+    if isinstance(error, (commands.CheckFailure, discord.errors.CheckFailure)):
         return
     raise error
 
@@ -899,17 +905,33 @@ async def _update(ctx):
     embed.set_footer(text="Older changes are no longer shown here.")
     await ctx.respond(embed=embed)
 
+def _latency_ms():
+    """Gateway latency in ms, or None when unavailable (bot.latency can be inf/NaN
+    right after a (re)connect before the first heartbeat ACK)."""
+    lat = bot.latency
+    if lat is None or lat != lat or lat in (float("inf"), float("-inf")):
+        return None
+    return round(lat * 1000)
+
+
 @bot.slash_command(name="ping", description="Show bot latency")
 async def _ping(ctx):
     await ctx.defer()
-    gateway_ms = round(bot.latency * 1000)
+    gateway_ms = _latency_ms()
     t_start = time.monotonic()
     await ctx.followup.send("⏱️ Measuring…")
     api_ms = round((time.monotonic() - t_start) * 1000)
     embed = discord.Embed(title="🏓 Pong!", color=0x7a7aff)
-    embed.add_field(name="Gateway", value=f"```{gateway_ms} ms```", inline=True)
+    embed.add_field(name="Gateway", value=f"```{gateway_ms if gateway_ms is not None else '—'} ms```", inline=True)
     embed.add_field(name="API Roundtrip", value=f"```{api_ms} ms```", inline=True)
-    quality = "🟢 Excellent" if gateway_ms < 100 else ("🟡 Good" if gateway_ms < 250 else "🔴 High latency")
+    if gateway_ms is None:
+        quality = "⚪ Connecting…"
+    elif gateway_ms < 100:
+        quality = "🟢 Excellent"
+    elif gateway_ms < 250:
+        quality = "🟡 Good"
+    else:
+        quality = "🔴 High latency"
     embed.set_footer(text=quality)
     await ctx.edit(content="", embed=embed)
 
@@ -924,7 +946,8 @@ async def _stats(ctx):
     embed.add_field(name="Servers", value=f"```{guild_count:,}```", inline=True)
     embed.add_field(name="Users", value=f"```{user_count:,}```", inline=True)
     embed.add_field(name="Shards", value=f"```{shard_count}```", inline=True)
-    embed.add_field(name="Latency", value=f"```{round(bot.latency * 1000)} ms```", inline=True)
+    _lat_ms = _latency_ms()
+    embed.add_field(name="Latency", value=f"```{_lat_ms if _lat_ms is not None else '—'} ms```", inline=True)
     uptime_s = int(time.monotonic() - _startup_time)
     h, rem = divmod(uptime_s, 3600)
     m, s = divmod(rem, 60)

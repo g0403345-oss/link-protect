@@ -60,6 +60,11 @@ struct APIClient {
         return try await request("/api/mobile/guild/\(guildId)", as: Resp.self).data
     }
 
+    func scamShieldStats(_ guildId: String) async throws -> ScamShieldStats {
+        if demo { return ScamShieldStats(flaggedTotal: 1284, flaggedWeek: 96, guildCatches: 3) }
+        return try await request("/api/mobile/guild/\(guildId)/scamshield-stats")
+    }
+
     // MARK: Mutations
 
     func patch<V: Encodable>(_ guildId: String, path: String, value: V) async throws {

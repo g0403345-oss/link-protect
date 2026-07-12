@@ -82,6 +82,11 @@ export interface ServerData {
   safe: Record<string, unknown>;
   decay?: { enabled: boolean; days: number };
   raid?: { enabled: boolean; threshold: number; window: number; timeout_minutes: number };
+  scamguard?: {
+    enabled: boolean; channels: number; window: number;
+    action: 'delete' | 'timeout' | 'kick' | 'ban'; timeout_minutes: number;
+    join_check: boolean; join_action: 'kick' | 'ban'; min_servers: number;
+  };
   overrides?: Record<string, ChannelOverride>;
 }
 

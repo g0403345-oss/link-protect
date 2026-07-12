@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -24,7 +24,9 @@ import VoteBanner from '@/components/VoteBanner';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit';
+type Section = 'overview' | 'blockers' | 'scamshield' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit';
+
+interface ScamShieldStats { flaggedTotal: number; flaggedWeek: number; guildCatches: number; }
 
 interface GuildAction {
   user_id: string; username: string; channel_id: string;
@@ -122,6 +124,27 @@ function NumberInput({ label, description, value, icon, color, onSave, saving }:
 }
 
 
+function SegmentPicker({ options, value, onChange, disabled }: {
+  options: { id: string; label: string; color?: string }[];
+  value: string; onChange: (v: string) => void; disabled?: boolean;
+}) {
+  return (
+    <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2 }}>
+      {options.map(({ id, label, color }) => {
+        const active = value === id;
+        const c = color ?? '#5865f2';
+        return (
+          <button key={id} onClick={() => !disabled && onChange(id)} disabled={disabled}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: disabled ? 'default' : 'pointer', background: active ? `${c}26` : 'transparent', color: active ? c : '#6d6f78', transition: 'all 0.12s' }}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+
 /* ── main ──────────────────────────────────────────────────── */
 
 export default function GuildDashboard() {
@@ -139,6 +162,7 @@ export default function GuildDashboard() {
   const [guildInfo, setGuildInfo] = useState<{ name: string; icon: string | null } | null>(null);
   const [actions, setActions] = useState<GuildAction[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [shieldStats, setShieldStats] = useState<ScamShieldStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [newLink, setNewLink] = useState('');
@@ -217,6 +241,13 @@ export default function GuildDashboard() {
     } catch { /* silent */ }
   }, [guildId]);
 
+  const fetchShieldStats = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/guild/${guildId}/scamshield`);
+      if (res.ok) setShieldStats(await res.json() as ScamShieldStats);
+    } catch { /* silent */ }
+  }, [guildId]);
+
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-info`)
       .then(r => r.json()).then(d => setGuildInfo(d)).catch(() => {});
@@ -264,6 +295,9 @@ export default function GuildDashboard() {
 
   // Load the audit log when its tab opens
   useEffect(() => { if (section === 'audit') fetchAudit(); }, [section, fetchAudit]);
+
+  // Load Scam Shield network stats when its tab opens
+  useEffect(() => { if (section === 'scamshield') fetchShieldStats(); }, [section, fetchShieldStats]);
 
   const patch = useCallback(async (path: string, value: unknown, label?: string) => {
     setSaving(path);
@@ -334,11 +368,13 @@ export default function GuildDashboard() {
   const allow = data.link?.allow ?? [];
   const decay = data.decay ?? { enabled: false, days: 30 };
   const raid = data.raid ?? { enabled: false, threshold: 5, window: 10, timeout_minutes: 60 };
+  const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 60, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
   const overrides = data.overrides ?? {};
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
     { id: 'overview',     label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
     { id: 'blockers',     label: 'Link Blockers',  icon: AlertTriangle, desc: 'What gets blocked' },
+    { id: 'scamshield',   label: 'Scam Shield',    icon: ShieldAlert,   desc: 'Scam spam & known scammers' },
     { id: 'warnings',     label: 'Warnings',       icon: Ban,           desc: 'Kick, ban & decay' },
     { id: 'channelrules', label: 'Channel Rules',  icon: Target,        desc: 'Per-channel behaviour' },
     { id: 'access',       label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
@@ -528,6 +564,99 @@ export default function GuildDashboard() {
                     <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: 'rgba(242,63,67,0.06)', border: '1px solid rgba(242,63,67,0.15)', borderRadius: 8 }}>
                       <Info size={13} color="#f23f43" style={{ flexShrink: 0, marginTop: 1 }} />
                       <p style={{ fontSize: 12, color: '#6d6f78' }}>Trusted (allowlisted) domains and whitelisted members never trigger this. Make sure Link Protect has <b>Moderate Members</b> so timeouts work.</p>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {/* SCAM SHIELD */}
+              {section === 'scamshield' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SectionHeader title="Scam Shield" description="Stops hijacked accounts and scam bots — the ones that paste the same scam into every channel" icon={ShieldAlert} />
+
+                  <div className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    <StatCard label="Flagged accounts (network)" value={shieldStats?.flaggedTotal ?? '—'} icon={Globe} color="#f23f43" />
+                    <StatCard label="Newly flagged (7 days)" value={shieldStats?.flaggedWeek ?? '—'} icon={TrendingUp} color="#f0b232" />
+                    <StatCard label="Caught in this server" value={shieldStats?.guildCatches ?? '—'} icon={ShieldAlert} color="#23a55a" />
+                  </div>
+
+                  <Card title="Scam Spam Detection">
+                    <ToggleSwitch
+                      checked={!!scamguard.enabled}
+                      onChange={(v) => patch('scamguard.enabled', v, 'Scam spam detection')}
+                      label="Detect cross-channel scam spam"
+                      description="One account posting the same message (link, image or wall of text) into several channels within seconds — every copy is deleted and the action below is applied."
+                      disabled={saving === 'scamguard.enabled'}
+                    />
+                    {scamguard.enabled && (
+                      <>
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <Ban size={14} color="#f23f43" />
+                            <label style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>Action on detection</label>
+                          </div>
+                          <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>The messages are always deleted — this decides what happens to the account</p>
+                          <SegmentPicker
+                            value={scamguard.action ?? 'ban'}
+                            onChange={(v) => patch('scamguard.action', v, 'Scam Shield action')}
+                            disabled={saving === 'scamguard.action'}
+                            options={[
+                              { id: 'delete',  label: 'Delete only', color: '#949ba4' },
+                              { id: 'timeout', label: 'Timeout',     color: '#5865f2' },
+                              { id: 'kick',    label: 'Kick',        color: '#f0b232' },
+                              { id: 'ban',     label: 'Ban',         color: '#f23f43' },
+                            ]}
+                          />
+                        </div>
+                        <div className="thresholds-3col" style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                          <NumberInput label="Channels" description="Same message in this many different channels" value={scamguard.channels ?? 3} icon={<Target size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('scamguard.channels', Math.max(2, v), 'Scam Shield channels')} saving={saving === 'scamguard.channels'} />
+                          <NumberInput label="Within (seconds)" description="Time window for the spam burst" value={scamguard.window ?? 60} icon={<Clock size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('scamguard.window', Math.min(300, Math.max(5, v)), 'Scam Shield window')} saving={saving === 'scamguard.window'} />
+                          {scamguard.action === 'timeout' && (
+                            <NumberInput label="Timeout (minutes)" description="How long the account is muted" value={scamguard.timeout_minutes ?? 60} icon={<Hourglass size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('scamguard.timeout_minutes', Math.max(1, v), 'Scam Shield timeout')} saving={saving === 'scamguard.timeout_minutes'} />
+                          )}
+                        </div>
+                      </>
+                    )}
+                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: 'rgba(242,63,67,0.06)', border: '1px solid rgba(242,63,67,0.15)', borderRadius: 8 }}>
+                      <Info size={13} color="#f23f43" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted members and roles never trigger this. Every catch is recorded in the <b>Activity Log</b> with the reason, and the account is flagged in the Link Protect network. For kicks/bans make sure the Link Protect role sits <b>above</b> member roles.</p>
+                    </div>
+                  </Card>
+
+                  <Card title="Known Scammer Check">
+                    <ToggleSwitch
+                      checked={!!scamguard.join_check}
+                      onChange={(v) => patch('scamguard.join_check', v, 'Known scammer check')}
+                      label="Remove known scam accounts automatically"
+                      description="Accounts that Link Protect already caught scam-spamming on other servers are removed the moment they join (or post their first message here)."
+                      disabled={saving === 'scamguard.join_check'}
+                    />
+                    {scamguard.join_check && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <LogIn size={14} color="#f0b232" />
+                            <label style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>Action on join</label>
+                          </div>
+                          <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>What happens to a known scam account</p>
+                          <SegmentPicker
+                            value={scamguard.join_action ?? 'kick'}
+                            onChange={(v) => patch('scamguard.join_action', v, 'Join action')}
+                            disabled={saving === 'scamguard.join_action'}
+                            options={[
+                              { id: 'kick', label: 'Kick', color: '#f0b232' },
+                              { id: 'ban',  label: 'Ban',  color: '#f23f43' },
+                            ]}
+                          />
+                        </div>
+                        <div style={{ minWidth: 220 }}>
+                          <NumberInput label="Caught on at least" description="Servers the account must have been caught on — higher = safer against false positives" value={scamguard.min_servers ?? 2} icon={<Globe size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('scamguard.min_servers', Math.max(1, v), 'Minimum servers')} saving={saving === 'scamguard.min_servers'} />
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
+                      <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: '#6d6f78' }}>Flags only come from Link Protect <b>catching the behaviour live</b> — never from reports or keyword matches. Only the account ID is stored, no messages. Server owners, admins and whitelisted members are never auto-removed, and every removal lands in the Activity Log with the full reason.</p>
                     </div>
                   </Card>
                 </div>

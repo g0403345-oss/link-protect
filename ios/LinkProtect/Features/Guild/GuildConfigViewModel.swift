@@ -48,6 +48,7 @@ final class GuildConfigViewModel: ObservableObject {
     }
 
     func refreshStats() async { stats = try? await api.stats(guildId) }
+    func scamShieldStats() async -> ScamShieldStats? { try? await api.scamShieldStats(guildId) }
     func refreshActions() async { actions = (try? await api.actions(guildId, limit: 50)) ?? [] }
     func loadAudit() async { audit = (try? await api.auditLog(guildId)) ?? [] }
     func loadTrends() async { if trends == nil { trends = try? await api.trends(guildId, days: 14) } }

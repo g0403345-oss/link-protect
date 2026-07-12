@@ -64,9 +64,10 @@ struct ServerData: Codable, Equatable {
     var warn = WarnConfig()
     var decay = Decay()
     var raid = Raid()
+    var scamguard = ScamGuard()
     var overrides: [String: ChannelOverride] = [:]
 
-    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, overrides }
+    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, scamguard, overrides }
 
     /// Empty defaults — used as a non-nil fallback while data loads.
     init() {}
@@ -81,6 +82,7 @@ struct ServerData: Codable, Equatable {
         warn = (try? c.decode(WarnConfig.self, forKey: .warn)) ?? WarnConfig()
         decay = (try? c.decode(Decay.self, forKey: .decay)) ?? Decay()
         raid = (try? c.decode(Raid.self, forKey: .raid)) ?? Raid()
+        scamguard = (try? c.decode(ScamGuard.self, forKey: .scamguard)) ?? ScamGuard()
         overrides = (try? c.decode([String: ChannelOverride].self, forKey: .overrides)) ?? [:]
     }
 
@@ -96,6 +98,38 @@ struct ServerData: Codable, Equatable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? false
             days = (try? c.decode(Int.self, forKey: .days)) ?? 30
+        }
+        func encode(to encoder: Encoder) throws {}
+    }
+
+    /// Scam Shield — cross-channel scam-spam defense + known-scammer join check.
+    struct ScamGuard: Codable, Equatable {
+        var enabled = false
+        var channels = 3
+        var window = 60
+        var action = "ban"          // delete | timeout | kick | ban
+        var timeoutMinutes = 60
+        var joinCheck = false
+        var joinAction = "kick"     // kick | ban
+        var minServers = 2
+        init() {}
+        enum CodingKeys: String, CodingKey {
+            case enabled, channels, window, action
+            case timeoutMinutes = "timeout_minutes"
+            case joinCheck = "join_check"
+            case joinAction = "join_action"
+            case minServers = "min_servers"
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? false
+            channels = (try? c.decode(Int.self, forKey: .channels)) ?? 3
+            window = (try? c.decode(Int.self, forKey: .window)) ?? 60
+            action = (try? c.decode(String.self, forKey: .action)) ?? "ban"
+            timeoutMinutes = (try? c.decode(Int.self, forKey: .timeoutMinutes)) ?? 60
+            joinCheck = (try? c.decode(Bool.self, forKey: .joinCheck)) ?? false
+            joinAction = (try? c.decode(String.self, forKey: .joinAction)) ?? "kick"
+            minServers = (try? c.decode(Int.self, forKey: .minServers)) ?? 2
         }
         func encode(to encoder: Encoder) throws {}
     }
@@ -197,6 +231,13 @@ struct ServerData: Codable, Equatable {
         }
         func encode(to encoder: Encoder) throws {}
     }
+}
+
+/// Scam Shield network stats (mobile /guild/{id}/scamshield-stats).
+struct ScamShieldStats: Codable, Equatable {
+    var flaggedTotal = 0
+    var flaggedWeek = 0
+    var guildCatches = 0
 }
 
 /// `warn` mixes fixed config keys (kick/ban/timeout) with one entry per warned

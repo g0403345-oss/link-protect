@@ -1443,6 +1443,78 @@ async def get_audit(request: Request, guild_id: str, limit: int = 100):
     return _audit_payload(guild_id, limit)
 
 
+# ── Scam Shield (cross-server flagged-account intel) ──────────────────────────
+
+def _ensure_flagged_tables():
+    """Defensive: the bot creates these; guard against the API querying first."""
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS flagged_users (
+        user_id TEXT PRIMARY KEY,
+        reason TEXT NOT NULL,
+        incidents INTEGER NOT NULL DEFAULT 0,
+        first_seen INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS flagged_user_guilds (
+        user_id TEXT NOT NULL,
+        guild_id INTEGER NOT NULL,
+        PRIMARY KEY (user_id, guild_id)
+    )""")
+    c.commit()
+
+_ensure_flagged_tables()
+
+
+def _scamshield_stats_payload(guild_id: str) -> dict:
+    c = _get_conn()
+    total = c.execute("SELECT COUNT(*) AS c FROM flagged_users").fetchone()["c"]
+    week = c.execute(
+        "SELECT COUNT(*) AS c FROM flagged_users WHERE last_seen >= ?",
+        (int(time.time()) - 7 * 86400,),
+    ).fetchone()["c"]
+    catches = c.execute(
+        "SELECT COUNT(*) AS c FROM actions WHERE guild_id=? AND reason LIKE 'Scam Shield%'",
+        (int(guild_id),),
+    ).fetchone()["c"]
+    return {"flaggedTotal": total, "flaggedWeek": week, "guildCatches": catches}
+
+
+@app.get("/api/guild/{guild_id}/scamshield-stats")
+@require_auth
+async def scamshield_stats(request: Request, guild_id: str):
+    """Network-wide flagged-account counts + this guild's Scam Shield catches."""
+    return _scamshield_stats_payload(guild_id)
+
+
+@app.get("/api/admin/flagged")
+async def admin_flagged(request: Request, limit: int = 100):
+    """Operator view of flagged accounts (false-positive handling)."""
+    await _require_admin(request)
+    c = _get_conn()
+    rows = c.execute(
+        "SELECT f.user_id, f.reason, f.incidents, f.first_seen, f.last_seen, "
+        "       (SELECT COUNT(*) FROM flagged_user_guilds g WHERE g.user_id = f.user_id) AS guilds "
+        "FROM flagged_users f ORDER BY f.last_seen DESC LIMIT ?",
+        (max(1, min(int(limit or 100), 500)),),
+    ).fetchall()
+    return {"flagged": [
+        {"userId": r["user_id"], "reason": r["reason"], "incidents": r["incidents"],
+         "guilds": r["guilds"], "firstSeen": r["first_seen"], "lastSeen": r["last_seen"]}
+        for r in rows
+    ]}
+
+
+@app.delete("/api/admin/flagged/{user_id}")
+async def admin_unflag(request: Request, user_id: str):
+    """Remove a false-positive flag network-wide."""
+    await _require_admin(request)
+    c = _get_conn()
+    c.execute("DELETE FROM flagged_users WHERE user_id=?", (str(user_id),))
+    c.execute("DELETE FROM flagged_user_guilds WHERE user_id=?", (str(user_id),))
+    c.commit()
+    return {"ok": True}
+
+
 @app.get("/api/user/{user_id}/editor-guilds")
 @require_auth
 async def user_editor_guilds(request: Request, user_id: str):
@@ -1926,6 +1998,9 @@ MOBILE_ALLOWED_PATHS = {
     "channel.channel", "channel.category", "channel.member", "channel.role",
     "link.links", "link.allow",
     "raid.enabled", "raid.threshold", "raid.window", "raid.timeout_minutes",
+    "scamguard.enabled", "scamguard.channels", "scamguard.window",
+    "scamguard.action", "scamguard.timeout_minutes",
+    "scamguard.join_check", "scamguard.join_action", "scamguard.min_servers",
 }
 
 
@@ -2252,6 +2327,12 @@ async def mobile_guild(request: Request, guild_id: str):
     if data is None:
         raise HTTPException(status_code=404, detail="Guild not found")
     return {"data": _client_safe(data)}
+
+
+@app.get("/api/mobile/guild/{guild_id}/scamshield-stats")
+async def mobile_scamshield_stats(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return _scamshield_stats_payload(guild_id)
 
 
 @app.patch("/api/mobile/guild/{guild_id}")
