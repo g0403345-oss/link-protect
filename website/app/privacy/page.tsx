@@ -12,7 +12,7 @@ export default function PrivacyPage() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="June 23, 2026"
+      updated="July 12, 2026"
       intro="Link Protect is a Discord moderation bot and companion app that automatically blocks unwanted links and keeps servers safe. This policy explains exactly what data we use, why, and what we never touch. We keep it minimal on purpose."
     >
       <LegalSection heading="Who we are">
@@ -33,6 +33,8 @@ export default function PrivacyPage() {
             <>{strong('Discord account basics')} — when you sign in with Discord (on the website or in the app), we use the <em>identify</em> and <em>guilds</em> OAuth scopes to read your Discord user ID, username and avatar, and the list of servers you are a member of. This is used solely to authenticate you and show the servers you can manage.</>,
             <>{strong('Server configuration')} — the settings you choose for a server (active blockers, warning thresholds, whitelists, custom blacklists, log channel). Stored per server so the bot can enforce them.</>,
             <>{strong('Moderation history')} — when the bot acts on a message (warn, timeout, kick, ban) it records the action type, the reason, the affected user’s ID, the channel ID and a timestamp. This powers warning counts, statistics and the activity log.</>,
+            <>{strong('Scam Shield flags')} — when the bot catches an account mass-posting the same scam message across several channels, it records that account’s Discord user ID together with incident counters and timestamps in a shared flag list, so servers that opt in can automatically remove known scam accounts. Only the user ID and counters are stored — never message content or usernames. Flags are created exclusively by the bot observing this behaviour live, never from reports or keyword matches, and can be reviewed and removed on request through our support server.</>,
+            <>{strong('Member join events')} — on servers that enable the Scam Shield join check, the bot receives member join events and compares the joining account’s user ID against the flag list in memory. Join events are not stored; only if a flagged account is removed does a moderation-history entry (as above) get written.</>,
             <>{strong('Push notifications (app only)')} — if you enable notifications, we store your device’s push token and your notification preferences so we can deliver alerts. You can turn this off anytime in iOS Settings.</>,
           ]}
         />
