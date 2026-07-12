@@ -19,7 +19,16 @@ export default function DashboardPage() {
   const fetchGuilds = () => {
     setLoadState('loading');
     fetch('/api/guilds')
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((r) => {
+        if (r.status === 401) {
+          // Discord token expired and couldn't be refreshed — re-run the OAuth
+          // redirect (silent for already-authorized users) instead of erroring.
+          signIn('discord');
+          throw new Error('reauth');
+        }
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((d: EnrichedGuild[]) => { setGuilds(d); setLoadState('success'); })
       .catch(() => setLoadState('error'));
   };

@@ -24,7 +24,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.accessToken) {
+    if (!session?.accessToken || session.error === 'RefreshTokenError') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -35,7 +35,11 @@ export async function GET() {
     ]);
 
     if (userGuildsResult.status === 'rejected') {
-      console.error('[API /guilds] Failed to fetch user guilds:', userGuildsResult.reason);
+      const reason = userGuildsResult.reason;
+      if (reason instanceof Error && reason.message === 'DISCORD_UNAUTHORIZED') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      console.error('[API /guilds] Failed to fetch user guilds:', reason);
       return NextResponse.json({ error: 'Failed to fetch guilds from Discord' }, { status: 502 });
     }
 

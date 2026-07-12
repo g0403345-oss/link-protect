@@ -2136,15 +2136,23 @@ async def _token_request(form: dict) -> dict:
     if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="OAuth is not configured on the server")
     form |= {"client_id": DISCORD_CLIENT_ID, "client_secret": DISCORD_CLIENT_SECRET}
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{DISCORD_API}/oauth2/token",
-            data=form,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=10,
-        )
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{DISCORD_API}/oauth2/token",
+                data=form,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10,
+            )
+    except httpx.HTTPError:
+        # Transient network trouble — the app must NOT treat this as a dead
+        # session (it would wipe its stored tokens and force a re-login).
+        raise HTTPException(status_code=502, detail="Couldn't reach Discord — please try again.")
+    if resp.status_code in (400, 401):
+        # invalid_grant etc. — the code/refresh token is genuinely dead.
+        raise HTTPException(status_code=401, detail="Discord rejected the sign-in")
     if resp.status_code != 200:
-        raise HTTPException(status_code=400, detail="Discord rejected the sign-in")
+        raise HTTPException(status_code=502, detail="Discord is unavailable — please try again.")
     t = resp.json()
     return {
         "access_token": t["access_token"],

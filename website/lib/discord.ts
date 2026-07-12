@@ -40,6 +40,12 @@ export async function getUserGuilds(accessToken: string): Promise<DiscordGuild[]
     return getUserGuilds(accessToken);
   }
 
+  if (res.status === 401) {
+    // Access token expired/revoked — callers translate this into a 401 so the
+    // client re-authenticates instead of showing a dead-end retry error.
+    throw new Error('DISCORD_UNAUTHORIZED');
+  }
+
   if (!res.ok) {
     throw new Error(`Discord API error: ${res.status} ${res.statusText}`);
   }

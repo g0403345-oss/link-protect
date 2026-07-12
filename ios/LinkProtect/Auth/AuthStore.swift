@@ -55,17 +55,32 @@ final class AuthStore: ObservableObject {
             return
         }
         tokens = stored
-        do {
-            let user = try await api.me()
-            state = .signedIn(user)
-            // Restoring a session must also (re)register for push — otherwise a
-            // user who stays logged in across installs/updates never registers a
-            // device token (only a fresh signIn() did this before).
-            await PushManager.shared.registerIfAuthorized(api: api)
-        } catch {
-            // Token invalid / revoked — fall back to signed-out without nagging.
-            signOut(clearError: true)
+        // Only a definitive rejection (revoked/expired-beyond-refresh) may wipe
+        // the stored session. A transient failure (offline, server restart)
+        // must keep the Keychain bundle — otherwise a single bad launch forces
+        // a full re-login even though the tokens are perfectly valid.
+        for attempt in 0..<3 {
+            do {
+                let user = try await api.me()
+                state = .signedIn(user)
+                // Restoring a session must also (re)register for push — otherwise a
+                // user who stays logged in across installs/updates never registers a
+                // device token (only a fresh signIn() did this before).
+                await PushManager.shared.registerIfAuthorized(api: api)
+                return
+            } catch APIError.unauthorized {
+                // Token truly dead — fall back to signed-out without nagging.
+                signOut(clearError: true)
+                return
+            } catch {
+                if attempt < 2 {
+                    try? await Task.sleep(nanoseconds: UInt64(attempt + 1) * 1_000_000_000)
+                }
+            }
         }
+        // Still failing (likely offline): show the sign-in screen but keep the
+        // tokens — the next launch restores the session automatically.
+        state = .signedOut
     }
 
     // MARK: Sign in / out
@@ -116,13 +131,17 @@ final class AuthStore: ObservableObject {
         let rt = current.refreshToken
         let task = Task { [weak self] () throws -> TokenBundle in
             guard let self else { throw OAuthError.cancelled }
-            return try await self.refresh(using: rt)
+            let refreshed = try await self.refresh(using: rt)
+            // Persist INSIDE the task: Discord rotates refresh tokens (single
+            // use), so if the awaiting caller gets cancelled mid-refresh the
+            // new bundle must still reach the Keychain — otherwise the stored
+            // refresh token is already consumed and the session dies.
+            self.persist(refreshed)
+            return refreshed
         }
         refreshTask = task
         defer { refreshTask = nil }
-        let refreshed = try await task.value
-        persist(refreshed)
-        return refreshed.accessToken
+        return try await task.value.accessToken
     }
 
     private func refresh(using refreshToken: String) async throws -> TokenBundle {
@@ -133,9 +152,16 @@ final class AuthStore: ObservableObject {
         req.httpBody = try JSONEncoder().encode(["refresh_token": refreshToken])
 
         let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw OAuthError.exchangeFailed("Session expired. Please sign in again.")
+        guard let http = response as? HTTPURLResponse else { throw APIError.decoding }
+        switch http.statusCode {
+        case 200:
+            return try JSONDecoder().decode(TokenBundle.self, from: data)
+        case 400, 401:
+            // Refresh token genuinely rejected — a re-login is required.
+            throw APIError.unauthorized
+        default:
+            // Server hiccup / gateway error — retryable, session stays intact.
+            throw APIError.server(http.statusCode, "Token refresh failed")
         }
-        return try JSONDecoder().decode(TokenBundle.self, from: data)
     }
 }
