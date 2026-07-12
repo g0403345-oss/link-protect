@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import os
 import time
+import traceback
 from datetime import timedelta
 
 import aiohttp
@@ -60,18 +61,26 @@ class ScamShield(commands.Cog):
         self._flagged: set[str] = set()
         # (guild_id, user_id) pairs we already join-checked (first-message path).
         self._checked: set[tuple[int, int]] = set()
+        self._started = False
 
-    async def cog_load(self):
+    async def _ensure_started(self):
+        """py-cord (unlike discord.py 2.x) never calls cog_load, so caches and
+        loops must start lazily — on_ready or the first message, whichever
+        comes first."""
+        if self._started:
+            return
+        self._started = True
         try:
             self._flagged = await asyncio.to_thread(load_flagged_ids_sync)
+            print(f"[scamguard] loaded {len(self._flagged)} flagged ids", flush=True)
         except Exception:
             self._flagged = set()
         self._refresh.start()
         self._cleanup.start()
 
-    async def cog_unload(self):
-        self._refresh.cancel()
-        self._cleanup.cancel()
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self._ensure_started()
 
     @tasks.loop(seconds=_FLAGGED_REFRESH)
     async def _refresh(self):
@@ -101,6 +110,7 @@ class ScamShield(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
+        await self._ensure_started()
 
         settings = await get_settings(str(message.guild.id))
         sg = settings.get("scamguard", {}) or {}
@@ -181,6 +191,8 @@ class ScamShield(commands.Cog):
                 acted = "timeout"
         except Exception:
             acted = None
+            print(f"[scamguard] {action} failed in guild {guild.id}:", flush=True)
+            traceback.print_exc()
 
         # Warn entry + dashboard log — the "why" must always be visible.
         uid, uname = str(member.id), getattr(member, "name", str(member.id))
@@ -293,6 +305,8 @@ class ScamShield(commands.Cog):
             else:
                 await guild.kick(member, reason=reason)
         except Exception:
+            print(f"[scamguard] join-{action} failed in guild {guild.id}:", flush=True)
+            traceback.print_exc()
             return False
 
         uid, uname = str(member.id), getattr(member, "name", str(member.id))

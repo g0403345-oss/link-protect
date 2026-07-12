@@ -72,21 +72,26 @@ class Observer(commands.Cog):
         self._refresher: asyncio.Task | None = None
         self._scan_day = ""
         self._scan_count = 0
+        self._started = False
 
-    async def cog_load(self):
+    async def _ensure_started(self):
+        """py-cord (unlike discord.py 2.x) never calls cog_load, so the session
+        and background tasks must start lazily — on_ready or the first message.
+        (Before this fix the flusher never ran: observations piled up in memory
+        and seen_domains was last updated 2026-06-28.)"""
+        if self._started:
+            return
+        self._started = True
         self._session = aiohttp.ClientSession()
         self._known_bad = await asyncio.to_thread(load_known_bad_sync)
         self._worker = asyncio.create_task(self._scan_worker())
         self._flusher = asyncio.create_task(self._flush_loop())
         self._refresher = asyncio.create_task(self._refresh_loop())
+        print("[observer] background tasks started", flush=True)
 
-    async def cog_unload(self):
-        for t in (self._worker, self._flusher, self._refresher):
-            if t:
-                t.cancel()
-        await self._flush_now()
-        if self._session and not self._session.closed:
-            await self._session.close()
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self._ensure_started()
 
     def _quota_ok(self) -> bool:
         today = time.strftime("%Y-%m-%d")
@@ -100,6 +105,8 @@ class Observer(commands.Cog):
         # In-memory only — never touch the DB here.
         if message.author.bot or not message.guild:
             return
+        if not self._started:
+            await self._ensure_started()
         content = message.content
         if "http" not in content and "www." not in content:
             return

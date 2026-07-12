@@ -33,12 +33,18 @@ class RaidProtection(commands.Cog):
         self._window: dict[tuple[int, str], list] = {}
         # {(guild_id, domain): last_fired_monotonic} — debounce repeat triggers.
         self._cooldown: dict[tuple[int, str], float] = {}
+        self._started = False
 
-    async def cog_load(self):
+    def _ensure_started(self):
+        """py-cord never calls cog_load — start the cleanup loop lazily."""
+        if self._started:
+            return
+        self._started = True
         self._cleanup.start()
 
-    async def cog_unload(self):
-        self._cleanup.cancel()
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self._ensure_started()
 
     @tasks.loop(minutes=5)
     async def _cleanup(self):
@@ -58,6 +64,7 @@ class RaidProtection(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild or "." not in message.content:
             return
+        self._ensure_started()
 
         settings = await get_settings(str(message.guild.id))
         settings = resolve_channel(settings, message.channel)
