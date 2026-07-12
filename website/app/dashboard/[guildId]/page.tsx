@@ -371,10 +371,14 @@ export default function GuildDashboard() {
   const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 60, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
   const overrides = data.overrides ?? {};
 
+  // Scam Shield UI is built but hidden until the feature launches publicly —
+  // flip to true to show the tab again (backend + bot are already live).
+  const SHOW_SCAM_SHIELD = false;
+
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
     { id: 'overview',     label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
     { id: 'blockers',     label: 'Link Blockers',  icon: AlertTriangle, desc: 'What gets blocked' },
-    { id: 'scamshield',   label: 'Scam Shield',    icon: ShieldAlert,   desc: 'Scam spam & known scammers' },
+    ...(SHOW_SCAM_SHIELD ? [{ id: 'scamshield' as Section, label: 'Scam Shield', icon: ShieldAlert, desc: 'Scam spam & known scammers' }] : []),
     { id: 'warnings',     label: 'Warnings',       icon: Ban,           desc: 'Kick, ban & decay' },
     { id: 'channelrules', label: 'Channel Rules',  icon: Target,        desc: 'Per-channel behaviour' },
     { id: 'access',       label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
