@@ -27,7 +27,18 @@ def _get_conn() -> sqlite3.Connection:
         # instead of raising "database is locked" immediately.
         conn.execute("PRAGMA busy_timeout=10000;")
         _tls.conn = conn
-    return _tls.conn
+    conn = _tls.conn
+    # Self-heal: a failed write leaves the implicit transaction open (we never
+    # rollback on error). A stuck transaction pins a stale WAL snapshot, so this
+    # thread reads outdated data and every write fails instantly with
+    # SQLITE_BUSY_SNAPSHOT ("database is locked") — forever. Roll it back here
+    # so each helper starts from a fresh snapshot.
+    if conn.in_transaction:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+    return conn
 
 def _init_db():
     c = _get_conn()
@@ -183,6 +194,18 @@ def _fetch_sync(guild_id: int) -> dict:
             c.commit()
         except sqlite3.IntegrityError:
             # Another on_message thread inserted this guild first — use theirs.
+            row = c.execute("SELECT data FROM servers WHERE guild_id=?", (guild_id,)).fetchone()
+            if row is not None:
+                return json.loads(row[0])
+        except sqlite3.OperationalError:
+            # Write lock contention. Never let a busy DB break moderation: clear
+            # the half-open transaction, re-read with a fresh snapshot (the row
+            # may exist but was invisible to a stale snapshot), else fall back
+            # to defaults without persisting them.
+            try:
+                c.rollback()
+            except sqlite3.Error:
+                pass
             row = c.execute("SELECT data FROM servers WHERE guild_id=?", (guild_id,)).fetchone()
             if row is not None:
                 return json.loads(row[0])

@@ -56,7 +56,16 @@ def _get_conn() -> sqlite3.Connection:
         conn.execute("PRAGMA busy_timeout=5000;")
         conn.row_factory = sqlite3.Row
         _tls.conn = conn
-    return _tls.conn
+    conn = _tls.conn
+    # Self-heal: a failed write leaves the implicit transaction open, pinning a
+    # stale WAL snapshot on this connection — all reads go stale and all writes
+    # fail instantly with "database is locked" until rolled back.
+    if conn.in_transaction:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+    return conn
 
 def _ensure_actions_table():
     c = _get_conn()
