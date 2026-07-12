@@ -848,6 +848,7 @@ async def _help(ctx):
     )
     embed.add_field(name="Support Server", value="[Click to join](https://discord.gg/BjDC9t329E)", inline=True)
     embed.add_field(name="Web Dashboard", value="[Open dashboard](https://link-protect.com/dashboard)", inline=True)
+    embed.add_field(name="Privacy Policy", value="[link-protect.com/privacy](https://link-protect.com/privacy)", inline=True)
     await ctx.respond(embed=embed)
 
 

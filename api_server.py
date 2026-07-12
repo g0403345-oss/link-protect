@@ -1350,6 +1350,9 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "channel.channel", "channel.category", "channel.member", "channel.role",
         "link.links", "link.allow",
         "raid.enabled", "raid.threshold", "raid.window", "raid.timeout_minutes",
+        "scamguard.enabled", "scamguard.channels", "scamguard.window",
+        "scamguard.action", "scamguard.timeout_minutes",
+        "scamguard.join_check", "scamguard.join_action", "scamguard.min_servers",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
