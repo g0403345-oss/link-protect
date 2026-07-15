@@ -493,7 +493,10 @@ async def on_ready():
     print(f"✅ Eingeloggt als {bot.user}")
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,
             name="https://norecoil.de"))
-    update_topgg_stats.start()
+    # on_ready fires again after reconnects — a bare start() then raises
+    # "Task is already launched and is not completed."
+    if not update_topgg_stats.is_running():
+        update_topgg_stats.start()
     if not heartbeat.is_running():
         heartbeat.start()
     if not decay_warns.is_running():
@@ -745,7 +748,10 @@ async def nootification(ctx):
                 name="Nicht erreicht",
                 value=f"```{chr(10).join(failed[:10])}```" if len(failed) > 0 else "Keine",
                 inline=False)
-        await log_channel.send(embed=result_embed)
+        try:
+            await log_channel.send(embed=result_embed)
+        except discord.Forbidden:
+            pass
     await ctx.respond("✅ Benachrichtigung gestartet, siehe Log-Channel.")
 
 
@@ -1047,7 +1053,10 @@ async def _warn_reset(ctx, member: discord.Member):
                 description=f"{ctx.author.mention} reset all {old_count} warning(s) for {member.mention}.",
                 color=discord.Color.blurple(),
             )
-            await log_channel.send(embed=log_embed)
+            try:
+                await log_channel.send(embed=log_embed)
+            except discord.Forbidden:
+                pass  # No access to the configured log channel.
 
 
 @bot.slash_command(name="advertise", description="See latest payed advertise")
@@ -2623,7 +2632,10 @@ async def warn_user(ctx, member: discord.Member,
             log_embed = discord.Embed(title="User Warned",
                                       description=f"{ctx.author.mention} warned {member.mention} for:\n - {reason}",
                                       color=discord.Color.orange())
-            await log_channel.send(embed=log_embed)
+            try:
+                await log_channel.send(embed=log_embed)
+            except discord.Forbidden:
+                pass  # No access to the configured log channel — warn still applied.
 
 
 @bot.slash_command(name="warnings", description="Show all warnings from a user")
@@ -2711,7 +2723,10 @@ async def _warndel(ctx, member: discord.Member,
             log_embed.add_field(name="Deleted Reason", value=removed, inline=False)
             log_embed.add_field(name="Remaining Warnings", value=warn_count)
             log_embed.set_footer(text=f"Guild: {ctx.guild.name} • User ID: {member.id}")
-            await log_channel.send(embed=log_embed)
+            try:
+                await log_channel.send(embed=log_embed)
+            except discord.Forbidden:
+                pass  # No access to the configured log channel.
 
 
 @bot.slash_command(name="warn-delete-server", description="Delete all warnings of all users on this server")
@@ -2758,7 +2773,10 @@ async def _warn_delete_server(ctx):
             )
             log_embed.add_field(name="Total Users", value=f"{total_users}")
             log_embed.add_field(name="Total Warnings", value=f"{total_warns}")
-            await log_channel.send(embed=log_embed)
+            try:
+                await log_channel.send(embed=log_embed)
+            except discord.Forbidden:
+                pass  # No access to the configured log channel.
 
 
 @bot.slash_command(name="modstats", description="Show moderation statistics for this server")
