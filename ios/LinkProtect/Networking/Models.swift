@@ -106,7 +106,7 @@ struct ServerData: Codable, Equatable {
     struct ScamGuard: Codable, Equatable {
         var enabled = false
         var channels = 3
-        var window = 60
+        var window = 10
         var action = "ban"          // delete | timeout | kick | ban
         var timeoutMinutes = 60
         var joinCheck = false
@@ -124,7 +124,7 @@ struct ServerData: Codable, Equatable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? false
             channels = (try? c.decode(Int.self, forKey: .channels)) ?? 3
-            window = (try? c.decode(Int.self, forKey: .window)) ?? 60
+            window = (try? c.decode(Int.self, forKey: .window)) ?? 10
             action = (try? c.decode(String.self, forKey: .action)) ?? "ban"
             timeoutMinutes = (try? c.decode(Int.self, forKey: .timeoutMinutes)) ?? 60
             joinCheck = (try? c.decode(Bool.self, forKey: .joinCheck)) ?? false

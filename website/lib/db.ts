@@ -201,7 +201,7 @@ export async function checkLink(url: string): Promise<LinkVerdict> {
 
 // ── User reports (→ operator admin panel) ──────────────────────────────────────
 
-export type ReportType = "malicious_link" | "false_positive" | "bug" | "feedback";
+export type ReportType = "malicious_link" | "false_positive" | "bug" | "feedback" | "appeal";
 
 export interface Report {
   id: number;
@@ -231,6 +231,26 @@ export async function submitReport(body: {
 
 export async function getReports(search: string): Promise<{ reports: Report[]; counts: Record<string, number> }> {
   return apiFetch(`/api/admin/reports${search}`);
+}
+
+// ── Scam Shield appeals (unban requests) ─────────────────────────────────────
+
+export interface AppealStatus {
+  flagged: boolean;
+  flag: { reason: string; incidents: number; guilds: number; lastSeen: number } | null;
+  appeal: { id: number; status: Report["status"]; message: string | null; createdAt: number } | null;
+}
+
+export async function getAppealStatus(): Promise<AppealStatus> {
+  return apiFetch(`/api/appeal/status`);
+}
+
+export async function submitAppeal(message: string): Promise<{ id: number; existing?: boolean }> {
+  return apiFetch(`/api/appeal`, { method: "POST", body: JSON.stringify({ message }) });
+}
+
+export async function decideAppeal(id: number, accept: boolean): Promise<void> {
+  await apiFetch(`/api/admin/appeals/${id}/decide`, { method: "POST", body: JSON.stringify({ accept }) });
 }
 
 export async function updateReport(id: number, body: { status?: string; promote?: boolean }): Promise<void> {

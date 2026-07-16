@@ -192,7 +192,7 @@ _DEFAULT = {
     # kicks/bans accounts already flagged on ≥ `min_servers` other servers the
     # moment they join (or first post, if the join event isn't available).
     "scamguard": {
-        "enabled": False, "channels": 3, "window": 60,
+        "enabled": False, "channels": 3, "window": 10,
         "action": "ban", "timeout_minutes": 60,
         "join_check": False, "join_action": "kick", "min_servers": 2,
     },

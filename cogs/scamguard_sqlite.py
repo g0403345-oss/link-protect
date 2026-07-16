@@ -142,7 +142,7 @@ class ScamShield(commands.Cog):
 
         now = time.monotonic()
         channels_needed = max(2, int(sg.get("channels", 3) or 3))
-        window = min(300, max(5, int(sg.get("window", 60) or 60)))
+        window = min(300, max(5, int(sg.get("window", 10) or 10)))
 
         key = (message.guild.id, message.author.id)
         if now - self._cooldown.get(key, 0) < window * 3:
@@ -175,6 +175,12 @@ class ScamShield(commands.Cog):
                 deleted += 1
             except Exception:
                 pass
+
+        # DM the user BEFORE acting — after a kick/ban there is no mutual
+        # server anymore and Discord refuses the DM.
+        if action != "delete":
+            await self._dm_actioned(member, guild, action, minutes,
+                                    f"posting the same message in {n_channels} channels within seconds")
 
         # Apply the configured action (best-effort — hierarchy/permissions apply).
         acted = None
@@ -302,6 +308,9 @@ class ScamShield(commands.Cog):
         action = "ban" if str(sg.get("join_action", "kick")).lower() == "ban" else "kick"
         reason = (f"Scam Shield: account was caught scam-spamming on "
                   f"{flag['guilds']} other servers (detected on {via})")
+        await self._dm_actioned(member, guild, action, 0,
+                                f"this account was caught scam-spamming on {flag['guilds']} "
+                                f"server(s) in the Link Protect network")
         try:
             if action == "ban":
                 await guild.ban(member, reason=reason)
@@ -339,6 +348,31 @@ class ScamShield(commands.Cog):
                          body=f"{uname} was {'banned' if action == 'ban' else 'kicked'} on {via} — "
                               f"flagged on {flag['guilds']} servers.")
         return True
+
+    async def _dm_actioned(self, member, guild, action: str, minutes: int, why: str) -> None:
+        """Best-effort DM explaining what happened and how to appeal. Sent
+        before kick/ban (no mutual server afterwards = no DM possible)."""
+        verb = {"ban": "banned", "kick": "kicked",
+                "timeout": f"timed out for {minutes} min"}.get(action, action)
+        try:
+            embed = discord.Embed(
+                title="🛡️ You were removed by Scam Shield",
+                description=(
+                    f"You were **{verb}** on **{guild.name}**.\n\n"
+                    f"**Why:** {why} — the typical pattern of a hijacked or scam account. "
+                    f"If that's you: your account may be compromised — change your password "
+                    f"and revoke suspicious authorized apps.\n\n"
+                    f"**Wrongly flagged?** You can appeal here:\n"
+                    f"🔗 https://link-protect.com/appeal\n"
+                    f"Sign in with Discord, describe what happened, and we'll review it. "
+                    f"You'll be able to chat with the review team directly on that page."
+                ),
+                color=discord.Color.red(),
+            )
+            embed.set_footer(text="Link Protect · link-protect.com")
+            await member.send(embed=embed)
+        except Exception:
+            pass  # DMs closed — nothing else we can do.
 
     async def _push(self, guild_id, title, body):
         if not _API_SECRET:

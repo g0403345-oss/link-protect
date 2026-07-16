@@ -368,7 +368,7 @@ export default function GuildDashboard() {
   const allow = data.link?.allow ?? [];
   const decay = data.decay ?? { enabled: false, days: 30 };
   const raid = data.raid ?? { enabled: false, threshold: 5, window: 10, timeout_minutes: 60 };
-  const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 60, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
+  const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 10, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
   const overrides = data.overrides ?? {};
 
   // Scam Shield launched 2026-07-16 (members intent approved). The flag stays
@@ -614,7 +614,7 @@ export default function GuildDashboard() {
                         </div>
                         <div className="thresholds-3col" style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                           <NumberInput label="Channels" description="Same message in this many different channels" value={scamguard.channels ?? 3} icon={<Target size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('scamguard.channels', Math.max(2, v), 'Scam Shield channels')} saving={saving === 'scamguard.channels'} />
-                          <NumberInput label="Within (seconds)" description="Time window for the spam burst" value={scamguard.window ?? 60} icon={<Clock size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('scamguard.window', Math.min(300, Math.max(5, v)), 'Scam Shield window')} saving={saving === 'scamguard.window'} />
+                          <NumberInput label="Within (seconds)" description="Time window for the spam burst" value={scamguard.window ?? 10} icon={<Clock size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('scamguard.window', Math.min(300, Math.max(5, v)), 'Scam Shield window')} saving={saving === 'scamguard.window'} />
                           {scamguard.action === 'timeout' && (
                             <NumberInput label="Timeout (minutes)" description="How long the account is muted" value={scamguard.timeout_minutes ?? 60} icon={<Hourglass size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('scamguard.timeout_minutes', Math.max(1, v), 'Scam Shield timeout')} saving={saving === 'scamguard.timeout_minutes'} />
                           )}

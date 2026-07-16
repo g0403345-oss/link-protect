@@ -707,7 +707,7 @@ async def check_link(request: Request, url: str = Query(default="")):
 
 # ── User reports (→ operator admin panel) ─────────────────────────────────────
 
-_REPORT_TYPES = {"malicious_link", "false_positive", "bug", "feedback"}
+_REPORT_TYPES = {"malicious_link", "false_positive", "bug", "feedback", "appeal"}
 _REPORT_STATUSES = {"open", "reviewed", "resolved", "dismissed"}
 
 
@@ -962,6 +962,110 @@ async def post_report_message(request: Request, report_id: int, body: ReportMess
         _notify("user", ADMIN_USER_ID, "report_reply", f"New reply on report #{report_id}", preview, report_id)
     row = c.execute("SELECT * FROM reports WHERE id=?", (int(report_id),)).fetchone()
     return _thread_payload(row)
+
+
+# ── Scam Shield appeals (unban requests) ──────────────────────────────────────
+# A flagged account can appeal once (per open case); the appeal is a normal
+# report of type 'appeal', so the whole two-way ticket machinery (thread,
+# notifications, bell) works unchanged. Accepting an appeal removes the flag
+# network-wide; denying keeps it and lets the user file a new appeal later.
+
+class AppealBody(BaseModel):
+    message: str
+
+
+class AppealDecideBody(BaseModel):
+    accept: bool
+
+
+def _flag_info(user_id: str) -> dict | None:
+    c = _get_conn()
+    row = c.execute(
+        "SELECT reason, incidents, first_seen, last_seen FROM flagged_users WHERE user_id=?",
+        (str(user_id),),
+    ).fetchone()
+    if row is None:
+        return None
+    guilds = c.execute(
+        "SELECT COUNT(*) AS c FROM flagged_user_guilds WHERE user_id=?", (str(user_id),)
+    ).fetchone()["c"]
+    return {"reason": row["reason"], "incidents": row["incidents"],
+            "guilds": guilds, "lastSeen": row["last_seen"]}
+
+
+@app.get("/api/appeal/status")
+@require_auth
+async def appeal_status(request: Request):
+    aid, _ = _web_actor(request)
+    if not aid:
+        raise HTTPException(status_code=401, detail="No acting user")
+    row = _get_conn().execute(
+        "SELECT id, status, message, created_at FROM reports "
+        "WHERE user_id=? AND type='appeal' ORDER BY id DESC LIMIT 1",
+        (str(aid),),
+    ).fetchone()
+    appeal = ({"id": row["id"], "status": row["status"], "message": row["message"],
+               "createdAt": row["created_at"]} if row else None)
+    flag = _flag_info(aid)
+    return {"flagged": flag is not None, "flag": flag, "appeal": appeal}
+
+
+@app.post("/api/appeal")
+@require_auth
+async def post_appeal(request: Request, body: AppealBody):
+    aid, aname = _web_actor(request)
+    if not aid:
+        raise HTTPException(status_code=401, detail="No acting user")
+    if _flag_info(aid) is None:
+        raise HTTPException(status_code=409, detail="This account is not flagged.")
+    c = _get_conn()
+    existing = c.execute(
+        "SELECT id FROM reports WHERE user_id=? AND type='appeal' "
+        "AND status IN ('open','reviewed') ORDER BY id DESC LIMIT 1",
+        (str(aid),),
+    ).fetchone()
+    if existing:
+        return {"ok": True, "id": existing["id"], "existing": True}
+    msg = (body.message or "").strip()[:2000]
+    if not msg:
+        raise HTTPException(status_code=400, detail="Please describe what happened.")
+    rid = _insert_report(aid, aname, None, "appeal", None, None, msg)
+    _notify("user", ADMIN_USER_ID, "report_new", "New unban appeal", msg[:140], rid)
+    return {"ok": True, "id": rid}
+
+
+@app.post("/api/admin/appeals/{report_id}/decide")
+@require_auth
+async def admin_decide_appeal(request: Request, report_id: int, body: AppealDecideBody):
+    c = _get_conn()
+    row = c.execute("SELECT * FROM reports WHERE id=?", (int(report_id),)).fetchone()
+    if not row or row["type"] != "appeal":
+        raise HTTPException(status_code=404, detail="Appeal not found")
+    uid = row["user_id"]
+    accept = bool(body.accept)
+    if accept:
+        c.execute("DELETE FROM flagged_users WHERE user_id=?", (str(uid),))
+        c.execute("DELETE FROM flagged_user_guilds WHERE user_id=?", (str(uid),))
+    c.execute("UPDATE reports SET status=? WHERE id=?",
+              ("resolved" if accept else "dismissed", int(report_id)))
+    verdict = (
+        "✅ Appeal accepted — the flag on your account has been removed and the "
+        "automatic join check no longer applies to you. (Bans on individual "
+        "servers are up to that server's staff.)"
+        if accept else
+        "❌ Appeal denied — the flag on your account stays in place. If you have "
+        "new information, you can submit a new appeal."
+    )
+    c.execute(
+        "INSERT INTO report_messages(report_id, sender, user_id, username, body, created_at) "
+        "VALUES(?,?,?,?,?,?)",
+        (int(report_id), "admin", ADMIN_USER_ID, "Link Protect", verdict, int(time.time())),
+    )
+    c.commit()
+    _notify("user", uid, "report_status",
+            "Your appeal was accepted" if accept else "Your appeal was denied",
+            verdict[:140], int(report_id))
+    return {"ok": True, "accepted": accept}
 
 
 @app.get("/api/my/reports")

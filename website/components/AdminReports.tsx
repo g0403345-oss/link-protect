@@ -13,6 +13,7 @@ const TYPE_META: Record<ReportType, { label: string; color: string; icon: typeof
   false_positive: { label: 'False positive', color: '#f0b232', icon: ShieldOff },
   bug: { label: 'Bug', color: '#eb459e', icon: Bug },
   feedback: { label: 'Feedback', color: '#5865f2', icon: MessageSquare },
+  appeal: { label: 'Appeal', color: '#23a55a', icon: ShieldOff },
 };
 
 const STATUS_COLOR: Record<string, string> = {
