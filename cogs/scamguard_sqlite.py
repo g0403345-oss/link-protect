@@ -219,9 +219,14 @@ class ScamShield(commands.Cog):
         except Exception:
             pass
 
-        # Cross-server flag + threat-intel for any links in the spam.
+        # Cross-server flag + threat-intel for any links in the spam. The
+        # message itself is stored as evidence for the appeal review (deleted
+        # when the flag is removed).
         try:
-            await asyncio.to_thread(flag_scammer_sync, uid, int(guild.id), "scam-spam")
+            atts = [{"name": a.filename, "size": a.size, "url": a.url}
+                    for a in sample.attachments[:5]]
+            await asyncio.to_thread(flag_scammer_sync, uid, int(guild.id), "scam-spam",
+                                    sample.content or "", atts, n_channels)
             self._flagged.add(uid)
         except Exception:
             pass

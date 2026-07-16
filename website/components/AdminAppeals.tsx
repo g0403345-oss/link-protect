@@ -1,9 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, MessageSquare, Check, X, ShieldAlert, Scale } from 'lucide-react';
+import { RefreshCw, MessageSquare, Check, X, ShieldAlert, Scale, FileWarning, Paperclip, Hash } from 'lucide-react';
 import type { Report } from '@/lib/db';
 import ReportThread from '@/components/ReportThread';
+
+interface Evidence {
+  guildId: string;
+  content: string | null;
+  attachments: { name: string; size: number; url: string }[];
+  channels: number;
+  createdAt: number;
+}
+
+const IMG_RE = /\.(png|jpe?g|gif|webp)(\?|$)/i;
 
 const STATUS_COLOR: Record<string, string> = {
   open: '#f0b232', reviewed: '#5865f2', resolved: '#23a55a', dismissed: '#52535a',
@@ -22,6 +32,7 @@ function relTime(ts: number) {
  *  the user's bell. */
 export default function AdminAppeals() {
   const [appeals, setAppeals] = useState<Report[]>([]);
+  const [evidence, setEvidence] = useState<Record<string, Evidence[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [status, setStatus] = useState('open');
@@ -35,10 +46,19 @@ export default function AdminAppeals() {
     if (status) p.set('status', status);
     fetch(`/api/admin/reports?${p.toString()}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(true);
-        else setAppeals(d.reports ?? []);
+      .then(async (d) => {
+        if (d.error) { setError(true); setLoading(false); return; }
+        const list: Report[] = d.reports ?? [];
+        setAppeals(list);
         setLoading(false);
+        // What did they actually post? Load the stored scam messages.
+        const ids = Array.from(new Set(list.map((r) => r.userId))).slice(0, 50);
+        if (ids.length) {
+          try {
+            const ev = await fetch(`/api/admin/evidence?users=${ids.join(',')}`);
+            if (ev.ok) setEvidence((await ev.json()).evidence ?? {});
+          } catch { /* evidence is best-effort */ }
+        }
       })
       .catch(() => { setError(true); setLoading(false); });
   }, [status]);
@@ -111,6 +131,45 @@ export default function AdminAppeals() {
               <span style={{ marginLeft: 'auto', fontSize: 11, color: '#52535a' }}>{relTime(a.createdAt)}</span>
             </div>
             {a.message && <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.5, marginBottom: 10 }}>{a.message}</p>}
+
+            {/* What the account actually posted (stored at detection time) */}
+            {(evidence[a.userId] ?? []).length > 0 && (
+              <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#f0b232', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <FileWarning size={11} /> Caught posting
+                </div>
+                {(evidence[a.userId] ?? []).map((ev, i) => (
+                  <div key={i} style={{ background: '#18181b', border: '1px solid rgba(240,178,50,0.25)', borderLeft: '3px solid #f0b232', borderRadius: 8, padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#52535a', marginBottom: ev.content || ev.attachments.length ? 6 : 0 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Hash size={10} /> {ev.channels} channels</span>
+                      <span>guild …{ev.guildId.slice(-4)}</span>
+                      <span style={{ marginLeft: 'auto' }}>{relTime(ev.createdAt)}</span>
+                    </div>
+                    {ev.content && (
+                      <p style={{ fontSize: 12.5, fontFamily: 'monospace', color: '#e0e1e5', lineHeight: 1.5, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{ev.content}</p>
+                    )}
+                    {ev.attachments.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: ev.content ? 8 : 0 }}>
+                        {ev.attachments.map((at, j) => IMG_RE.test(at.url || at.name) ? (
+                          <a key={j} href={at.url} target="_blank" rel="noreferrer" title={at.name}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={at.url} alt={at.name}
+                              style={{ maxWidth: 220, maxHeight: 140, borderRadius: 6, border: '1px solid #2e2e36', display: 'block' }}
+                              onError={(e) => { (e.currentTarget.parentElement as HTMLElement).innerHTML = `🖼️ ${at.name} (CDN link expired)`; }} />
+                          </a>
+                        ) : (
+                          <a key={j} href={at.url} target="_blank" rel="noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#7289da', textDecoration: 'none', background: '#111113', border: '1px solid #2e2e36', borderRadius: 6, padding: '4px 9px' }}>
+                            <Paperclip size={11} /> {at.name} <span style={{ color: '#52535a' }}>({Math.round(at.size / 1024)} KB)</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button onClick={() => setOpenId(a.id)}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#7289da' }}>

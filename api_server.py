@@ -1044,8 +1044,7 @@ async def admin_decide_appeal(request: Request, report_id: int, body: AppealDeci
     uid = row["user_id"]
     accept = bool(body.accept)
     if accept:
-        c.execute("DELETE FROM flagged_users WHERE user_id=?", (str(uid),))
-        c.execute("DELETE FROM flagged_user_guilds WHERE user_id=?", (str(uid),))
+        _delete_flag(uid)
     c.execute("UPDATE reports SET status=? WHERE id=?",
               ("resolved" if accept else "dismissed", int(report_id)))
     verdict = (
@@ -1567,9 +1566,55 @@ def _ensure_flagged_tables():
         guild_id INTEGER NOT NULL,
         PRIMARY KEY (user_id, guild_id)
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS flag_evidence (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        guild_id INTEGER NOT NULL,
+        content TEXT,
+        attachments TEXT,
+        channels INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_evidence_user ON flag_evidence (user_id, id DESC)")
     c.commit()
 
 _ensure_flagged_tables()
+
+
+def _delete_flag(user_id: str) -> None:
+    """Remove a flag network-wide — including the stored evidence (it exists
+    only to review the flag, so it goes when the flag goes)."""
+    c = _get_conn()
+    c.execute("DELETE FROM flagged_users WHERE user_id=?", (str(user_id),))
+    c.execute("DELETE FROM flagged_user_guilds WHERE user_id=?", (str(user_id),))
+    c.execute("DELETE FROM flag_evidence WHERE user_id=?", (str(user_id),))
+    c.commit()
+
+
+@app.get("/api/admin/flag-evidence")
+@require_auth
+async def admin_flag_evidence(request: Request, users: str = ""):
+    """Evidence (the offending messages) for up to 50 flagged user ids —
+    powers the appeal review in the admin panel (Next route enforces admin)."""
+    ids = [u.strip() for u in users.split(",") if u.strip()][:50]
+    if not ids:
+        return {"evidence": {}}
+    c = _get_conn()
+    out: dict = {}
+    for uid in ids:
+        rows = c.execute(
+            "SELECT guild_id, content, attachments, channels, created_at "
+            "FROM flag_evidence WHERE user_id=? ORDER BY id DESC LIMIT 5",
+            (uid,),
+        ).fetchall()
+        out[uid] = [{
+            "guildId": str(r["guild_id"]),
+            "content": r["content"],
+            "attachments": json.loads(r["attachments"] or "[]"),
+            "channels": r["channels"],
+            "createdAt": r["created_at"],
+        } for r in rows]
+    return {"evidence": out}
 
 
 def _scamshield_stats_payload(guild_id: str) -> dict:
@@ -1594,9 +1639,9 @@ async def scamshield_stats(request: Request, guild_id: str):
 
 
 @app.get("/api/admin/flagged")
+@require_auth
 async def admin_flagged(request: Request, limit: int = 100):
     """Operator view of flagged accounts (false-positive handling)."""
-    await _require_admin(request)
     c = _get_conn()
     rows = c.execute(
         "SELECT f.user_id, f.reason, f.incidents, f.first_seen, f.last_seen, "
@@ -1612,14 +1657,101 @@ async def admin_flagged(request: Request, limit: int = 100):
 
 
 @app.delete("/api/admin/flagged/{user_id}")
+@require_auth
 async def admin_unflag(request: Request, user_id: str):
     """Remove a false-positive flag network-wide."""
-    await _require_admin(request)
-    c = _get_conn()
-    c.execute("DELETE FROM flagged_users WHERE user_id=?", (str(user_id),))
-    c.execute("DELETE FROM flagged_user_guilds WHERE user_id=?", (str(user_id),))
-    c.commit()
+    _delete_flag(user_id)
     return {"ok": True}
+
+
+# ── Protection adoption stats (admin) ─────────────────────────────────────────
+# How many servers have each protection enabled — with a daily history so
+# adoption changes are visible as a chart. Snapshots are taken by a background
+# task (and lazily on endpoint calls), one row per day per key.
+
+_PROTECTION_KEYS = (
+    "protect.all", "protect.nsfw", "protect.nitro", "protect.malware",
+    "protect.invite", "protect.youtube", "protect.google", "protect.gif",
+    "protect.twitch", "protect.steam", "protect.bit",
+    "scamguard.enabled", "scamguard.join_check", "raid.enabled",
+    "silent", "decay.enabled", "log.Activated",
+)
+
+
+def _ensure_protection_stats_table():
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS protection_stats (
+        day TEXT NOT NULL,
+        key TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        total INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, key)
+    )""")
+    c.commit()
+
+_ensure_protection_stats_table()
+
+
+def _compute_protection_counts() -> tuple[dict, int]:
+    """One pass over all server configs → {key: enabled-count}, total servers."""
+    c = _get_conn()
+    counts = {k: 0 for k in _PROTECTION_KEYS}
+    total = 0
+    for (data_json,) in c.execute("SELECT data FROM servers").fetchall():
+        try:
+            data = json.loads(data_json)
+        except Exception:
+            continue
+        total += 1
+        for key in _PROTECTION_KEYS:
+            if bool(_deep_get(data, key)):
+                counts[key] += 1
+    return counts, total
+
+
+def _snapshot_protection_stats() -> tuple[dict, int]:
+    counts, total = _compute_protection_counts()
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    c = _get_conn()
+    for key, n in counts.items():
+        c.execute(
+            "INSERT INTO protection_stats(day, key, count, total) VALUES(?,?,?,?) "
+            "ON CONFLICT(day, key) DO UPDATE SET count=excluded.count, total=excluded.total",
+            (day, key, n, total),
+        )
+    c.commit()
+    return counts, total
+
+
+@app.on_event("startup")
+async def _protection_stats_loop():
+    async def loop():
+        while True:
+            try:
+                await asyncio.to_thread(_snapshot_protection_stats)
+            except Exception:
+                pass
+            await asyncio.sleep(6 * 3600)
+    asyncio.get_event_loop().create_task(loop())
+
+
+@app.get("/api/admin/protection-stats")
+@require_auth
+async def admin_protection_stats(request: Request, days: int = 90):
+    counts, total = await asyncio.to_thread(_snapshot_protection_stats)
+    since = time.strftime("%Y-%m-%d", time.gmtime(time.time() - max(7, min(int(days or 90), 365)) * 86400))
+    rows = _get_conn().execute(
+        "SELECT day, key, count, total FROM protection_stats WHERE day >= ? ORDER BY day",
+        (since,),
+    ).fetchall()
+    history: dict = {}
+    for r in rows:
+        history.setdefault(r["day"], {"_total": r["total"]})[r["key"]] = r["count"]
+    return {
+        "current": counts,
+        "totalServers": total,
+        "history": [{"day": d, **v} for d, v in history.items()],
+    }
 
 
 @app.get("/api/user/{user_id}/editor-guilds")

@@ -10,6 +10,7 @@ import Navbar from '@/components/Navbar';
 import AdminThreatData from '@/components/AdminThreatData';
 import AdminReports from '@/components/AdminReports';
 import AdminAppeals from '@/components/AdminAppeals';
+import AdminProtectionStats from '@/components/AdminProtectionStats';
 import { ADMIN_USER_ID } from '@/lib/admin';
 
 interface GuildInfo { name: string; icon: string | null; }
@@ -80,7 +81,7 @@ export default function AdminPanel() {
   const [lockSaving, setLockSaving] = useState(false);
 
   // Active admin tab
-  const [view, setView] = useState<'servers' | 'threats' | 'reports' | 'appeals'>('servers');
+  const [view, setView] = useState<'servers' | 'threats' | 'reports' | 'appeals' | 'protection'>('servers');
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
@@ -358,6 +359,7 @@ export default function AdminPanel() {
               { id: 'threats', label: 'Threat Data', icon: ShieldAlert },
               { id: 'reports', label: 'Reports', icon: Flag },
               { id: 'appeals', label: 'Appeals', icon: Scale },
+              { id: 'protection', label: 'Protection Stats', icon: Activity },
             ] as const).map(t => {
               const active = view === t.id;
               return (
@@ -374,6 +376,8 @@ export default function AdminPanel() {
           {view === 'reports' && <AdminReports />}
 
           {view === 'appeals' && <AdminAppeals />}
+
+          {view === 'protection' && <AdminProtectionStats />}
 
           {view === 'servers' && (
           <>

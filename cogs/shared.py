@@ -137,6 +137,19 @@ def _init_db():
         PRIMARY KEY (user_id, guild_id)
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_flagged_last ON flagged_users (last_seen DESC)")
+    # Evidence for flagged accounts: the offending scam message itself (text +
+    # attachment metadata), kept ONLY while the account is flagged so appeal
+    # reviews can see what was actually posted. Deleted together with the flag.
+    c.execute("""CREATE TABLE IF NOT EXISTS flag_evidence (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        guild_id INTEGER NOT NULL,
+        content TEXT,
+        attachments TEXT,
+        channels INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_evidence_user ON flag_evidence (user_id, id DESC)")
     # top.gg votes — drives the public supporter leaderboard + vote reminders.
     # One row per user: lifetime total + this-month count (for the monthly board).
     c.execute("""CREATE TABLE IF NOT EXISTS votes (
@@ -882,7 +895,9 @@ def flush_caught_sync(rows: list) -> None:
 # Only the bot's own scam-blitz detection writes here (never keyword matches),
 # so a flag always means "this exact account mass-posted scam content live".
 
-def flag_scammer_sync(user_id: str, guild_id: int, reason: str) -> None:
+def flag_scammer_sync(user_id: str, guild_id: int, reason: str,
+                      content: str = "", attachments: list | None = None,
+                      channels: int = 0) -> None:
     c = _get_conn()
     now = int(time.time())
     c.execute(
@@ -896,6 +911,20 @@ def flag_scammer_sync(user_id: str, guild_id: int, reason: str) -> None:
         "INSERT OR IGNORE INTO flagged_user_guilds(user_id, guild_id) VALUES(?,?)",
         (str(user_id), int(guild_id)),
     )
+    # Evidence for appeal review: the scam message itself. Keep the last 5
+    # incidents per account; everything is deleted when the flag is removed.
+    if content or attachments:
+        c.execute(
+            "INSERT INTO flag_evidence(user_id, guild_id, content, attachments, channels, created_at) "
+            "VALUES(?,?,?,?,?,?)",
+            (str(user_id), int(guild_id), (content or "")[:2000],
+             json.dumps(attachments or [])[:4000], int(channels), now),
+        )
+        c.execute(
+            "DELETE FROM flag_evidence WHERE user_id=? AND id NOT IN "
+            "(SELECT id FROM flag_evidence WHERE user_id=? ORDER BY id DESC LIMIT 5)",
+            (str(user_id), str(user_id)),
+        )
     c.commit()
 
 

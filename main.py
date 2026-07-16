@@ -407,6 +407,13 @@ async def on_application_command_error(ctx, error):
     # different class than commands.CheckFailure, so catch both.
     if isinstance(error, (commands.CheckFailure, discord.errors.CheckFailure)):
         return
+    # 10062 "Unknown interaction": the token expired before we could respond
+    # (event backlog right after a restart / gateway hiccup). Nothing can be
+    # sent to that interaction anymore — log one line instead of a stack spam.
+    original = getattr(error, "original", None)
+    if isinstance(original, discord.NotFound) and getattr(original, "code", 0) == 10062:
+        print(f"[cmd] interaction expired before response ({ctx.command.qualified_name})", flush=True)
+        return
     raise error
 
 _SKIP_COGS = {'shared', 'logger'}
