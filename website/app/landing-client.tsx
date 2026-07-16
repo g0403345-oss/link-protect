@@ -332,6 +332,56 @@ function LinkScannerVisual() {
   );
 }
 
+/* ── Interactive: Scam Shield blitz demo ─────────────────────── */
+function ScamShieldVisual() {
+  // 0..3 = scam copies posted, 4 = deleted, 5 = verdict shown
+  const [step, setStep] = useState(0);
+  const timers = useRef<number[]>([]);
+
+  const play = () => {
+    timers.current.forEach(window.clearTimeout);
+    timers.current = [];
+    setStep(0);
+    [1, 2, 3, 4, 5].forEach((s, i) => {
+      timers.current.push(window.setTimeout(() => setStep(s), 500 + i * 650));
+    });
+  };
+  useEffect(() => { play(); return () => timers.current.forEach(window.clearTimeout); }, []);
+
+  const channels = ['general', 'memes', 'giveaways'];
+  return (
+    <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hijacked account spams every channel</div>
+        <button onClick={play} style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, cursor: 'pointer', border: '1px solid #2e2e36', background: 'transparent', color: '#949ba4' }}>↻ Replay</button>
+      </div>
+
+      {channels.map((ch, i) => (
+        <div key={ch} style={{ borderRadius: 8, border: '1px solid #2e2e36', background: '#1e1f22', padding: '8px 12px', minHeight: 38 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', marginBottom: 3 }}># {ch}</div>
+          {step > i && (
+            <motion.div initial={{ opacity: 0, y: 3 }} animate={{ opacity: step >= 4 ? 0.35 : 1, y: 0 }} transition={{ duration: 0.2 }}
+              style={{ fontSize: 12, color: '#949ba4', textDecoration: step >= 4 ? 'line-through' : 'none' }}>
+              <span style={{ color: '#f0b232', fontWeight: 600 }}>Scammer</span>{' '}
+              🎁 I&apos;m giving away $5,600 to everyone! <span style={{ color: '#5865f2', textDecoration: 'underline' }}>gozawin.com</span>
+            </motion.div>
+          )}
+        </div>
+      ))}
+
+      <div style={{ minHeight: 58 }}>
+        {step >= 5 && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+            style={{ padding: '10px 12px', background: '#1e1f22', borderRadius: 8, border: '1px solid #2e2e36', borderLeft: '3px solid #f23f43' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f23f43', marginBottom: 2 }}>🛡️ Scam spam blocked</div>
+            <div style={{ fontSize: 12, color: '#949ba4' }}>3 messages deleted · account banned · flagged network-wide</div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Interactive: warning escalation simulator ───────────────── */
 function WarnSimulator() {
   const [w, setW] = useState(1);
@@ -428,6 +478,7 @@ const BLOCKERS = [
   { name: 'Google Links', icon: '🔍' }, { name: 'URL Shorteners', icon: '🔗' },
   { name: 'GIF Links', icon: '🖼️' }, { name: 'Custom Blacklist', icon: '📋' },
   { name: 'Link-only channels', icon: '📌' }, { name: 'All external links', icon: '🌐' },
+  { name: 'Scam Spam', icon: '🛡️' }, { name: 'Raid Protection', icon: '🚨' },
 ];
 
 /* ── Main ─────────────────────────────────────────────────────── */
@@ -450,7 +501,7 @@ export default function LandingClient() {
             <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
-              v2.1.0 — Silent Mode is live
+              v2.4.0 — Scam Shield is live
               <ArrowRight size={12} />
             </a>
 
@@ -459,7 +510,7 @@ export default function LandingClient() {
             </h1>
 
             <p style={{ fontSize: 18, color: '#6d6f78', lineHeight: 1.6, maxWidth: 420, marginBottom: 32 }}>
-              14 independent shields blocking phishing, NSFW, scams and custom domains — before they ever appear in your server.
+              16 independent shields blocking phishing, NSFW, scam spam and hijacked accounts — before they ever appear in your server.
             </p>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -531,6 +582,20 @@ export default function LandingClient() {
           />
 
           <Feature
+            badge="Scam Shield — new"
+            title="Hijacked accounts, stopped in seconds."
+            description="When an account pastes the same scam into channel after channel, Scam Shield deletes every copy, removes the account, and flags it across the whole Link Protect network."
+            bullets={[
+              'Detects the same message hitting several channels within seconds',
+              'Delete only, timeout, kick or ban — your choice',
+              'Known scam accounts are removed the moment they join your server',
+              'Flags come only from live behaviour — never keywords or reports',
+            ]}
+            visual={<ScamShieldVisual />}
+            flip
+          />
+
+          <Feature
             badge="Warning system"
             title="Progressive punishment. Your rules."
             description="Repeated offenders get escalating consequences. You control every threshold directly from the dashboard."
@@ -541,7 +606,6 @@ export default function LandingClient() {
               'One-click warning reset for individual users',
             ]}
             visual={<WarnSimulator />}
-            flip
           />
 
           <Feature
@@ -555,6 +619,7 @@ export default function LandingClient() {
               'Works across all 14 detection shields',
             ]}
             visual={<SilentModeVisual />}
+            flip
           />
         </div>
       </section>
@@ -563,7 +628,7 @@ export default function LandingClient() {
       <section id="blockers" style={{ padding: '80px 24px', background: '#111113', borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b' }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>14 shields. Every threat covered.</h2>
+            <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>16 shields. Every threat covered.</h2>
             <p style={{ fontSize: 15, color: '#52535a' }}>Toggle each protection on or off — per server, per channel.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>

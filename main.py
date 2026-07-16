@@ -862,6 +862,24 @@ async def _help(ctx):
 # length 2 — /update intentionally only shows the latest two releases.
 _CHANGELOG = [
     {
+        "version": "2.4.0",
+        "date": "16.07.2026",
+        "fields": [
+            ("🛡️ Scam Shield (new!)",
+             " • Stops hijacked accounts that paste the same scam into\n"
+             "   every channel: all copies are deleted and the account is\n"
+             "   timed out / kicked / banned — your choice.\n"
+             " • Cross-server intel: accounts caught scam-spamming are\n"
+             "   flagged network-wide. Enable the join check and known\n"
+             "   scam accounts are removed the moment they join.\n"
+             " • Set it up in the web dashboard → Scam Shield tab."),
+            ("🐞 Bug Fixes",
+             " • Sessions on the website no longer expire after 7 days.\n"
+             " • /warn and warn-log commands no longer fail when the\n"
+             "   log channel is inaccessible."),
+        ],
+    },
+    {
         "version": "2.3.0",
         "date": "26.06.2026",
         "fields": [
@@ -877,16 +895,6 @@ _CHANGELOG = [
              " • Kick/ban failures now explain why (owner / perms / role)\n"
              "   and show the fix directly in the warning.\n"
              " • Warnings now show how many remain until kick/ban."),
-        ],
-    },
-    {
-        "version": "2.2.0",
-        "date": "21.06.2026",
-        "fields": [
-            ("✨ New Features",
-             " • Category Whitelist — whitelist entire Discord categories\n"
-             "   so all channels inside are exempt from link restrictions.\n"
-             " • Malware scanner now respects the channel/category whitelist."),
         ],
     },
 ]
