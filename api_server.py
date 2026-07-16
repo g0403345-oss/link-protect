@@ -11,6 +11,7 @@ import re
 import sqlite3
 import threading
 import time
+import traceback
 from functools import wraps
 from typing import Any
 
@@ -60,7 +61,12 @@ def _get_conn() -> sqlite3.Connection:
     # Self-heal: a failed write leaves the implicit transaction open, pinning a
     # stale WAL snapshot on this connection — all reads go stale and all writes
     # fail instantly with "database is locked" until rolled back.
+    # LOUD on purpose: if this fires during normal operation, some code path is
+    # calling a _get_conn()-using helper in the middle of its own transaction —
+    # that helper call would silently discard the pending writes.
     if conn.in_transaction:
+        print("[db] WARNING: rolling back stray open transaction", flush=True)
+        traceback.print_stack(limit=6)
         try:
             conn.rollback()
         except sqlite3.Error:
@@ -779,6 +785,10 @@ def _update_report(report_id: int, status=None, promote: bool = False) -> dict:
         if status not in _REPORT_STATUSES:
             raise HTTPException(status_code=400, detail="Invalid status")
         c.execute("UPDATE reports SET status=? WHERE id=?", (status, int(report_id)))
+        # Commit BEFORE calling _notify: helpers acquire the connection via
+        # _get_conn(), whose stray-transaction guard would roll our pending
+        # UPDATE back (that exact interaction silently ate status changes).
+        c.commit()
         if status != row["status"]:
             _notify("user", row["user_id"], "report_status",
                     f"Your report was marked {status}", None, int(report_id))

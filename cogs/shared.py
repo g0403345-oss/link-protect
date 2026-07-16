@@ -33,7 +33,13 @@ def _get_conn() -> sqlite3.Connection:
     # thread reads outdated data and every write fails instantly with
     # SQLITE_BUSY_SNAPSHOT ("database is locked") — forever. Roll it back here
     # so each helper starts from a fresh snapshot.
+    # LOUD on purpose: firing during normal operation means some code path calls
+    # a _get_conn()-using helper inside its own transaction — the guard would
+    # then silently discard the pending writes (bit us in _update_report).
     if conn.in_transaction:
+        import traceback
+        print("[db] WARNING: rolling back stray open transaction", flush=True)
+        traceback.print_stack(limit=6)
         try:
             conn.rollback()
         except sqlite3.Error:
