@@ -83,22 +83,31 @@ export default function AppealPage() {
           </div>
         )}
 
-        {auth === 'authenticated' && !loading && data && (
+        {auth === 'authenticated' && !loading && data && (() => {
+          // Only an open/reviewed appeal blocks a new one — after a decision the
+          // flag check runs fresh, so a re-flagged account can appeal again.
+          const openAppeal = data.appeal && (data.appeal.status === 'open' || data.appeal.status === 'reviewed');
+          return (
           <>
-            {/* Not flagged, never appealed */}
-            {!data.flagged && !data.appeal && (
-              <div style={{ ...card, textAlign: 'center' }}>
-                <ShieldCheck size={30} color="#23a55a" style={{ margin: '0 auto 12px' }} />
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>This account is not flagged</p>
-                <p style={{ fontSize: 13, color: '#6d6f78', lineHeight: 1.6 }}>
-                  Link Protect has no network flag on your account. If you were banned from a specific
-                  server, that ban is managed by that server&apos;s staff — please contact them directly.
+            {/* Current flag check — always visible */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', marginBottom: 12, borderRadius: 10, background: data.flagged ? 'rgba(242,63,67,0.07)' : 'rgba(35,165,90,0.07)', border: `1px solid ${data.flagged ? 'rgba(242,63,67,0.25)' : 'rgba(35,165,90,0.25)'}` }}>
+              {data.flagged
+                ? <ShieldAlert size={17} color="#f23f43" style={{ flexShrink: 0 }} />
+                : <ShieldCheck size={17} color="#23a55a" style={{ flexShrink: 0 }} />}
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: data.flagged ? '#f23f43' : '#23a55a' }}>
+                  {data.flagged ? 'This account is currently flagged' : 'This account is currently not flagged'}
+                </p>
+                <p style={{ fontSize: 12, color: '#6d6f78' }}>
+                  {data.flagged
+                    ? `Caught scam-spamming on ${data.flag?.guilds ?? 1} server(s) — you can appeal below.`
+                    : 'Link Protect has no network flag on your account. If you were banned from a specific server, that ban is managed by that server’s staff.'}
                 </p>
               </div>
-            )}
+            </div>
 
-            {/* Flagged, no open appeal → form */}
-            {data.flagged && !data.appeal && (
+            {/* Flagged + no case in review → (new) appeal form */}
+            {data.flagged && !openAppeal && (
               <div style={card}>
                 <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.6, marginBottom: 6 }}>
                   Your account was caught posting the same message across several channels on{' '}
@@ -118,11 +127,11 @@ export default function AppealPage() {
               </div>
             )}
 
-            {/* Appeal exists → status + conversation */}
+            {/* Latest appeal → status + conversation (form above handles new ones) */}
             {data.appeal && (() => {
-              const meta = STATUS_META[data.appeal.status] ?? STATUS_META.open;
+              const meta = STATUS_META[data.appeal!.status] ?? STATUS_META.open;
               return (
-                <div style={card}>
+                <div style={{ ...card, marginTop: data.flagged && !openAppeal ? 12 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                     <meta.icon size={16} color={meta.color} />
                     <span style={{ fontSize: 14, fontWeight: 700, color: meta.color }}>{meta.label}</span>
@@ -140,22 +149,19 @@ export default function AppealPage() {
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: 'rgba(88,101,242,0.12)', color: '#7289da', border: '1px solid rgba(88,101,242,0.4)', borderRadius: 8, cursor: 'pointer' }}>
                       <MessageSquare size={13} /> Open conversation
                     </button>
-                    {data.appeal.status === 'dismissed' && data.flagged && (
-                      <button onClick={() => setData({ ...data, appeal: null })}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 16px', fontSize: 13, fontWeight: 600, background: '#18181b', color: '#949ba4', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer' }}>
-                        Submit a new appeal
-                      </button>
-                    )}
                   </div>
-                  <p style={{ fontSize: 12, color: '#52535a', marginTop: 14, lineHeight: 1.5 }}>
-                    You&apos;ll get a notification (🔔 top right) whenever the review team replies —
-                    you can answer directly in the conversation.
-                  </p>
+                  {openAppeal && (
+                    <p style={{ fontSize: 12, color: '#52535a', marginTop: 14, lineHeight: 1.5 }}>
+                      You&apos;ll get a notification (🔔 top right) whenever the review team replies —
+                      you can answer directly in the conversation.
+                    </p>
+                  )}
                 </div>
               );
             })()}
           </>
-        )}
+          );
+        })()}
       </main>
       {threadOpen && data?.appeal && (
         <ReportThread reportId={data.appeal.id} onClose={() => { setThreadOpen(false); load(); }} />
