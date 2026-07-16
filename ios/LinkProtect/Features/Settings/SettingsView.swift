@@ -174,6 +174,9 @@ struct SettingsView: View {
                     triggerToggle("Protection rule triggered", "A link was blocked or a member was actioned",
                                   isOn: binding(\.ruleTriggered))
                     Divider().overlay(Theme.border)
+                    triggerToggle("Scam Shield", "A scam spammer was caught or a known scam account was removed",
+                                  isOn: binding(\.scamShield))
+                    Divider().overlay(Theme.border)
                     triggerToggle("Server settings changed", "Someone updated a server's configuration",
                                   isOn: binding(\.settingsChanged))
                 }

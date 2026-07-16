@@ -41,7 +41,9 @@ final class ServerListViewModel: ObservableObject {
             totalWarned: present.reduce(0) { $0 + $1.warnedUsers },
             totalBlockers: present.reduce(0) { $0 + $1.activeProtections },
             updated: Date(),
-            servers: topServers.map { .init(id: $0.id, name: $0.name, warned: $0.warnedUsers, blockers: $0.activeProtections) }
+            servers: topServers.map { .init(id: $0.id, name: $0.name, warned: $0.warnedUsers,
+                                            blockers: $0.activeProtections, catches: $0.scamCatches) },
+            scamCatches: present.reduce(0) { $0 + ($1.scamCatches ?? 0) }
         )
         LPWidgetStore.save(snap)
         WidgetCenter.shared.reloadAllTimelines()

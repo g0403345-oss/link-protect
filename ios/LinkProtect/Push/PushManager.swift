@@ -36,16 +36,22 @@ final class PushManager: NSObject, ObservableObject {
         registerCategories()
     }
 
-    /// Define the actionable notification category used by rule-triggered pushes.
+    /// Define the actionable notification categories.
     func registerCategories() {
         let open = UNNotificationAction(identifier: "OPEN_SERVER", title: "Open server", options: [.foreground])
         let reset = UNNotificationAction(identifier: "RESET_WARNS", title: "Reset warnings",
                                          options: [.destructive, .authenticationRequired])
-        let action = UNNotificationCategory(identifier: "LP_ACTION", actions: [open, reset],
+        let ban = UNNotificationAction(identifier: "BAN_USER", title: "Ban user",
+                                       options: [.destructive, .authenticationRequired])
+        let action = UNNotificationCategory(identifier: "LP_ACTION", actions: [open, reset, ban],
                                             intentIdentifiers: [], options: [])
+        // Scam Shield events: the account was caught but not banned yet —
+        // banning straight from the notification is the headline action.
+        let scam = UNNotificationCategory(identifier: "LP_SCAM", actions: [ban, open],
+                                          intentIdentifiers: [], options: [])
         let settings = UNNotificationCategory(identifier: "LP_SETTINGS", actions: [open],
                                               intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([action, settings])
+        UNUserNotificationCenter.current().setNotificationCategories([action, scam, settings])
     }
 
     /// Handle a tap or action button on a delivered notification.
@@ -54,12 +60,27 @@ final class PushManager: NSObject, ObservableObject {
         let gid = info["guild_id"] as? String
         switch response.actionIdentifier {
         case "RESET_WARNS":
-            if let gid, let uid = info["user_id"] as? String, let api {
+            if let gid, let uid = info["user_id"] as? String, let api = await waitForAPI() {
                 try? await api.resetWarns(gid, userId: uid)
+            }
+        case "BAN_USER":
+            if let gid, let uid = info["user_id"] as? String, let api = await waitForAPI() {
+                _ = try? await api.moderate(gid, userId: uid, action: "ban",
+                                            username: info["username"] as? String,
+                                            reason: "Banned from Scam Shield notification")
             }
         default: // default tap or "OPEN_SERVER"
             if let gid { openGuildId = gid }
         }
+    }
+
+    /// An action can arrive before sign-in restore finished (cold launch from a
+    /// notification button) — wait briefly for the API client to become ready.
+    private func waitForAPI() async -> APIClient? {
+        for _ in 0..<20 where api == nil {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return api
     }
 
     func refreshAuthorizationStatus() async {

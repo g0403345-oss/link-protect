@@ -10,8 +10,21 @@ struct PushPreferences: Codable, Equatable {
     var botOffline = true
     var ruleTriggered = true
     var settingsChanged = false
+    var scamShield = true
 
     private static let key = "push.preferences"
+
+    // Older saved payloads predate `scamShield` — decode it as optional so a
+    // stored preference blob never resets the rest to defaults.
+    enum CodingKeys: String, CodingKey { case botOffline, ruleTriggered, settingsChanged, scamShield }
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        botOffline = (try? c.decode(Bool.self, forKey: .botOffline)) ?? true
+        ruleTriggered = (try? c.decode(Bool.self, forKey: .ruleTriggered)) ?? true
+        settingsChanged = (try? c.decode(Bool.self, forKey: .settingsChanged)) ?? false
+        scamShield = (try? c.decode(Bool.self, forKey: .scamShield)) ?? true
+    }
 
     static func load() -> PushPreferences {
         guard let data = UserDefaults.standard.data(forKey: key),
@@ -26,5 +39,5 @@ struct PushPreferences: Codable, Equatable {
         }
     }
 
-    var anyEnabled: Bool { botOffline || ruleTriggered || settingsChanged }
+    var anyEnabled: Bool { botOffline || ruleTriggered || settingsChanged || scamShield }
 }

@@ -2518,6 +2518,15 @@ async def mobile_guilds(request: Request):
     # guild list is not (intents / 200-page caps / propagation delays).
     db_ids = {str(r["guild_id"]) for r in _get_conn().execute("SELECT guild_id FROM servers").fetchall()}
 
+    def _scam_catches(gid: str) -> int:
+        try:
+            return _get_conn().execute(
+                "SELECT COUNT(*) AS c FROM actions WHERE guild_id=? AND reason LIKE 'Scam Shield%'",
+                (int(gid),),
+            ).fetchone()["c"]
+        except Exception:
+            return 0
+
     out = []
     seen: set = set()
     for g in managed:
@@ -2533,6 +2542,7 @@ async def mobile_guilds(request: Request):
             "botPresent": present,
             "activeProtections": sum(1 for v in protect.values() if v) if present else 0,
             "warnedUsers": _warned_user_count(data or {}) if present else 0,
+            "scamCatches": _scam_catches(gid) if present else 0,
         })
         seen.add(gid)
 
@@ -2552,6 +2562,7 @@ async def mobile_guilds(request: Request):
                 "botPresent": True,
                 "activeProtections": sum(1 for v in protect.values() if v),
                 "warnedUsers": _warned_user_count(data or {}),
+                "scamCatches": _scam_catches(gid),
             })
 
     # Servers with the bot first, then alphabetical.
@@ -2905,6 +2916,11 @@ def _ensure_device_table():
         kind TEXT NOT NULL DEFAULT 'settings_changed',
         ts INTEGER NOT NULL
     )""")
+    # Older registrations predate the Scam Shield alert type.
+    try:
+        c.execute("ALTER TABLE device_tokens ADD COLUMN scam_shield INTEGER NOT NULL DEFAULT 1")
+    except sqlite3.OperationalError:
+        pass
     c.commit()
 
 _ensure_device_table()
@@ -2915,6 +2931,7 @@ class PushRegisterBody(BaseModel):
     bot_offline: bool = True
     rule_triggered: bool = True
     settings_changed: bool = False
+    scam_shield: bool = True
     guild_ids: list[str] = []
     platform: str = "ios"
 
@@ -2927,13 +2944,14 @@ async def mobile_push_register(request: Request, body: PushRegisterBody):
     # Trust only guilds the user actually manages.
     verified = [gid for gid in body.guild_ids if gid in managed]
     _get_conn().execute(
-        "INSERT INTO device_tokens(device_token, user_id, platform, bot_offline, rule_triggered, settings_changed, guild_ids, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(device_token) DO UPDATE SET "
+        "INSERT INTO device_tokens(device_token, user_id, platform, bot_offline, rule_triggered, settings_changed, scam_shield, guild_ids, updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(device_token) DO UPDATE SET "
         "user_id=excluded.user_id, platform=excluded.platform, bot_offline=excluded.bot_offline, "
         "rule_triggered=excluded.rule_triggered, settings_changed=excluded.settings_changed, "
-        "guild_ids=excluded.guild_ids, updated_at=excluded.updated_at",
+        "scam_shield=excluded.scam_shield, guild_ids=excluded.guild_ids, updated_at=excluded.updated_at",
         (body.device_token, user["id"], body.platform, int(body.bot_offline),
-         int(body.rule_triggered), int(body.settings_changed), json.dumps(verified), int(time.time())),
+         int(body.rule_triggered), int(body.settings_changed), int(body.scam_shield),
+         json.dumps(verified), int(time.time())),
     )
     _get_conn().commit()
     return {"ok": True, "guilds": verified}
@@ -2953,9 +2971,12 @@ async def mobile_account_delete(request: Request):
 
 class NotifyBody(BaseModel):
     guild_id: str
-    kind: str  # "bot_offline" | "rule_triggered" | "settings_changed"
+    kind: str  # "bot_offline" | "rule_triggered" | "settings_changed" | "scam_shield"
     title: str
     body: str
+    user_id: str | None = None      # affected member — enables push actions (ban)
+    username: str | None = None
+    category: str | None = None     # APNs category (LP_SCAM / LP_ACTION / …)
 
 
 @app.post("/api/internal/notify")
@@ -2967,6 +2988,7 @@ async def internal_notify(request: Request, body: NotifyBody):
         "bot_offline": "bot_offline",
         "rule_triggered": "rule_triggered",
         "settings_changed": "settings_changed",
+        "scam_shield": "scam_shield",
     }.get(body.kind)
     if not pref_col:
         raise HTTPException(status_code=400, detail="Unknown notification kind")
@@ -2983,7 +3005,13 @@ async def internal_notify(request: Request, body: NotifyBody):
     except Exception:
         raise HTTPException(status_code=500, detail="Push not configured")
 
-    dead = await apns.send_many(tokens, body.title, body.body, thread_id=body.guild_id)
+    custom = {"t": body.kind, "guild_id": body.guild_id}
+    if body.user_id:
+        custom["user_id"] = body.user_id
+    if body.username:
+        custom["username"] = body.username
+    dead = await apns.send_many(tokens, body.title, body.body, thread_id=body.guild_id,
+                                category=body.category, custom=custom)
     for t in dead:
         _get_conn().execute("DELETE FROM device_tokens WHERE device_token=?", (t,))
     _get_conn().commit()
@@ -3096,6 +3124,8 @@ async def _action_push_loop():
             info = await _bot_guilds_info()
             for r in rows:
                 last = r["id"]
+                if (r["reason"] or "").startswith("Scam Shield"):
+                    continue  # the Scam Shield cog sends its own richer push
                 gid = str(r["guild_id"])
                 gname = info.get(gid, {}).get("name") or "a server"
                 verb = {"warned": "Warning", "kicked": "Kick", "banned": "Ban", "timeout": "Timeout"}.get(r["action"], "Action")
@@ -3104,7 +3134,8 @@ async def _action_push_loop():
                     f"{verb} · {gname}",
                     f"{r['username']}: {r['reason']}",
                     category="LP_ACTION",
-                    custom={"t": "action", "guild_id": gid, "user_id": str(r["user_id"]), "action": r["action"]},
+                    custom={"t": "action", "guild_id": gid, "user_id": str(r["user_id"]),
+                            "username": r["username"], "action": r["action"]},
                 )
         except Exception:
             pass

@@ -258,7 +258,9 @@ class ScamShield(commands.Cog):
             pass
 
         await self._push(guild.id, title=f"🛡️ Scam spam blocked in {guild.name}",
-                         body=f"{uname} posted the same message in {n_channels} channels — {acted or 'messages deleted'}.")
+                         body=f"{uname} posted the same message in {n_channels} channels — {acted or 'messages deleted'}.",
+                         user_id=uid, username=uname,
+                         category="LP_SCAM" if acted != "banned" else "LP_ACTION")
 
     # ── layer 2: flagged account joins ───────────────────────────────────────
 
@@ -351,7 +353,9 @@ class ScamShield(commands.Cog):
 
         await self._push(guild.id, title=f"🛡️ Known scam account removed in {guild.name}",
                          body=f"{uname} was {'banned' if action == 'ban' else 'kicked'} on {via} — "
-                              f"flagged on {flag['guilds']} servers.")
+                              f"flagged on {flag['guilds']} servers.",
+                         user_id=uid, username=uname,
+                         category="LP_SCAM" if action == "kick" else "LP_ACTION")
         return True
 
     async def _dm_actioned(self, member, guild, action: str, minutes: int, why: str) -> None:
@@ -379,14 +383,23 @@ class ScamShield(commands.Cog):
         except Exception:
             pass  # DMs closed — nothing else we can do.
 
-    async def _push(self, guild_id, title, body):
+    async def _push(self, guild_id, title, body, user_id=None, username=None, category=None):
+        """Push via the api server. kind 'scam_shield' has its own toggle in the
+        app; user info + category make the notification actionable (Ban button)."""
         if not _API_SECRET:
             return
+        payload = {"guild_id": str(guild_id), "kind": "scam_shield", "title": title, "body": body}
+        if user_id:
+            payload["user_id"] = str(user_id)
+        if username:
+            payload["username"] = str(username)
+        if category:
+            payload["category"] = category
         try:
             async with aiohttp.ClientSession() as s:
                 await s.post(
                     f"{_INTERNAL_API}/api/internal/notify",
-                    json={"guild_id": str(guild_id), "kind": "rule_triggered", "title": title, "body": body},
+                    json=payload,
                     headers={"Authorization": f"Bearer {_API_SECRET}"},
                     timeout=aiohttp.ClientTimeout(total=5),
                 )

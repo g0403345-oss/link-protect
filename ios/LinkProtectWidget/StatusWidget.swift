@@ -122,9 +122,10 @@ struct LPWidgetView: View {
             Text(snapshot.serverCount == 1 ? "server protected" : "servers protected")
                 .font(.system(size: 11)).foregroundStyle(wMuted).lineLimit(1).minimumScaleFactor(0.8)
             Spacer(minLength: 8)
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 miniStat("shield.fill", wGreen, snapshot.totalBlockers)
                 miniStat("exclamationmark.triangle.fill", wYellow, snapshot.totalWarned)
+                miniStat("shield.lefthalf.filled", wRed, snapshot.scamCatches ?? 0)
             }
         }
     }
@@ -136,6 +137,7 @@ struct LPWidgetView: View {
                 tile(snapshot.serverCount, "Servers", "server.rack", wAccent)
                 tile(snapshot.totalBlockers, "Blockers", "shield.fill", wGreen)
                 tile(snapshot.totalWarned, "Warned", "exclamationmark.triangle.fill", wYellow)
+                tile(snapshot.scamCatches ?? 0, "Scams", "shield.lefthalf.filled", wRed)
             }
             Spacer(minLength: 0)
             footer
@@ -149,6 +151,7 @@ struct LPWidgetView: View {
                 tile(snapshot.serverCount, "Servers", "server.rack", wAccent)
                 tile(snapshot.totalBlockers, "Blockers", "shield.fill", wGreen)
                 tile(snapshot.totalWarned, "Warned", "exclamationmark.triangle.fill", wYellow)
+                tile(snapshot.scamCatches ?? 0, "Scams", "shield.lefthalf.filled", wRed)
             }
             if !snapshot.servers.isEmpty {
                 Text("YOUR SERVERS").font(.system(size: 10, weight: .bold)).foregroundStyle(wFaint)
@@ -169,6 +172,9 @@ struct LPWidgetView: View {
             Spacer(minLength: 8)
             miniStat("shield.fill", wGreen, s.blockers)
             miniStat("exclamationmark.triangle.fill", wYellow, s.warned)
+            if (s.catches ?? 0) > 0 {
+                miniStat("shield.lefthalf.filled", wRed, s.catches ?? 0)
+            }
         }
     }
 

@@ -70,7 +70,9 @@ struct LockStatusView: View {
             if snapshot.signedIn {
                 Text("\(snapshot.serverCount) servers · \(snapshot.totalBlockers) blockers")
                     .font(.system(size: 13))
-                Text(snapshot.botOnline ? "Active · \(snapshot.totalWarned) warned" : "Bot offline")
+                Text(snapshot.botOnline
+                     ? "Active · \(snapshot.totalWarned) warned · \(snapshot.scamCatches ?? 0) scams"
+                     : "Bot offline")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             } else {

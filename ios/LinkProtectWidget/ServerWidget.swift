@@ -31,10 +31,11 @@ struct ServerQuery: EntityQuery {
 enum WidgetMetric: String, AppEnum {
     case warnings
     case blockers
+    case scams
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation { "Highlight" }
     static var caseDisplayRepresentations: [WidgetMetric: DisplayRepresentation] {
-        [.warnings: "Warned users", .blockers: "Active blockers"]
+        [.warnings: "Warned users", .blockers: "Active blockers", .scams: "Scam Shield catches"]
     }
 }
 
@@ -125,10 +126,11 @@ struct ServerWidgetView: View {
     }
 
     // The featured (big) value + label, driven by the chosen metric.
-    private func featured(_ warned: Int, _ blockers: Int) -> (Int, String) {
+    private func featured(_ warned: Int, _ blockers: Int, _ scams: Int = 0) -> (Int, String) {
         switch entry.metric {
         case .warnings: return (warned, warned == 1 ? "warned user" : "warned users")
         case .blockers: return (blockers, blockers == 1 ? "active blocker" : "active blockers")
+        case .scams:    return (scams, scams == 1 ? "scam catch" : "scam catches")
         }
     }
 
@@ -179,7 +181,7 @@ struct ServerWidgetView: View {
     // MARK: single server
 
     private func singleServer(_ s: LPWidgetSnapshot.Server) -> some View {
-        let f = featured(s.warned, s.blockers)
+        let f = featured(s.warned, s.blockers, s.catches ?? 0)
         return VStack(alignment: .leading, spacing: 0) {
             header(s.name)
             Spacer(minLength: 8)
@@ -194,6 +196,7 @@ struct ServerWidgetView: View {
                 HStack(spacing: 16) {
                     chip("shield.fill", wGreen, s.blockers, "blockers")
                     chip("exclamationmark.triangle.fill", wYellow, s.warned, "warned")
+                    chip("shield.lefthalf.filled", wRed, s.catches ?? 0, "scams")
                     Spacer(minLength: 0)
                     Text(entry.snapshot.updated, style: .time).font(.system(size: 11)).foregroundStyle(wFaint)
                 }

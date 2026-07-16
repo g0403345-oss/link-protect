@@ -40,6 +40,8 @@ struct ManagedGuild: Codable, Equatable, Hashable, Identifiable {
     let botPresent: Bool
     let activeProtections: Int
     let warnedUsers: Int
+    /// Scam Shield catches on this server (nil on older API responses).
+    var scamCatches: Int? = nil
 
     var iconURL: URL? {
         guard let icon else { return nil }

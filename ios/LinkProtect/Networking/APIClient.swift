@@ -268,6 +268,7 @@ struct APIClient {
             let bot_offline: Bool
             let rule_triggered: Bool
             let settings_changed: Bool
+            let scam_shield: Bool
             let guild_ids: [String]
             let platform = "ios"
         }
@@ -276,6 +277,7 @@ struct APIClient {
             bot_offline: preferences.botOffline,
             rule_triggered: preferences.ruleTriggered,
             settings_changed: preferences.settingsChanged,
+            scam_shield: preferences.scamShield,
             guild_ids: guildIds
         ))
     }

@@ -14,6 +14,7 @@ struct ServerListView: View {
     @State private var showAdmin = false
     @State private var search = ""
     @State private var path = NavigationPath()
+    @State private var setupGuild: ManagedGuild?
 
     init(user: DiscordUser, api: APIClient) {
         self.user = user
@@ -47,6 +48,9 @@ struct ServerListView: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView(user: user).environmentObject(lock) }
         .sheet(isPresented: $showAdmin) { AdminView(user: user, api: auth.api).environmentObject(toasts).environmentObject(push) }
+        .sheet(item: $setupGuild) { guild in
+            QuickSetupSheet(guild: guild, api: auth.api) { Task { await vm.load() } }
+        }
         .task { await vm.load(initial: true) }
     }
 
@@ -119,6 +123,12 @@ struct ServerListView: View {
             SearchField(text: $search, placeholder: "Search servers")
         }
 
+        // Freshly invited servers with zero protections → offer one-tap setup.
+        let unprotected = present.filter { $0.activeProtections == 0 }
+        if !unprotected.isEmpty && search.isEmpty {
+            quickSetupBanner(unprotected)
+        }
+
         if filtered.isEmpty {
             Text("No servers match “\(search)”.")
                 .font(.system(size: 14)).foregroundStyle(Theme.faint)
@@ -129,6 +139,19 @@ struct ServerListView: View {
                 groupedCard(present) { guild in
                     NavigationLink(value: guild) { ServerRow(guild: guild) }
                         .buttonStyle(RowButtonStyle())
+                        .contextMenu {
+                            if guild.activeProtections == 0 {
+                                Button { setupGuild = guild } label: {
+                                    Label("Quick setup", systemImage: "bolt.shield")
+                                }
+                            }
+                            Button {
+                                push.setMuted(guild.id, !push.isMuted(guild.id))
+                            } label: {
+                                Label(push.isMuted(guild.id) ? "Unmute notifications" : "Mute notifications",
+                                      systemImage: push.isMuted(guild.id) ? "bell" : "bell.slash")
+                            }
+                        }
                 }
             }
             if !absent.isEmpty {
@@ -137,6 +160,36 @@ struct ServerListView: View {
                 groupedCard(absent) { guild in
                     InviteRow(guild: guild)
                 }
+            }
+        }
+    }
+
+    /// One banner per unprotected server (max 3) — tap opens the setup sheet.
+    @ViewBuilder
+    private func quickSetupBanner(_ guilds: [ManagedGuild]) -> some View {
+        VStack(spacing: 8) {
+            ForEach(guilds.prefix(3)) { guild in
+                Button { setupGuild = guild } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "bolt.shield.fill")
+                            .font(.system(size: 18)).foregroundStyle(Theme.yellow)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(guild.name) isn't protected yet")
+                                .font(LPFont.bodyStrong).foregroundStyle(Theme.text).lineLimit(1)
+                            Text("Set up recommended protection in one tap")
+                                .font(LPFont.tiny).fontWeight(.regular).foregroundStyle(Theme.dim)
+                        }
+                        Spacer(minLength: 0)
+                        Text("Set up").font(LPFont.label).foregroundStyle(.white)
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(Theme.blurple).clipShape(Capsule())
+                    }
+                    .padding(12)
+                    .background(Theme.yellow.opacity(0.07))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.yellow.opacity(0.3), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(PressScaleStyle())
             }
         }
     }

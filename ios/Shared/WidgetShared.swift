@@ -10,21 +10,25 @@ struct LPWidgetSnapshot: Codable, Equatable {
     var totalBlockers: Int
     var updated: Date
     var servers: [Server]
+    /// Scam Shield catches across all servers (optional: decodes old snapshots).
+    var scamCatches: Int? = nil
 
     struct Server: Codable, Equatable, Identifiable {
         var id: String
         var name: String
         var warned: Int
         var blockers: Int
+        var catches: Int? = nil
     }
 
     static let placeholder = LPWidgetSnapshot(
         signedIn: true, botOnline: true, serverCount: 6, totalWarned: 12, totalBlockers: 34, updated: Date(),
         servers: [
-            .init(id: "1", name: "Bot Management", warned: 1, blockers: 5),
-            .init(id: "2", name: "Support", warned: 6, blockers: 5),
-            .init(id: "3", name: "Norecoil.de", warned: 3, blockers: 4),
-        ]
+            .init(id: "1", name: "Bot Management", warned: 1, blockers: 5, catches: 2),
+            .init(id: "2", name: "Support", warned: 6, blockers: 5, catches: 1),
+            .init(id: "3", name: "Norecoil.de", warned: 3, blockers: 4, catches: 0),
+        ],
+        scamCatches: 3
     )
     static let signedOut = LPWidgetSnapshot(
         signedIn: false, botOnline: false, serverCount: 0, totalWarned: 0, totalBlockers: 0, updated: Date(), servers: []
