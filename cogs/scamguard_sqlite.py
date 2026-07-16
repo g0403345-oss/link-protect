@@ -253,10 +253,13 @@ class ScamShield(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        """Requires the privileged members intent; if it's unavailable this never
-        fires and the first-message fallback in on_message covers it."""
+        """Requires the privileged members intent (approved 2026-07); the
+        first-message fallback in on_message stays as a second layer for
+        accounts that get flagged only AFTER they already joined a server."""
         if member.bot:
             return
+        # A join can be the first event after startup — load the flag list first.
+        await self._ensure_started()
         if str(member.id) not in self._flagged:
             return
         settings = await get_settings(str(member.guild.id))

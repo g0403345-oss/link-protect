@@ -371,9 +371,9 @@ export default function GuildDashboard() {
   const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 60, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
   const overrides = data.overrides ?? {};
 
-  // Scam Shield UI is built but hidden until the feature launches publicly —
-  // flip to true to show the tab again (backend + bot are already live).
-  const SHOW_SCAM_SHIELD = false;
+  // Scam Shield launched 2026-07-16 (members intent approved). The flag stays
+  // as a kill switch.
+  const SHOW_SCAM_SHIELD = true;
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [
     { id: 'overview',     label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
