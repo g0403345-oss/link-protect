@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, BarChart3 } from 'lucide-react';
+import { RefreshCw, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface StatsResponse {
   current: Record<string, number>;
@@ -50,6 +50,24 @@ export default function AdminProtectionStats() {
 
   const toggle = (k: string) =>
     setSelected((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
+
+  // Change vs. ~7 days ago: baseline is the newest snapshot that is at least
+  // 7 days old — or the oldest one we have while the history is still young.
+  const deltas = useMemo(() => {
+    if (!data || data.history.length < 2) return {} as Record<string, number>;
+    const days = data.history;
+    const latest = days[days.length - 1];
+    const cutoff = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+    let base = days[0];
+    for (const d of days) { if (d.day <= cutoff) base = d; else break; }
+    if (base.day === latest.day) base = days[0];
+    if (base.day === latest.day) return {} as Record<string, number>;
+    const out: Record<string, number> = {};
+    for (const { key } of KEY_META) {
+      out[key] = (data.current[key] ?? 0) - Number(base[key] ?? 0);
+    }
+    return out;
+  }, [data]);
 
   const chart = useMemo(() => {
     if (!data || data.history.length === 0) return null;
@@ -104,6 +122,13 @@ export default function AdminProtectionStats() {
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                     <span style={{ fontSize: 20, fontWeight: 900, color }}>{n.toLocaleString()}</span>
                     <span style={{ fontSize: 11, color: '#52535a' }}>{pct}%</span>
+                    {(deltas[key] ?? 0) !== 0 && (
+                      <span title="Change vs. 7 days ago"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 1, marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: deltas[key] > 0 ? '#23a55a' : '#f23f43' }}>
+                        {deltas[key] > 0 ? <ChevronUp size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
+                        {Math.abs(deltas[key])}
+                      </span>
+                    )}
                   </div>
                   <div style={{ height: 3, borderRadius: 2, background: '#1e1e22', marginTop: 7, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
