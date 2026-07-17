@@ -4,7 +4,8 @@ from discord.ext import commands
 from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
 _RE = re.compile(
-    r"(?:https?://)?(?:www\.)?(?:google\.\w{2,6}(?:\.\w{2})?|goo\.gl)(?:/[^\s]*)?",
+    # Delimiter lookahead so e.g. google.community (a non-Google TLD) can't match.
+    r"(?:https?://)?(?:[\w-]+\.)?(?:google\.\w{2,6}(?:\.\w{2})?|goo\.gl)(?=[/\s?#]|$)(?:/[^\s]*)?",
     re.IGNORECASE,
 )
 

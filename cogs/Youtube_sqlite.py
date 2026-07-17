@@ -4,7 +4,10 @@ from discord.ext import commands
 from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
 _RE = re.compile(
-    r"(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/)|youtu\.be/)[\w-]{11}",
+    # Videos (watch/embed/v/shorts/live + youtu.be) …
+    r"(?:https?://)?(?:[\w-]+\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)[\w-]{11}"
+    # … plus channels, handles and playlists — "block YouTube" should mean all of it.
+    r"|(?:https?://)?(?:[\w-]+\.)?youtube\.com/(?:@[\w.-]{3,}|channel/[\w-]+|c/[\w-]+|user/[\w-]+|playlist\?list=[\w-]+)",
     re.IGNORECASE,
 )
 

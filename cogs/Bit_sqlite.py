@@ -3,7 +3,17 @@ import discord
 from discord.ext import commands
 from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
-_RE = re.compile(r"(?:https?://)?(?:www\.)?bit\.ly/[\w-]+", re.IGNORECASE)
+# The dashboard sells this blocker as "bit.ly & shorteners" — cover the common
+# URL shorteners, not just bit.ly.
+_SHORTENERS = ("bit.ly", "tinyurl.com", "is.gd", "v.gd", "t.co", "cutt.ly",
+               "rb.gy", "tiny.cc", "shorturl.at", "ow.ly", "buff.ly",
+               "rebrand.ly", "t.ly", "kutt.it", "s.id", "shorte.st", "adf.ly")
+_RE = re.compile(
+    r"(?:https?://)?(?:www\.)?(?:" +
+    "|".join(re.escape(d) for d in _SHORTENERS) +
+    r")/[\w.-]+",
+    re.IGNORECASE,
+)
 
 
 class BitlyProtection(commands.Cog):
@@ -15,7 +25,8 @@ class BitlyProtection(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        if "bit.ly" not in message.content.lower():
+        content_lower = message.content.lower()
+        if not any(d in content_lower for d in _SHORTENERS):
             return
 
         if not _RE.search(message.content):
@@ -49,7 +60,7 @@ class BitlyProtection(commands.Cog):
         except Exception:
             return
 
-        await apply_warn(self.bot, message, settings, "Sending a Bit.ly short link")
+        await apply_warn(self.bot, message, settings, "Sending a URL-shortener link")
 
 
 def setup(bot):

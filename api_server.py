@@ -2953,7 +2953,10 @@ async def mobile_push_register(request: Request, body: PushRegisterBody):
     managed = {g["id"] for g in await _user_managed_guilds(token)}
     # Trust only guilds the user actually manages.
     verified = [gid for gid in body.guild_ids if gid in managed]
-    _get_conn().execute(
+    # ONE connection handle for write + commit: a second _get_conn() call would
+    # hit the stray-transaction guard and roll the pending INSERT back.
+    c = _get_conn()
+    c.execute(
         "INSERT INTO device_tokens(device_token, user_id, platform, bot_offline, rule_triggered, settings_changed, scam_shield, guild_ids, updated_at) "
         "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(device_token) DO UPDATE SET "
         "user_id=excluded.user_id, platform=excluded.platform, bot_offline=excluded.bot_offline, "
@@ -2963,7 +2966,7 @@ async def mobile_push_register(request: Request, body: PushRegisterBody):
          int(body.rule_triggered), int(body.settings_changed), int(body.scam_shield),
          json.dumps(verified), int(time.time())),
     )
-    _get_conn().commit()
+    c.commit()
     return {"ok": True, "guilds": verified}
 
 
@@ -3022,9 +3025,7 @@ async def internal_notify(request: Request, body: NotifyBody):
         custom["username"] = body.username
     dead = await apns.send_many(tokens, body.title, body.body, thread_id=body.guild_id,
                                 category=body.category, custom=custom)
-    for t in dead:
-        _get_conn().execute("DELETE FROM device_tokens WHERE device_token=?", (t,))
-    _get_conn().commit()
+    _prune(dead)
     return {"sent": len(tokens) - len(dead), "pruned": len(dead)}
 
 

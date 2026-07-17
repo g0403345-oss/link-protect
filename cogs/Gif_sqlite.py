@@ -4,8 +4,9 @@ from discord.ext import commands
 from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
 
 _RE = re.compile(
-    r"(?:https?://)?(?:www\.)?(?:tenor\.com/view/|giphy\.com/gifs/|"
-    r"media\.giphy\.com/media/|media\.tenor\.com/|klipy\.com/|"
+    # tenor.com/view/… also comes localized (tenor.com/de/view/…, /en-GB/view/…).
+    r"(?:https?://)?(?:www\.)?(?:tenor\.com/(?:[a-z]{2}(?:-[A-Z]{2})?/)?view/|giphy\.com/gifs/|"
+    r"media\.giphy\.com/media/|media\.tenor\.com/|(?:[\w-]+\.)?klipy\.com/|"
     r"cdn\.discordapp\.com/attachments/)[^\s]*",
     re.IGNORECASE,
 )

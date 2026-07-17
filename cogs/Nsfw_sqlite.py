@@ -8,7 +8,7 @@ _RE = re.compile(
     r"(?:https?://|www\.)\S*"
     r"(?:porn|porno|hentai|xnxx|xvideos|redtube|onlyfans|rule34|erome|tnaflix|youjizz|"
     r"spankbang|brazzers|xhamster|chaturbate|pornhub|teenporn|naughtyamerica|realitykings|"
-    r"mofos|x18|18plus|livejasmin|stripchat|camgirl|camsex|camwhore|faphouse|"
+    r"mofos|18plus|livejasmin|stripchat|camgirl|camsex|camwhore|faphouse|"
     r"motherless|xnxx|porntrex|bravotube|drtuber|youporn)\S*",
     re.IGNORECASE,
 )
