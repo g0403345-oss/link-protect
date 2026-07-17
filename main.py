@@ -638,6 +638,20 @@ async def on_guild_remove(guild):
     data = await asyncio.to_thread(lambda: db.reference("/servers").get()) or {}
     if str(guild.id) in data:
         db.reference(f"/servers/{guild.id}").delete()
+    # Leave log (mirrors the join log; the leave channel had been dead since
+    # Aug 2025) — red embed + running totals so churn vs. growth is visible.
+    try:
+        embed = discord.Embed(title=f"{guild.name} (ID: {guild.id})", color=0xf23f43)
+        embed.add_field(name=" ", value=f"Owner: <@{guild.owner_id}>", inline=False)
+        embed.add_field(name="Members:", value=f"```{guild.member_count or '?'}```", inline=True)
+        joined = guild.me.joined_at.strftime("%d.%m.%Y") if guild.me and guild.me.joined_at else "?"
+        embed.add_field(name="Bot joined:", value=f"```{joined}```", inline=True)
+        embed.set_footer(text=f"Total Server: {len(bot.guilds)}")
+        channel = bot.get_channel(1280441392237252660)
+        if channel:
+            await channel.send(embed=embed)
+    except Exception:
+        pass
 
 
 @bot.slash_command(name="z-database-controle",
