@@ -38,25 +38,23 @@ export default function NotificationBell({ isAdmin = false }: { isAdmin?: boolea
     } catch { /* ignore */ }
   }, []);
 
-  // Real-time via Server-Sent Events (no polling). The stream pushes the full
-  // list on connect and whenever a new ticket notification arrives; EventSource
-  // reconnects on its own when the ~50s upstream window ends.
+  // Visibility-aware polling. The previous SSE stream held a Vercel function
+  // open for every signed-in tab around the clock — that alone burned ~280
+  // GB-hrs/month of Fluid provisioned memory. A 60s poll (paused in background
+  // tabs, instant refresh on focus) costs a fraction of a percent of that and
+  // is plenty for ticket notifications.
   useEffect(() => {
-    fetchNotifs(); // instant first paint while the stream connects
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource('/api/notifications/stream');
-      es.onmessage = (e) => {
-        try {
-          const d = JSON.parse(e.data);
-          if (d && Array.isArray(d.notifications)) {
-            setItems(d.notifications);
-            setUnread(d.unread ?? 0);
-          }
-        } catch { /* heartbeat / non-JSON */ }
-      };
-    } catch { /* EventSource unsupported — fetchNotifs already ran */ }
-    return () => { es?.close(); };
+    fetchNotifs(); // instant first paint
+    const tick = () => { if (document.visibilityState === 'visible') fetchNotifs(); };
+    const interval = window.setInterval(tick, 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchNotifs(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [fetchNotifs]);
 
   useEffect(() => {
