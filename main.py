@@ -640,6 +640,11 @@ async def on_guild_remove(guild):
         db.reference(f"/servers/{guild.id}").delete()
     # Leave log (mirrors the join log; the leave channel had been dead since
     # Aug 2025) — red embed + running totals so churn vs. growth is visible.
+    # Skip "ghost" stubs: Discord lists long-departed guilds as unavailable in
+    # the startup payload and deletes them right after connect — same IDs fire
+    # on every restart with no name/data. Not real leaves, only log noise.
+    if guild.name is None:
+        return
     try:
         embed = discord.Embed(title=f"{guild.name} (ID: {guild.id})", color=0xf23f43)
         embed.add_field(name=" ", value=f"Owner: <@{guild.owner_id}>", inline=False)
