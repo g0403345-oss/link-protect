@@ -1651,7 +1651,7 @@ async def scamshield_stats(request: Request, guild_id: str):
 @app.get("/api/admin/flagged")
 @require_auth
 async def admin_flagged(request: Request, limit: int = 100):
-    """Operator view of flagged accounts (false-positive handling)."""
+    """Operator view of flagged accounts, with resolved Discord names/avatars."""
     c = _get_conn()
     rows = c.execute(
         "SELECT f.user_id, f.reason, f.incidents, f.first_seen, f.last_seen, "
@@ -1659,11 +1659,101 @@ async def admin_flagged(request: Request, limit: int = 100):
         "FROM flagged_users f ORDER BY f.last_seen DESC LIMIT ?",
         (max(1, min(int(limit or 100), 500)),),
     ).fetchall()
+    resolved = {u["id"]: u for u in await _resolve_users([r["user_id"] for r in rows])}
     return {"flagged": [
         {"userId": r["user_id"], "reason": r["reason"], "incidents": r["incidents"],
-         "guilds": r["guilds"], "firstSeen": r["first_seen"], "lastSeen": r["last_seen"]}
+         "guilds": r["guilds"], "firstSeen": r["first_seen"], "lastSeen": r["last_seen"],
+         "username": resolved.get(r["user_id"], {}).get("username"),
+         "avatar": resolved.get(r["user_id"], {}).get("avatar")}
         for r in rows
     ]}
+
+
+# 10-min cache for full Discord profiles (admin flagged-account inspector).
+_profile_cache: dict = {}
+
+
+async def _discord_profile(user_id: str) -> dict | None:
+    now = time.monotonic()
+    hit = _profile_cache.get(user_id)
+    if hit and now - hit[0] < 600:
+        return hit[1]
+    if not BOT_TOKEN:
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{DISCORD_API}/users/{user_id}",
+                                 headers={"Authorization": f"Bot {BOT_TOKEN}"}, timeout=6)
+        if r.status_code != 200:
+            return None
+        u = r.json()
+        prof = {
+            "id": str(u["id"]),
+            "username": u.get("username"),
+            "globalName": u.get("global_name"),
+            "avatar": u.get("avatar"),
+            "bot": bool(u.get("bot")),
+            "publicFlags": u.get("public_flags", 0),
+            "banner": u.get("banner"),
+            # Account age is the strongest bot/throwaway signal we have.
+            "createdAt": ((int(user_id) >> 22) + 1420070400000) // 1000,
+        }
+        _profile_cache[user_id] = (now, prof)
+        return prof
+    except Exception:
+        return None
+
+
+@app.get("/api/admin/flagged/{user_id}/detail")
+@require_auth
+async def admin_flagged_detail(request: Request, user_id: str):
+    """Everything we know about one account — works for unflagged ids too, so
+    the admin search can inspect any user before/after removing a flag."""
+    uid = str(user_id)
+    c = _get_conn()
+    row = c.execute(
+        "SELECT reason, incidents, first_seen, last_seen FROM flagged_users WHERE user_id=?",
+        (uid,),
+    ).fetchone()
+    flag = ({"reason": row["reason"], "incidents": row["incidents"],
+             "firstSeen": row["first_seen"], "lastSeen": row["last_seen"]} if row else None)
+
+    info = await _bot_guilds_info()
+    gids = [str(r["guild_id"]) for r in c.execute(
+        "SELECT guild_id FROM flagged_user_guilds WHERE user_id=?", (uid,)).fetchall()]
+    guilds = [{"id": g, "name": info.get(g, {}).get("name"),
+               "icon": info.get(g, {}).get("icon")} for g in gids]
+
+    evidence = [{
+        "guildId": str(r["guild_id"]),
+        "guildName": info.get(str(r["guild_id"]), {}).get("name"),
+        "content": r["content"],
+        "attachments": json.loads(r["attachments"] or "[]"),
+        "channels": r["channels"],
+        "createdAt": r["created_at"],
+    } for r in c.execute(
+        "SELECT guild_id, content, attachments, channels, created_at "
+        "FROM flag_evidence WHERE user_id=? ORDER BY id DESC LIMIT 10", (uid,)).fetchall()]
+
+    actions = [{
+        "guildId": str(r["guild_id"]),
+        "guildName": info.get(str(r["guild_id"]), {}).get("name"),
+        "action": r["action"], "reason": r["reason"],
+        "warnCount": r["warn_count"], "timestamp": r["timestamp"],
+    } for r in c.execute(
+        "SELECT guild_id, action, reason, warn_count, timestamp FROM actions "
+        "WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()]
+
+    appeals = [{
+        "id": r["id"], "status": r["status"], "message": r["message"],
+        "createdAt": r["created_at"],
+    } for r in c.execute(
+        "SELECT id, status, message, created_at FROM reports "
+        "WHERE user_id=? AND type='appeal' ORDER BY id DESC LIMIT 10", (uid,)).fetchall()]
+
+    return {"userId": uid, "flag": flag, "guilds": guilds, "evidence": evidence,
+            "actions": actions, "appeals": appeals,
+            "profile": await _discord_profile(uid)}
 
 
 @app.delete("/api/admin/flagged/{user_id}")
