@@ -1648,6 +1648,138 @@ async def scamshield_stats(request: Request, guild_id: str):
     return _scamshield_stats_payload(guild_id)
 
 
+# ── Scam Shield: retroactive member scan ──────────────────────────────────────
+# The join check only sees accounts AS they join. This scans the members already
+# in a server against the flag DB, so scammers that sneaked in earlier (or never
+# posted again) get caught too. Runs in the API server via Discord REST (needs
+# the members intent, which the app has). Safe by construction: same threshold,
+# owner/admin/whitelist exclusions and per-server action as the live join check,
+# plus a hard cap so a bad flag list can never mass-remove a server.
+
+_SCAN_MEMBER_CAP = 60000     # stop paginating past this (runaway guard)
+_SCAN_REMOVE_CAP = 25        # never auto-remove more than this in one scan
+_scan_inflight: set = set()  # guild ids currently scanning (no double-run)
+
+
+@app.post("/api/guild/{guild_id}/scamshield/scan")
+@require_auth
+async def scamshield_scan(request: Request, guild_id: str):
+    actor_id, actor_name = _web_actor(request)
+    data = _get_server(guild_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="Bot token not configured")
+    if guild_id in _scan_inflight:
+        raise HTTPException(status_code=409, detail="A scan is already running for this server.")
+
+    sg = data.get("scamguard", {}) or {}
+    min_servers = max(1, int(sg.get("min_servers", 2) or 2))
+    action = "ban" if str(sg.get("join_action", "kick")).lower() == "ban" else "kick"
+
+    flagged = {r["user_id"] for r in _get_conn().execute(
+        "SELECT user_id FROM flagged_users").fetchall()}
+    if not flagged:
+        return {"membersScanned": 0, "flaggedFound": 0, "eligible": 0,
+                "removed": 0, "failed": 0, "action": action, "removedUsers": []}
+
+    ch = data.get("channel", {}) or {}
+    wl_members = {str(x) for x in (ch.get("member") or [])}
+    wl_roles = {str(x) for x in (ch.get("role") or [])}
+
+    _scan_inflight.add(guild_id)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            headers = {"Authorization": f"Bot {BOT_TOKEN}"}
+
+            # Owner + which roles carry ADMINISTRATOR — never touch those members.
+            owner_id = None
+            admin_roles: set = set()
+            try:
+                gr = await client.get(f"{DISCORD_API}/guilds/{guild_id}", headers=headers)
+                if gr.status_code == 200:
+                    gj = gr.json()
+                    owner_id = str(gj.get("owner_id") or "")
+                    for role in gj.get("roles", []):
+                        if int(role.get("permissions", 0)) & 0x8:  # ADMINISTRATOR
+                            admin_roles.add(str(role["id"]))
+            except Exception:
+                pass
+
+            # Paginate members (members intent required).
+            scanned = 0
+            matches = []            # (uid, name) eligible for removal
+            after = "0"
+            while scanned < _SCAN_MEMBER_CAP:
+                resp = await client.get(
+                    f"{DISCORD_API}/guilds/{guild_id}/members?limit=1000&after={after}",
+                    headers=headers)
+                if resp.status_code == 429:
+                    await asyncio.sleep(float(resp.headers.get("Retry-After", "1")) + 0.3)
+                    continue
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=502,
+                                        detail="Couldn't read the member list (is the members intent enabled?)")
+                page = resp.json()
+                if not page:
+                    break
+                for m in page:
+                    scanned += 1
+                    u = m.get("user") or {}
+                    uid = str(u.get("id") or "")
+                    if not uid or u.get("bot") or uid not in flagged:
+                        continue
+                    if uid == owner_id or uid in wl_members:
+                        continue
+                    mroles = {str(r) for r in (m.get("roles") or [])}
+                    if mroles & admin_roles or mroles & wl_roles:
+                        continue
+                    flag = _flag_info(uid)
+                    if not flag or int(flag.get("guilds", 0) or 0) < min_servers:
+                        continue
+                    name = u.get("global_name") or u.get("username") or uid
+                    matches.append((uid, name))
+                after = page[-1]["user"]["id"]
+                if len(page) < 1000:
+                    break
+                await asyncio.sleep(0.25)  # gentle on the member-list rate limit
+
+            eligible = len(matches)
+            # Safety: a bad/poisoned flag list must never wipe a server.
+            if eligible > _SCAN_REMOVE_CAP:
+                _audit_record(guild_id, actor_id, actor_name, "scamshield.scan",
+                              f"Scan aborted — {eligible} flagged members exceed the safety cap "
+                              f"({_SCAN_REMOVE_CAP}); nothing removed.", None, None)
+                return {"membersScanned": scanned, "flaggedFound": eligible, "eligible": eligible,
+                        "removed": 0, "failed": 0, "action": action, "capped": True,
+                        "cap": _SCAN_REMOVE_CAP, "removedUsers": []}
+
+            removed, failed, removed_users = 0, 0, []
+            for uid, name in matches:
+                reason = (f"Scam Shield member scan: account flagged on "
+                          f"{_flag_info(uid).get('guilds', '?')} servers in the network")
+                ok, _detail = await _discord_mod_call(guild_id, uid, action, reason, 0)
+                if ok:
+                    removed += 1
+                    removed_users.append({"userId": uid, "username": name})
+                    _log_mod_action(guild_id, uid, name, _MOD_LOG_KIND[action], reason, 0)
+                else:
+                    failed += 1
+                await asyncio.sleep(0.4)  # pace kicks/bans under Discord's limits
+
+            desc = (f"Member scan by {actor_name or 'an admin'}: {scanned} scanned, "
+                    f"{removed} removed ({action}), {failed} failed")
+            _audit_record(guild_id, actor_id, actor_name, "scamshield.scan", desc, None, None)
+            if removed:
+                _notify_settings_changed(guild_id, detail=f"Scam Shield scan removed {removed} flagged account(s)",
+                                         actor=actor_name)
+            return {"membersScanned": scanned, "flaggedFound": eligible, "eligible": eligible,
+                    "removed": removed, "failed": failed, "action": action,
+                    "removedUsers": removed_users}
+    finally:
+        _scan_inflight.discard(guild_id)
+
+
 @app.get("/api/admin/flagged")
 @require_auth
 async def admin_flagged(request: Request, limit: int = 100):

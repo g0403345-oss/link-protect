@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -163,6 +163,8 @@ export default function GuildDashboard() {
   const [actions, setActions] = useState<GuildAction[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [shieldStats, setShieldStats] = useState<ScamShieldStats | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ membersScanned: number; eligible: number; removed: number; failed: number; action: string; capped?: boolean; cap?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [newLink, setNewLink] = useState('');
@@ -247,6 +249,25 @@ export default function GuildDashboard() {
       if (res.ok) setShieldStats(await res.json() as ScamShieldStats);
     } catch { /* silent */ }
   }, [guildId]);
+
+  const runMemberScan = useCallback(async () => {
+    setScanning(true); setScanResult(null);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/scamshield/scan`, { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { addToast('error', d?.error ?? 'Scan failed'); return; }
+      setScanResult(d);
+      if (d.capped) {
+        addToast('error', `${d.eligible} flagged members exceed the safety cap — nothing removed. Please review manually.`);
+      } else if (d.removed > 0) {
+        addToast('success', `Removed ${d.removed} flagged account(s) of ${d.membersScanned.toLocaleString()} scanned`);
+        fetchData(); fetchStats();
+      } else {
+        addToast('success', `Scanned ${d.membersScanned.toLocaleString()} members — none matched the flag database`);
+      }
+    } catch { addToast('error', 'Could not reach the server'); }
+    finally { setScanning(false); }
+  }, [guildId, addToast, fetchData, fetchStats]);
 
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-info`)
@@ -662,6 +683,38 @@ export default function GuildDashboard() {
                       <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
                       <p style={{ fontSize: 12, color: '#6d6f78' }}>Flags only come from Link Protect <b>catching the behaviour live</b> — never from reports or keyword matches. Only the account ID is stored, no messages. Server owners, admins and whitelisted members are never auto-removed, and every removal lands in the Activity Log with the full reason.</p>
                     </div>
+                  </Card>
+
+                  <Card title="Scan Existing Members">
+                    <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.6, marginBottom: 12 }}>
+                      The join check only catches scammers <b>as they join</b>. Run a one-time scan to
+                      check everyone <b>already in your server</b> against the flag database — accounts
+                      that sneaked in earlier get removed too, using your join-check settings above
+                      (<b>{scamguard.join_action === 'ban' ? 'ban' : 'kick'}</b>, flagged on ≥ {scamguard.min_servers ?? 2} servers).
+                    </p>
+                    <button onClick={runMemberScan} disabled={scanning}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, background: scanning ? '#2e2e36' : '#5865f2', color: '#fff', border: 'none', borderRadius: 8, cursor: scanning ? 'default' : 'pointer' }}>
+                      {scanning
+                        ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Scanning members…</>
+                        : <><Radar size={14} /> Scan existing members</>}
+                    </button>
+                    {scanning && (
+                      <p style={{ fontSize: 12, color: '#52535a', marginTop: 10 }}>This can take up to a minute on large servers — you can leave this page, it keeps running.</p>
+                    )}
+                    {scanResult && !scanning && (
+                      <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 8, background: scanResult.removed > 0 ? 'rgba(242,63,67,0.08)' : 'rgba(35,165,90,0.07)', border: `1px solid ${scanResult.removed > 0 ? 'rgba(242,63,67,0.25)' : 'rgba(35,165,90,0.2)'}` }}>
+                        {scanResult.capped ? (
+                          <p style={{ fontSize: 13, color: '#f0b232' }}><b>{scanResult.eligible} flagged members</b> exceeded the safety cap ({scanResult.cap}) — <b>nothing was removed</b>. That many matches is unusual; please review the Flagged Accounts list before acting.</p>
+                        ) : (
+                          <p style={{ fontSize: 13, color: '#c9ccd4' }}>
+                            Scanned <b style={{ color: '#f2f3f5' }}>{scanResult.membersScanned.toLocaleString()}</b> members ·{' '}
+                            {scanResult.removed > 0
+                              ? <><b style={{ color: '#f23f43' }}>{scanResult.removed} {scanResult.action === 'ban' ? 'banned' : 'kicked'}</b>{scanResult.failed > 0 ? ` · ${scanResult.failed} couldn't be removed (permissions/role)` : ''}</>
+                              : <b style={{ color: '#23a55a' }}>no flagged accounts found ✓</b>}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 </div>
               )}
