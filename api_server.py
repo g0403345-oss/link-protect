@@ -1672,6 +1672,38 @@ async def admin_flagged(request: Request, limit: int = 100):
 # 10-min cache for full Discord profiles (admin flagged-account inspector).
 _profile_cache: dict = {}
 
+# Guild-name fallback: _bot_guilds_info only knows guilds the bot is CURRENTLY
+# in — for a guild it already left we fetch (and cache, misses included) once.
+_guild_name_cache: dict = {}
+
+
+async def _guild_names(gids: list, info: dict) -> dict:
+    """{gid: name|None} using the bulk info first, then per-guild fallback."""
+    out: dict = {}
+    now = time.monotonic()
+    for gid in dict.fromkeys(str(g) for g in gids):
+        name = info.get(gid, {}).get("name")
+        if name:
+            out[gid] = name
+            continue
+        hit = _guild_name_cache.get(gid)
+        if hit and now - hit[0] < 600:
+            out[gid] = hit[1]
+            continue
+        name = None
+        if BOT_TOKEN:
+            try:
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(f"{DISCORD_API}/guilds/{gid}",
+                                         headers={"Authorization": f"Bot {BOT_TOKEN}"}, timeout=5)
+                if r.status_code == 200:
+                    name = r.json().get("name")
+            except Exception:
+                pass
+        _guild_name_cache[gid] = (now, name)
+        out[gid] = name
+    return out
+
 
 async def _discord_profile(user_id: str) -> dict | None:
     now = time.monotonic()
@@ -1721,28 +1753,34 @@ async def admin_flagged_detail(request: Request, user_id: str):
     info = await _bot_guilds_info()
     gids = [str(r["guild_id"]) for r in c.execute(
         "SELECT guild_id FROM flagged_user_guilds WHERE user_id=?", (uid,)).fetchall()]
-    guilds = [{"id": g, "name": info.get(g, {}).get("name"),
+    ev_rows = c.execute(
+        "SELECT guild_id, content, attachments, channels, created_at "
+        "FROM flag_evidence WHERE user_id=? ORDER BY id DESC LIMIT 10", (uid,)).fetchall()
+    act_rows = c.execute(
+        "SELECT guild_id, action, reason, warn_count, timestamp FROM actions "
+        "WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()
+
+    names = await _guild_names(
+        gids + [r["guild_id"] for r in ev_rows] + [r["guild_id"] for r in act_rows], info)
+
+    guilds = [{"id": g, "name": names.get(g),
                "icon": info.get(g, {}).get("icon")} for g in gids]
 
     evidence = [{
         "guildId": str(r["guild_id"]),
-        "guildName": info.get(str(r["guild_id"]), {}).get("name"),
+        "guildName": names.get(str(r["guild_id"])),
         "content": r["content"],
         "attachments": json.loads(r["attachments"] or "[]"),
         "channels": r["channels"],
         "createdAt": r["created_at"],
-    } for r in c.execute(
-        "SELECT guild_id, content, attachments, channels, created_at "
-        "FROM flag_evidence WHERE user_id=? ORDER BY id DESC LIMIT 10", (uid,)).fetchall()]
+    } for r in ev_rows]
 
     actions = [{
         "guildId": str(r["guild_id"]),
-        "guildName": info.get(str(r["guild_id"]), {}).get("name"),
+        "guildName": names.get(str(r["guild_id"])),
         "action": r["action"], "reason": r["reason"],
         "warnCount": r["warn_count"], "timestamp": r["timestamp"],
-    } for r in c.execute(
-        "SELECT guild_id, action, reason, warn_count, timestamp FROM actions "
-        "WHERE user_id=? ORDER BY id DESC LIMIT 50", (uid,)).fetchall()]
+    } for r in act_rows]
 
     appeals = [{
         "id": r["id"], "status": r["status"], "message": r["message"],

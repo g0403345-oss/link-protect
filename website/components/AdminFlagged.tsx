@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  RefreshCw, Search, ShieldOff, ShieldAlert, X, FileWarning, Paperclip,
-  Hash, Server, Scale, Activity, Bot, CalendarClock, ExternalLink,
+  RefreshCw, Search, ShieldOff, ShieldAlert, FileWarning, Paperclip,
+  Hash, Server, Scale, Activity, Bot, CalendarClock, ExternalLink, ChevronLeft,
 } from 'lucide-react';
 
 interface FlaggedRow {
@@ -104,6 +104,7 @@ export default function AdminFlagged() {
   return (
     <div>
       {/* search */}
+      {!detail && !detailLoading && (
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 420 }}>
           <Search size={14} color="#52535a" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -117,21 +118,23 @@ export default function AdminFlagged() {
         </button>
       </div>
 
+      )}
+
       {/* look up an arbitrary id that isn't in the flagged list */}
-      {searchIdNotListed && (
+      {!detail && !detailLoading && searchIdNotListed && (
         <button onClick={() => openDetail(search.trim())}
           style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.35)', borderRadius: 8, color: '#7289da', cursor: 'pointer' }}>
           <Search size={13} /> ID {search.trim()} inspizieren (nicht geflaggt)
         </button>
       )}
 
-      {error && (
+      {!detail && !detailLoading && error && (
         <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
           Bot API unreachable.
         </div>
       )}
 
-      {!error && !loading && filtered.length === 0 && !searchIdNotListed && (
+      {!detail && !detailLoading && !error && !loading && filtered.length === 0 && !searchIdNotListed && (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <ShieldOff size={30} color="#2e2e36" style={{ margin: '0 auto 10px' }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: '#949ba4' }}>
@@ -141,6 +144,7 @@ export default function AdminFlagged() {
       )}
 
       {/* list */}
+      {!detail && !detailLoading && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {filtered.map((r) => (
           <button key={r.userId} onClick={() => openDetail(r.userId)}
@@ -161,13 +165,16 @@ export default function AdminFlagged() {
           </button>
         ))}
       </div>
+      )}
 
-      {/* detail modal */}
+      {/* detail — inline page, matching the rest of the admin panel */}
       {(detail || detailLoading) && (
-        <div onClick={() => setDetail(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 680, maxHeight: '86vh', overflowY: 'auto', background: '#111113', border: '1px solid #2e2e36', borderRadius: 14, padding: 22 }}>
+        <div style={{ marginTop: 4 }}>
+          <button onClick={() => setDetail(null)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer' }}>
+            <ChevronLeft size={14} /> Alle geflaggten Accounts
+          </button>
+          <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: 22 }}>
             {detailLoading || !detail ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
                 <RefreshCw size={18} color="#52535a" style={{ animation: 'spin 1s linear infinite' }} />
@@ -195,9 +202,6 @@ export default function AdminFlagged() {
                       @{detail.profile?.username ?? '—'} · <span style={{ fontFamily: 'monospace' }}>{detail.userId}</span>
                     </div>
                   </div>
-                  <button onClick={() => setDetail(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
-                    <X size={18} color="#6d6f78" />
-                  </button>
                 </div>
 
                 {/* key facts */}
@@ -249,7 +253,7 @@ export default function AdminFlagged() {
                   <div key={i} style={{ background: '#18181b', border: '1px solid rgba(240,178,50,0.25)', borderLeft: '3px solid #f0b232', borderRadius: 8, padding: '9px 12px', marginBottom: 8 }}>
                     <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#52535a', marginBottom: 6, flexWrap: 'wrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Hash size={10} /> {ev.channels} Channels</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Server size={10} /> {ev.guildName ?? `…${ev.guildId.slice(-4)}`}</span>
+                      <a href={`/dashboard/${ev.guildId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#7289da', textDecoration: 'none' }}><Server size={10} /> {ev.guildName ?? `Server …${ev.guildId.slice(-4)}`}</a>
                       <span style={{ marginLeft: 'auto' }}>{fmtDate(ev.createdAt)}</span>
                     </div>
                     {ev.content && <p style={{ fontSize: 12.5, fontFamily: 'monospace', color: '#e0e1e5', lineHeight: 1.5, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{ev.content}</p>}
@@ -278,13 +282,17 @@ export default function AdminFlagged() {
                     <SectionLabel icon={<Server size={11} />} text={`Erwischt auf (${detail.guilds.length})`} color="#f23f43" />
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                       {detail.guilds.map((g) => (
-                        <span key={g.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#c9ccd4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '4px 11px' }}>
+                        <a key={g.id} href={`/dashboard/${g.id}`} target="_blank" rel="noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#c9ccd4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '4px 11px', textDecoration: 'none' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#5865f2'; e.currentTarget.style.color = '#fff'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2e2e36'; e.currentTarget.style.color = '#c9ccd4'; }}>
                           {g.icon && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={`https://cdn.discordapp.com/icons/${g.id}/${g.icon}.webp?size=32`} alt="" style={{ width: 16, height: 16, borderRadius: '50%' }} />
                           )}
-                          {g.name ?? `…${g.id.slice(-6)}`}
-                        </span>
+                          {g.name ?? `Server …${g.id.slice(-6)}`}
+                          <ExternalLink size={10} style={{ opacity: 0.6 }} />
+                        </a>
                       ))}
                     </div>
                   </>
@@ -313,7 +321,7 @@ export default function AdminFlagged() {
                     <span style={{ fontWeight: 800, color: ACTION_COLOR[a.action] ?? '#949ba4', textTransform: 'capitalize', flexShrink: 0 }}>{a.action}</span>
                     <span style={{ color: '#949ba4', minWidth: 0 }}>{a.reason}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: '#52535a', flexShrink: 0 }}>
-                      {a.guildName ?? `…${a.guildId.slice(-4)}`} · {fmtDate(a.timestamp)}
+                      <a href={`/dashboard/${a.guildId}`} target="_blank" rel="noreferrer" style={{ color: '#7289da', textDecoration: 'none' }}>{a.guildName ?? `Server …${a.guildId.slice(-4)}`}</a> · {fmtDate(a.timestamp)}
                     </span>
                   </div>
                 ))}
