@@ -104,18 +104,6 @@ export default function Leaderboard() {
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 22, padding: '12px 24px', fontSize: 14.5, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', boxShadow: '0 8px 24px rgba(88,101,242,0.4)' }}>
             Vote on top.gg <ArrowRight size={15} />
           </a>
-          {/* Live top.gg widget (server/vote counts straight from top.gg) —
-              recolored via URL params to blend into the site's dark theme. */}
-          <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center' }}>
-            <a href="https://top.gg/bot/888390889892892684" target="_blank" rel="noreferrer" title="Link Protect on top.gg">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://top.gg/api/widget/888390889892892684.svg?topcolor=111113&middlecolor=18181b&usernamecolor=f2f3f5&datacolor=949ba4&labelcolor=5865f2&highlightcolor=5865f2&certifiedcolor=23a55a"
-                alt="Link Protect on top.gg" width={300} height={150} loading="lazy"
-                style={{ borderRadius: 12, border: '1px solid #26262c', display: 'block' }}
-              />
-            </a>
-          </div>
         </div>
       </div>
 
