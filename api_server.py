@@ -388,6 +388,7 @@ def _apply_override(guild_id: str, channel_id: str, body: "OverrideBody"):
         allow = body.allow if body.allow is not None else prev.get("allow")
         if allow:
             ov["allow"] = {
+                "enabled": bool(allow.get("enabled", True)),
                 "member": [str(x) for x in (allow.get("member") or [])][:50],
                 "role": [str(x) for x in (allow.get("role") or [])][:50],
             }

@@ -97,7 +97,15 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
   const setAllow = (channelId: string, ov: ChannelOverride, kind: 'member' | 'role', ids: string[]) => {
     const body: ChannelOverride = {
       mode: 'custom', protect: ov.protect ?? {}, silent: ov.silent,
-      allow: { member: ov.allow?.member ?? [], role: ov.allow?.role ?? [], [kind]: ids },
+      allow: { enabled: ov.allow?.enabled ?? true, member: ov.allow?.member ?? [], role: ov.allow?.role ?? [], [kind]: ids },
+    };
+    return callApi(channelId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  };
+
+  const setAllowEnabled = (channelId: string, ov: ChannelOverride, enabled: boolean) => {
+    const body: ChannelOverride = {
+      mode: 'custom', protect: ov.protect ?? {}, silent: ov.silent,
+      allow: { enabled, member: ov.allow?.member ?? [], role: ov.allow?.role ?? [] },
     };
     return callApi(channelId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   };
@@ -229,30 +237,54 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
                     </div>
 
                     {/* Per-channel exceptions: who may still post despite the blockers above */}
-                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #232329' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <Target size={13} color="#23a55a" />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>Exceptions — allowed in this channel</span>
-                      </div>
-                      <p style={{ fontSize: 12, color: '#6d6f78', lineHeight: 1.5, marginBottom: 10 }}>
-                        These members and roles can post links here even though the blockers above are on —
-                        e.g. turn on <b>All Links</b> and add your staff role so only they can share links in this channel.
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <PickerList
-                          title="Allowed members" description="These users bypass this channel's blockers"
-                          icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId}
-                          value={ov.allow?.member ?? []} onSave={(v) => setAllow(cid, ov, 'member', v)}
-                          saving={busy === cid}
-                        />
-                        <PickerList
-                          title="Allowed roles" description="Members with these roles bypass this channel's blockers"
-                          icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId}
-                          value={ov.allow?.role ?? []} onSave={(v) => setAllow(cid, ov, 'role', v)}
-                          saving={busy === cid}
-                        />
-                      </div>
-                    </div>
+                    {(() => {
+                      const restrictOn = ov.allow?.enabled ?? ((ov.allow?.member?.length ?? 0) + (ov.allow?.role?.length ?? 0) > 0);
+                      const exCount = (ov.allow?.member?.length ?? 0) + (ov.allow?.role?.length ?? 0);
+                      const anyBlocker = BLOCKERS.some(({ key }) => ov.protect?.[key]);
+                      return (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #232329' }}>
+                          <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: '2px 14px' }}>
+                            <ToggleSwitch
+                              checked={restrictOn}
+                              onChange={(v) => setAllowEnabled(cid, ov, v)}
+                              disabled={busy === cid}
+                              label="Restrict who can post here"
+                              description="Only the members & roles you pick may post the blocked link types — everyone else is blocked"
+                              size="sm"
+                            />
+                          </div>
+                          {restrictOn && (
+                            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              <PickerList
+                                title="Allowed members" description="These users bypass this channel's blockers"
+                                icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId}
+                                value={ov.allow?.member ?? []} onSave={(v) => setAllow(cid, ov, 'member', v)}
+                                saving={busy === cid}
+                              />
+                              <PickerList
+                                title="Allowed roles" description="Members with these roles bypass this channel's blockers"
+                                icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId}
+                                value={ov.allow?.role ?? []} onSave={(v) => setAllow(cid, ov, 'role', v)}
+                                saving={busy === cid}
+                              />
+                            </div>
+                          )}
+                          {/* Plain-language summary of the resulting behaviour */}
+                          <div style={{ marginTop: 10, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 12px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
+                            <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
+                            <p style={{ fontSize: 12, color: '#6d6f78', lineHeight: 1.5 }}>
+                              {!anyBlocker
+                                ? <>No blockers are on here, so <b>everyone can post everything</b> in this channel.</>
+                                : restrictOn
+                                  ? (exCount > 0
+                                      ? <>Right now: <b style={{ color: '#c9ccd4' }}>only the {exCount} chosen member{exCount === 1 ? '' : 's'}/role{exCount === 1 ? '' : 's'}</b> may post the blocked link types here — everyone else is blocked.</>
+                                      : <>Restriction is on but the list is empty, so <b>nobody</b> may post the blocked link types here yet — add members or roles above.</>)
+                                  : <>The blocked link types apply to <b>everyone</b> here (no exceptions). Turn on the switch to let specific members/roles through.</>}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

@@ -354,6 +354,8 @@ def _apply_channel_allow(eff: dict, settings: dict, ov: dict) -> None:
     (used by every cog) exempts them here without touching the server-wide list.
     Deep-copies the channel dict so the cached settings are never mutated."""
     allow = ov.get("allow") or {}
+    if not allow.get("enabled", True):   # exceptions toggled off — keep the list, ignore it
+        return
     a_members = [str(x) for x in (allow.get("member") or [])]
     a_roles = [str(x) for x in (allow.get("role") or [])]
     if not a_members and not a_roles:
