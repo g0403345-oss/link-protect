@@ -223,15 +223,20 @@ export default function GuildDashboard() {
     if (status === 'unauthenticated') router.push('/dashboard');
   }, [status, router]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Silent refetch (e.g. after saving a channel rule) updates the data in
+    // place without flashing the full-page spinner — that flash looked like a
+    // page reload after every toggle.
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/guild/${guildId}`);
       if (!res.ok) { if (res.status === 403) { router.push('/dashboard'); return; } throw new Error(); }
       setData(await res.json() as ServerData);
-    } catch { addToast('error', 'Failed to load settings'); }
-    finally { setLoading(false); }
+    } catch { if (!silent) addToast('error', 'Failed to load settings'); }
+    finally { if (!silent) setLoading(false); }
   }, [guildId, router, addToast]);
+
+  const refreshDataSilently = useCallback(() => { fetchData({ silent: true }); }, [fetchData]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -837,7 +842,7 @@ export default function GuildDashboard() {
                     <ChannelRules
                       guildId={guildId}
                       overrides={overrides}
-                      onSaved={fetchData}
+                      onSaved={refreshDataSilently}
                       addToast={addToast}
                     />
                   </div>
