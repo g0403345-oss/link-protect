@@ -94,6 +94,8 @@ export interface ChannelOverride {
   mode: 'default' | 'off' | 'custom';
   protect?: Partial<ServerData['protect']>;
   silent?: boolean;
+  /** Members/roles exempt from blocking in this channel only. */
+  allow?: { member?: string[]; role?: string[] };
 }
 
 export interface GlobalStats {

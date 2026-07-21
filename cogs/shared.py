@@ -343,8 +343,26 @@ def resolve_channel(settings: dict, channel) -> dict:
         eff["protect"] = merged
         if "silent" in ov:
             eff["silent"] = bool(ov["silent"])
+        _apply_channel_allow(eff, settings, ov)
         return eff
     return settings
+
+
+def _apply_channel_allow(eff: dict, settings: dict, ov: dict) -> None:
+    """Per-channel exemptions: members/roles in the override's `allow` list are
+    added to the effective whitelist FOR THIS CHANNEL ONLY, so is_whitelisted
+    (used by every cog) exempts them here without touching the server-wide list.
+    Deep-copies the channel dict so the cached settings are never mutated."""
+    allow = ov.get("allow") or {}
+    a_members = [str(x) for x in (allow.get("member") or [])]
+    a_roles = [str(x) for x in (allow.get("role") or [])]
+    if not a_members and not a_roles:
+        return
+    base = settings.get("channel") or {}
+    ch = dict(base)
+    ch["member"] = list(get_safe_list(base.get("member"))) + a_members
+    ch["role"] = list(get_safe_list(base.get("role"))) + a_roles
+    eff["channel"] = ch
 
 
 # ── warning decay ───────────────────────────────────────────────────────────

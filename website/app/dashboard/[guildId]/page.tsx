@@ -154,6 +154,17 @@ export default function GuildDashboard() {
   const guildId = params.guildId;
 
   const [section, setSection] = useState<Section>('overview');
+  const mainRef = useRef<HTMLElement>(null);
+  // Switch tab AND jump to the top: the content area scrolls on its own, so a
+  // plain setSection left you at the previous scroll offset (looked like a
+  // random jump). Reset both the content container and the window.
+  const selectSection = useCallback((id: Section) => {
+    setSection(id);
+    requestAnimationFrame(() => {
+      mainRef.current?.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0 });
+    });
+  }, []);
   const [selectedUser, setSelectedUser] = useState<{ id: string; warns: number; reasons: string[] } | null>(null);
   const [modalBusy, setModalBusy] = useState<string | null>(null);
   const [modalConfirm, setModalConfirm] = useState<string | null>(null);
@@ -330,7 +341,13 @@ export default function GuildDashboard() {
         const u = JSON.parse(JSON.stringify(prev)) as ServerData;
         const keys = path.split('.');
         let cur: Record<string, unknown> = u as unknown as Record<string, unknown>;
-        for (let i = 0; i < keys.length - 1; i++) cur = cur[keys[i]] as Record<string, unknown>;
+        // Create missing intermediate objects — older server data may lack
+        // whole branches (e.g. warn.timeout, decay), and walking into an
+        // undefined key here used to throw and trip the Next error page.
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (typeof cur[keys[i]] !== 'object' || cur[keys[i]] === null) cur[keys[i]] = {};
+          cur = cur[keys[i]] as Record<string, unknown>;
+        }
         cur[keys[keys.length - 1]] = value;
         return u;
       });
@@ -450,7 +467,7 @@ export default function GuildDashboard() {
         {NAV.map(({ id, label, icon: Icon }) => {
           const active = section === id;
           return (
-            <button key={id} onClick={() => setSection(id)}
+            <button key={id} onClick={() => selectSection(id)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, background: active ? 'rgba(88,101,242,0.15)' : 'transparent', color: active ? '#5865f2' : '#6d6f78', flexShrink: 0, transition: 'all 0.15s' }}>
               <Icon size={13} /> {label}
             </button>
@@ -464,7 +481,7 @@ export default function GuildDashboard() {
           {NAV.map(({ id, label, icon: Icon, desc }) => {
             const active = section === id;
             return (
-              <button key={id} onClick={() => setSection(id)}
+              <button key={id} onClick={() => selectSection(id)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', marginBottom: 2, transition: 'background 0.1s', background: active ? 'rgba(88,101,242,0.12)' : 'transparent', borderLeft: active ? '2px solid #5865f2' : '2px solid transparent' }}>
                 <Icon size={15} color={active ? '#5865f2' : '#52535a'} />
                 <div>
@@ -477,7 +494,7 @@ export default function GuildDashboard() {
         </aside>
 
         {/* Content */}
-        <main className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+        <main ref={mainRef} className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
           <div style={{ marginBottom: 20 }}><VoteBanner /></div>
           <AnimatePresence mode="wait">
             <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>

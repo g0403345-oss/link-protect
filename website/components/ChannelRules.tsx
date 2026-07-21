@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, X, Hash, Info, ShieldOff, Server, Target, ChevronDown } from 'lucide-react';
+import { Plus, X, Hash, Info, ShieldOff, Server, Target, ChevronDown, Users, Shield } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
+import PickerList from '@/components/PickerList';
 import type { ChannelOverride, ServerData } from '@/lib/db';
 
 interface DiscordChannel { id: string; name: string; type: number; parent_id?: string | null; }
@@ -88,7 +89,16 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
   };
 
   const toggleBlocker = (channelId: string, ov: ChannelOverride, key: string, val: boolean) => {
-    const body: ChannelOverride = { mode: 'custom', protect: { ...(ov.protect ?? {}), [key]: val } };
+    // Keep allow + silent so toggling a blocker never wipes the exception list.
+    const body: ChannelOverride = { mode: 'custom', protect: { ...(ov.protect ?? {}), [key]: val }, allow: ov.allow, silent: ov.silent };
+    return callApi(channelId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  };
+
+  const setAllow = (channelId: string, ov: ChannelOverride, kind: 'member' | 'role', ids: string[]) => {
+    const body: ChannelOverride = {
+      mode: 'custom', protect: ov.protect ?? {}, silent: ov.silent,
+      allow: { member: ov.allow?.member ?? [], role: ov.allow?.role ?? [], [kind]: ids },
+    };
     return callApi(channelId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   };
 
@@ -216,6 +226,32 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
                           />
                         </div>
                       ))}
+                    </div>
+
+                    {/* Per-channel exceptions: who may still post despite the blockers above */}
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #232329' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <Target size={13} color="#23a55a" />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>Exceptions — allowed in this channel</span>
+                      </div>
+                      <p style={{ fontSize: 12, color: '#6d6f78', lineHeight: 1.5, marginBottom: 10 }}>
+                        These members and roles can post links here even though the blockers above are on —
+                        e.g. turn on <b>All Links</b> and add your staff role so only they can share links in this channel.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <PickerList
+                          title="Allowed members" description="These users bypass this channel's blockers"
+                          icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId}
+                          value={ov.allow?.member ?? []} onSave={(v) => setAllow(cid, ov, 'member', v)}
+                          saving={busy === cid}
+                        />
+                        <PickerList
+                          title="Allowed roles" description="Members with these roles bypass this channel's blockers"
+                          icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId}
+                          value={ov.allow?.role ?? []} onSave={(v) => setAllow(cid, ov, 'role', v)}
+                          saving={busy === cid}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

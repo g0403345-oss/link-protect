@@ -343,6 +343,8 @@ class OverrideBody(BaseModel):
     mode: str                       # "default" | "off" | "custom"
     protect: dict | None = None     # only for "custom": {blocker: bool}
     silent: bool | None = None      # only for "custom": optional
+    allow: dict | None = None       # only for "custom": {"member":[...],"role":[...]}
+                                    # members/roles exempt from blocking IN THIS channel
 
 
 class ModerateBody(BaseModel):
@@ -371,10 +373,24 @@ def _apply_override(guild_id: str, channel_id: str, body: "OverrideBody"):
     elif body.mode == "off":
         overrides[cid] = {"mode": "off"}
     elif body.mode == "custom":
-        protect = {k: bool(v) for k, v in (body.protect or {}).items() if k in PROTECT_KEYS}
+        # Merge onto any existing custom override so a partial update (e.g. just
+        # toggling one blocker) never wipes the allow-list or silent flag.
+        prev = overrides.get(cid) if isinstance(overrides.get(cid), dict) and \
+            overrides.get(cid).get("mode") == "custom" else {}
+        if body.protect is not None:
+            protect = {k: bool(v) for k, v in body.protect.items() if k in PROTECT_KEYS}
+        else:
+            protect = prev.get("protect", {}) or {}
         ov = {"mode": "custom", "protect": protect}
-        if body.silent is not None:
-            ov["silent"] = bool(body.silent)
+        silent = body.silent if body.silent is not None else prev.get("silent")
+        if silent is not None:
+            ov["silent"] = bool(silent)
+        allow = body.allow if body.allow is not None else prev.get("allow")
+        if allow:
+            ov["allow"] = {
+                "member": [str(x) for x in (allow.get("member") or [])][:50],
+                "role": [str(x) for x in (allow.get("role") or [])][:50],
+            }
         overrides[cid] = ov
     else:
         raise HTTPException(status_code=400, detail="mode must be 'default', 'off' or 'custom'")
