@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LinkChecker from '@/components/LinkChecker';
 import Leaderboard from '@/components/Leaderboard';
+import SupporterWall from '@/components/SupporterWall';
 
 /* ── "Now on iOS" app showcase ───────────────────────────────── */
 function PhoneShot({ src, alt, raised }: { src: string; alt: string; raised?: boolean }) {
@@ -650,6 +651,7 @@ export default function LandingClient() {
       {/* LEADERBOARD — vote reward */}
       <section style={{ padding: '96px 24px', borderTop: '1px solid #18181b' }}>
         <Leaderboard />
+        <SupporterWall />
       </section>
 
       {/* CTA */}

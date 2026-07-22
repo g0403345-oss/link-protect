@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Trophy, ArrowRight } from 'lucide-react';
 import type { LeaderboardEntry } from '@/lib/db';
-import { SupporterBadge, rankMeta, VOTE_URL } from './SupporterBadge';
+import { SupporterBadge, StreakChip, rankMeta, VOTE_URL } from './SupporterBadge';
 
 function monthName(key: string) {
   if (!key) return '';
@@ -45,7 +45,10 @@ function PodiumCard({ entry }: { entry: LeaderboardEntry }) {
       <div style={{ fontSize: isGold ? 15 : 13.5, fontWeight: 700, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', textAlign: 'center' }}>
         {entry.username ?? `User …${entry.id.slice(-4)}`}
       </div>
-      <SupporterBadge />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <SupporterBadge total={entry.total} />
+        <StreakChip streak={entry.streak} />
+      </div>
       <div style={{ marginTop: 2, fontSize: 20, fontWeight: 900, color: meta.color, letterSpacing: '-0.02em' }}>
         {entry.votes}
         <span style={{ fontSize: 11, fontWeight: 600, color: '#949ba4', marginLeft: 4 }}>{entry.votes === 1 ? 'vote' : 'votes'}</span>
@@ -97,8 +100,9 @@ export default function Leaderboard() {
             Vote &amp; get on the board
           </h2>
           <p style={{ fontSize: 15.5, color: '#6d6f78', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
-            Vote for Link Protect on top.gg to earn a <strong style={{ color: '#ff6b6e' }}>♥ Supporter</strong> badge —
-            the month&apos;s top voters are featured here in gold, silver &amp; bronze.
+            Vote for Link Protect on top.gg to earn a <strong style={{ color: '#ff6b6e' }}>♥ Supporter</strong> badge
+            and role, build a <strong style={{ color: '#ff922b' }}>🔥 daily streak</strong> and climb the milestone
+            tiers — Bronze, Silver, Gold &amp; Diamond.
           </p>
           <a href={VOTE_URL} target="_blank" rel="noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 22, padding: '12px 24px', fontSize: 14.5, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', boxShadow: '0 8px 24px rgba(88,101,242,0.4)' }}>
@@ -130,7 +134,8 @@ export default function Leaderboard() {
                     <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {e.username ?? `User …${e.id.slice(-4)}`}
                     </span>
-                    <SupporterBadge />
+                    <StreakChip streak={e.streak} />
+                    <SupporterBadge total={e.total} />
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#b5bac1', minWidth: 56, textAlign: 'right' }}>{e.votes} votes</span>
                   </div>
                 ))}

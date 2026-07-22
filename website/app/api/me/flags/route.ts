@@ -15,8 +15,8 @@ export async function GET() {
   try {
     return NextResponse.json(await getUserFlags(session.user.id));
   } catch {
-    // Fail soft — a missing flag just means the tour may show once more.
-    return NextResponse.json({ tourSeen: false });
+    // Fail soft — a missing flag just means the tour/popup may show once more.
+    return NextResponse.json({ tourSeen: false, votePromptSeen: false });
   }
 }
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  let body: { tourSeen?: boolean } = {};
+  let body: { tourSeen?: boolean; votePromptSeen?: boolean } = {};
   try {
     body = await req.json();
   } catch {

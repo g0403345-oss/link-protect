@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { VoteStatus } from '@/lib/db';
-import { SupporterBadge, rankMeta, VOTE_URL } from './SupporterBadge';
+import { SupporterBadge, StreakChip, milestoneMeta, rankMeta, VOTE_URL } from './SupporterBadge';
 
 function fmt(sec: number) {
   if (sec <= 0) return 'now';
@@ -84,12 +84,23 @@ export default function VoteBanner() {
             <span style={{ fontSize: 14.5, fontWeight: 800, color: '#fff' }}>
               {v?.rank ? `You're #${v.rank} this month` : 'Vote for Link Protect'}
             </span>
-            {v?.supporter && <SupporterBadge />}
+            {v?.supporter && <SupporterBadge total={v.total} />}
+            <StreakChip streak={v?.streak} />
           </div>
           <p style={{ fontSize: 12.5, color: '#c4c6cc', marginTop: 2 }}>
             {inCooldown
-              ? `Thanks for voting! 🎉 You can vote again in ${fmt(v!.canVoteAt - now)}.`
-              : 'Your vote keeps Link Protect free — and earns a ♥ Supporter badge + a spot on the home leaderboard.'}
+              ? (v!.streak >= 2
+                  ? `Thanks for voting! 🎉 Your 🔥 ${v!.streak}-day streak is safe — come back in ${fmt(v!.canVoteAt - now)}.`
+                  : `Thanks for voting! 🎉 You can vote again in ${fmt(v!.canVoteAt - now)}.`)
+              : (v && v.streak >= 2
+                  ? `🔥 Keep your ${v.streak}-day streak alive — vote now before it resets!`
+                  : 'Your vote keeps Link Protect free — earn the ♥ Supporter badge, build a 🔥 streak and climb the milestone tiers.')}
+            {(() => {
+              const m = milestoneMeta(v?.total);
+              if (v?.total && m?.next) return ` ${m.next - v.total} more votes to ${m.next === 50 ? 'Silver' : m.next === 100 ? 'Gold' : 'Diamond'}.`;
+              if (v?.total && !m && v.total > 0) return ` ${10 - v.total} more ${10 - v.total === 1 ? 'vote' : 'votes'} to your Bronze badge.`;
+              return '';
+            })()}
           </p>
         </div>
 

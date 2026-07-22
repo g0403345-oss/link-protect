@@ -332,6 +332,14 @@ export interface LeaderboardEntry {
   avatarUrl: string | null;
   votes: number;
   total: number;
+  streak: number;      // live consecutive-day vote streak (0 when lapsed)
+}
+
+export interface SupporterWallEntry {
+  id: string;
+  username: string | null;
+  avatarUrl: string | null;
+  votes: number;
 }
 
 export interface VoteStatus {
@@ -345,14 +353,21 @@ export interface VoteStatus {
   monthly: number;
   rank: number | null;
   supporter: boolean;
+  streak: number;      // live consecutive-day vote streak (0 when lapsed)
+  bestStreak: number;
 }
 
 export interface UserFlags {
   tourSeen: boolean;
+  votePromptSeen: boolean;
 }
 
 export async function getLeaderboard(limit = 10): Promise<{ month: string; leaderboard: LeaderboardEntry[] }> {
   return apiFetch(`/api/leaderboard?limit=${limit}`);
+}
+
+export async function getSupporters(): Promise<{ month: string; count: number; supporters: SupporterWallEntry[] }> {
+  return apiFetch(`/api/supporters`);
 }
 
 export async function getUserVote(userId: string): Promise<VoteStatus> {
@@ -370,6 +385,9 @@ export async function getUserFlags(userId: string): Promise<UserFlags> {
   return apiFetch(`/api/user/${userId}/flags`);
 }
 
-export async function setUserFlags(userId: string, body: { tourSeen?: boolean }): Promise<UserFlags> {
+export async function setUserFlags(
+  userId: string,
+  body: { tourSeen?: boolean; votePromptSeen?: boolean }
+): Promise<UserFlags> {
   return apiFetch(`/api/user/${userId}/flags`, { method: "POST", body: JSON.stringify(body) });
 }

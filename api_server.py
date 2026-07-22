@@ -164,7 +164,19 @@ def _ensure_vote_tables():
         c.execute("ALTER TABLE votes ADD COLUMN synced INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # Streak migration: consecutive-day vote streaks (voter perk).
+    for ddl in ("streak INTEGER NOT NULL DEFAULT 0", "best_streak INTEGER NOT NULL DEFAULT 0"):
+        try:
+            c.execute(f"ALTER TABLE votes ADD COLUMN {ddl}")
+        except sqlite3.OperationalError:
+            pass
     c.execute("CREATE INDEX IF NOT EXISTS idx_votes_month ON votes (month, monthly DESC)")
+    # Which users currently hold the ♥ Supporter role on the support server —
+    # lets the expiry sweep remove roles without listing guild members.
+    c.execute("""CREATE TABLE IF NOT EXISTS supporter_roles (
+        user_id TEXT PRIMARY KEY,
+        granted_at INTEGER NOT NULL
+    )""")
     c.execute("""CREATE TABLE IF NOT EXISTS kv (
         path TEXT PRIMARY KEY, value TEXT NOT NULL
     )""")
@@ -1196,6 +1208,34 @@ async def seen_notifications(request: Request):
 
 VOTE_COOLDOWN = 12 * 3600       # top.gg lets a user vote every 12 hours
 SUPPORTER_WINDOW = 30 * 86400   # "supporter" = voted within the last 30 days
+# A day-streak survives as long as consecutive votes are ≤48h apart (i.e. you
+# may skip up to one calendar day). Deliberately forgiving — streaks should
+# motivate, not punish a single late evening.
+STREAK_GRACE = 48 * 3600
+
+# Support server where active voters get the ♥ Supporter role for 30 days.
+SUPPORT_GUILD_ID = os.environ.get("SUPPORT_GUILD_ID", "864823666952372245")
+SUPPORTER_ROLE_NAME = "♥ Supporter"
+SUPPORTER_ROLE_KEY = "config:supporter_role_id"
+
+
+def _utc_day(ts: int) -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime(ts))
+
+
+def _next_streak(last: int, prev_streak: int, now: int) -> int:
+    """Day-based streak: another vote on the same UTC day keeps it, a vote on a
+    later day within the grace window extends it, anything else restarts at 1."""
+    if not last or now - last > STREAK_GRACE:
+        return 1
+    if _utc_day(last) == _utc_day(now):
+        return max(prev_streak, 1)
+    return max(prev_streak, 0) + 1
+
+
+def _live_streak(last: int, streak: int, now: int) -> int:
+    """The stored streak counts only while the last vote is within grace."""
+    return streak if last and now - last <= STREAK_GRACE else 0
 
 
 def _month_key() -> str:
@@ -1218,25 +1258,37 @@ def _record_vote(user_id: str, exact: bool = True) -> None:
     now = int(time.time())
     mk = _month_key()
     synced = 0 if exact else 1
-    row = c.execute("SELECT monthly, month FROM votes WHERE user_id=?", (str(user_id),)).fetchone()
+    row = c.execute("SELECT monthly, month, last_voted, streak, best_streak FROM votes WHERE user_id=?",
+                    (str(user_id),)).fetchone()
     if row:
         monthly = (row["monthly"] + 1) if row["month"] == mk else 1
-        c.execute("UPDATE votes SET last_voted=?, total=total+1, monthly=?, month=?, synced=? WHERE user_id=?",
-                  (now, monthly, mk, synced, str(user_id)))
+        streak = _next_streak(row["last_voted"], row["streak"], now)
+        best = max(row["best_streak"], streak)
+        c.execute("UPDATE votes SET last_voted=?, total=total+1, monthly=?, month=?, synced=?, streak=?, best_streak=? "
+                  "WHERE user_id=?",
+                  (now, monthly, mk, synced, streak, best, str(user_id)))
     else:
-        c.execute("INSERT INTO votes(user_id, last_voted, total, monthly, month, synced) VALUES(?,?,1,1,?,?)",
+        c.execute("INSERT INTO votes(user_id, last_voted, total, monthly, month, synced, streak, best_streak) "
+                  "VALUES(?,?,1,1,?,?,1,1)",
                   (str(user_id), now, mk, synced))
     c.commit()
+    # Voter perk: grant the ♥ Supporter role on the support server (best-effort).
+    try:
+        asyncio.create_task(_grant_supporter_role(str(user_id)))
+    except RuntimeError:
+        pass
 
 
 def _vote_status(user_id: str) -> dict:
     c = _get_conn()
     now = int(time.time())
     mk = _month_key()
-    row = c.execute("SELECT last_voted, total, monthly, month, synced FROM votes WHERE user_id=?", (str(user_id),)).fetchone()
+    row = c.execute("SELECT last_voted, total, monthly, month, synced, streak, best_streak FROM votes WHERE user_id=?",
+                    (str(user_id),)).fetchone()
     if not row:
         return {"hasVoted": False, "lastVoted": 0, "canVoteAt": now, "synced": False,
-                "total": 0, "monthly": 0, "rank": None, "supporter": False}
+                "total": 0, "monthly": 0, "rank": None, "supporter": False,
+                "streak": 0, "bestStreak": 0}
     last = row["last_voted"]
     monthly = row["monthly"] if row["month"] == mk else 0
     rank = None
@@ -1257,6 +1309,8 @@ def _vote_status(user_id: str) -> dict:
         "monthly": monthly,
         "rank": rank,
         "supporter": (now - last) < SUPPORTER_WINDOW,
+        "streak": _live_streak(last, row["streak"], now),
+        "bestStreak": row["best_streak"],
     }
 
 
@@ -1276,6 +1330,108 @@ async def topgg_webhook(request: Request, body: TopggVoteBody):
     return {"ok": True}
 
 
+# ── Voter perk: ♥ Supporter role on the support server ────────────────────────
+# Granted on every vote, removed by a background sweep once the voter's last
+# vote is older than the 30-day supporter window. The bot needs Manage Roles on
+# the support server (and its top role above ♥ Supporter).
+
+async def _supporter_role_id() -> str | None:
+    """Resolve (and lazily create) the ♥ Supporter role. Cached in kv."""
+    cached = None
+    try:
+        row = _get_conn().execute("SELECT value FROM kv WHERE path=?", (SUPPORTER_ROLE_KEY,)).fetchone()
+        cached = json.loads(row["value"]) if row else None
+    except Exception:
+        pass
+    if cached:
+        return str(cached)
+    if not BOT_TOKEN or not SUPPORT_GUILD_ID:
+        return None
+    headers = {"Authorization": f"Bot {BOT_TOKEN}"}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(f"{DISCORD_API}/guilds/{SUPPORT_GUILD_ID}/roles", headers=headers)
+            if r.status_code != 200:
+                return None
+            role = next((x for x in r.json() if x.get("name") == SUPPORTER_ROLE_NAME), None)
+            if not role:
+                r = await client.post(
+                    f"{DISCORD_API}/guilds/{SUPPORT_GUILD_ID}/roles",
+                    headers={**headers, "X-Audit-Log-Reason": "Link Protect voter perk role"},
+                    json={"name": SUPPORTER_ROLE_NAME, "color": 0xF23F43,
+                          "hoist": True, "mentionable": False, "permissions": "0"},
+                )
+                if r.status_code not in (200, 201):
+                    print(f"[supporter-role] create failed: {r.status_code} {r.text[:200]}")
+                    return None
+                role = r.json()
+    except Exception as e:
+        print(f"[supporter-role] resolve failed: {e}")
+        return None
+    rid = str(role["id"])
+    _kv_set(SUPPORTER_ROLE_KEY, rid)
+    return rid
+
+
+async def _grant_supporter_role(user_id: str) -> None:
+    """Best-effort: add the role after a vote. 404 = not on the support server."""
+    rid = await _supporter_role_id()
+    if not rid:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.put(
+                f"{DISCORD_API}/guilds/{SUPPORT_GUILD_ID}/members/{user_id}/roles/{rid}",
+                headers={"Authorization": f"Bot {BOT_TOKEN}",
+                         "X-Audit-Log-Reason": "top.gg vote — supporter perk (30 days)"},
+            )
+        if r.status_code == 204:
+            c = _get_conn()
+            c.execute("INSERT OR REPLACE INTO supporter_roles(user_id, granted_at) VALUES(?,?)",
+                      (str(user_id), int(time.time())))
+            c.commit()
+        elif r.status_code == 404 and '"code": 10011' in r.text:
+            _kv_set(SUPPORTER_ROLE_KEY, None)  # role was deleted — re-resolve next vote
+    except Exception:
+        pass
+
+
+async def _supporter_role_loop():
+    """Hourly sweep: strip the role from voters whose 30-day window lapsed."""
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            cutoff = int(time.time()) - SUPPORTER_WINDOW
+            rows = _get_conn().execute(
+                "SELECT s.user_id FROM supporter_roles s LEFT JOIN votes v ON v.user_id = s.user_id "
+                "WHERE v.last_voted IS NULL OR v.last_voted < ?", (cutoff,)
+            ).fetchall()
+            if not rows:
+                continue
+            rid = await _supporter_role_id()
+            if not rid:
+                continue
+            async with httpx.AsyncClient(timeout=10) as client:
+                for r in rows[:50]:  # gentle: at most 50 removals per sweep
+                    uid = r["user_id"]
+                    try:
+                        resp = await client.delete(
+                            f"{DISCORD_API}/guilds/{SUPPORT_GUILD_ID}/members/{uid}/roles/{rid}",
+                            headers={"Authorization": f"Bot {BOT_TOKEN}",
+                                     "X-Audit-Log-Reason": "Supporter window (30 days) expired"},
+                        )
+                        # 204 removed · 404 member/role gone — either way, done tracking.
+                        if resp.status_code in (204, 404):
+                            c = _get_conn()
+                            c.execute("DELETE FROM supporter_roles WHERE user_id=?", (uid,))
+                            c.commit()
+                        await asyncio.sleep(1)  # stay far from the rate limit
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+
 _lb_cache: tuple[float, dict] | None = None
 _LB_TTL = 20.0  # short enough that the polling landing page feels near-live
 
@@ -1290,8 +1446,9 @@ async def leaderboard(request: Request, limit: int = 10):
     if _lb_cache and now - _lb_cache[0] < _LB_TTL and _lb_cache[1].get("limit") == limit:
         return _lb_cache[1]
     mk = _month_key()
+    wall = int(time.time())
     rows = _get_conn().execute(
-        "SELECT user_id, monthly, total, last_voted FROM votes "
+        "SELECT user_id, monthly, total, last_voted, streak FROM votes "
         "WHERE month=? AND monthly>0 ORDER BY monthly DESC, last_voted ASC LIMIT ?",
         (mk, limit),
     ).fetchall()
@@ -1303,9 +1460,46 @@ async def leaderboard(request: Request, limit: int = 10):
             "rank": i + 1, "id": r["user_id"],
             "username": u.get("username"), "avatarUrl": _avatar_url(r["user_id"], u.get("avatar")),
             "votes": r["monthly"], "total": r["total"],
+            "streak": _live_streak(r["last_voted"], r["streak"], wall),
         })
     payload = {"month": mk, "leaderboard": board, "limit": limit}
     _lb_cache = (now, payload)
+    return payload
+
+
+# ── Supporter wall: every voter of the current month (landing page) ───────────
+
+_wall_cache: tuple[float, dict] | None = None
+_WALL_TTL = 300.0  # avatars change rarely; keep Discord REST traffic low
+
+
+@app.get("/api/supporters")
+@require_auth
+async def supporters(request: Request, limit: int = 48):
+    """All of this month's voters — avatar wall on the landing page."""
+    global _wall_cache
+    now = time.monotonic()
+    limit = max(1, min(int(limit or 48), 48))
+    if _wall_cache and now - _wall_cache[0] < _WALL_TTL and _wall_cache[1].get("limit") == limit:
+        return _wall_cache[1]
+    mk = _month_key()
+    rows = _get_conn().execute(
+        "SELECT user_id, monthly FROM votes WHERE month=? AND monthly>0 "
+        "ORDER BY monthly DESC, last_voted ASC",
+        (mk,),
+    ).fetchall()
+    shown = rows[:limit]
+    resolved = {u["id"]: u for u in await _resolve_users([r["user_id"] for r in shown])}
+    wall = []
+    for r in shown:
+        u = resolved.get(r["user_id"], {})
+        wall.append({
+            "id": r["user_id"], "username": u.get("username"),
+            "avatarUrl": _avatar_url(r["user_id"], u.get("avatar")),
+            "votes": r["monthly"],
+        })
+    payload = {"month": mk, "count": len(rows), "supporters": wall, "limit": limit}
+    _wall_cache = (now, payload)
     return payload
 
 
@@ -1360,6 +1554,7 @@ async def user_vote(request: Request, user_id: str):
 
 class UserFlagsBody(BaseModel):
     tourSeen: bool | None = None
+    votePromptSeen: bool | None = None  # "don't show again" on the vote popup
 
 
 def _flags_key(user_id: str) -> str:
@@ -1374,10 +1569,15 @@ def _get_flags(user_id: str) -> dict:
         return {}
 
 
+def _flags_payload(flags: dict) -> dict:
+    return {"tourSeen": bool(flags.get("tourSeen")),
+            "votePromptSeen": bool(flags.get("votePromptSeen"))}
+
+
 @app.get("/api/user/{user_id}/flags")
 @require_auth
 async def get_user_flags(request: Request, user_id: str):
-    return {"tourSeen": bool(_get_flags(user_id).get("tourSeen"))}
+    return _flags_payload(_get_flags(user_id))
 
 
 @app.post("/api/user/{user_id}/flags")
@@ -1386,8 +1586,10 @@ async def set_user_flags(request: Request, user_id: str, body: UserFlagsBody):
     flags = _get_flags(user_id)
     if body.tourSeen is not None:
         flags["tourSeen"] = bool(body.tourSeen)
+    if body.votePromptSeen is not None:
+        flags["votePromptSeen"] = bool(body.votePromptSeen)
     _kv_set(_flags_key(user_id), flags)
-    return {"tourSeen": bool(flags.get("tourSeen"))}
+    return _flags_payload(flags)
 
 
 @app.get("/api/mobile/admin/config")
@@ -3484,6 +3686,7 @@ async def _start_background_tasks():
     asyncio.create_task(_action_push_loop())
     asyncio.create_task(_bot_offline_loop())
     asyncio.create_task(_settings_push_loop())
+    asyncio.create_task(_supporter_role_loop())
 
 
 if __name__ == "__main__":

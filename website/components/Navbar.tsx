@@ -8,7 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
-import { SupporterBadge, rankMeta } from '@/components/SupporterBadge';
+import { SupporterBadge, StreakChip, rankMeta } from '@/components/SupporterBadge';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function Navbar() {
@@ -50,13 +50,15 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Voter status drives the pill's medal colour + Supporter badge.
-  const [vote, setVote] = useState<{ rank: number | null; supporter: boolean } | null>(null);
+  // Voter status drives the pill's medal colour + Supporter badge + streak.
+  const [vote, setVote] = useState<{ rank: number | null; supporter: boolean; total: number; streak: number } | null>(null);
   useEffect(() => {
     if (!session?.user?.id) { setVote(null); return; }
     fetch('/api/me/vote')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d && !d.error) setVote({ rank: d.rank ?? null, supporter: !!d.supporter }); })
+      .then((d) => {
+        if (d && !d.error) setVote({ rank: d.rank ?? null, supporter: !!d.supporter, total: d.total ?? 0, streak: d.streak ?? 0 });
+      })
       .catch(() => {});
   }, [session?.user?.id]);
   const pillMeta = rankMeta(vote?.rank ?? null);
@@ -120,7 +122,8 @@ export default function Navbar() {
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {session.user?.name}
                 </span>
-                {vote?.supporter && <SupporterBadge size={12} />}
+                {vote?.supporter && <SupporterBadge size={12} total={vote.total} />}
+                {vote?.supporter && <StreakChip size={12} streak={vote.streak} />}
                 <ChevronDown size={14} color="#6d6f78" style={{ transition: 'transform 0.15s', transform: menuOpen ? 'rotate(180deg)' : 'none' }} />
               </button>
 

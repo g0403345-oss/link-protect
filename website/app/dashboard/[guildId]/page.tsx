@@ -21,6 +21,7 @@ import MemberModeration from '@/components/MemberModeration';
 import DashboardTour from '@/components/DashboardTour';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
+import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
@@ -188,6 +189,10 @@ export default function GuildDashboard() {
   // the user across devices and re-logins, not just this browser's localStorage.
   const [flagsReady, setFlagsReady] = useState(false);
   const tourSeenRemote = useRef(false);
+  // Vote popup: per-account "don't show again" flag + suppression while the
+  // tour is (or was) running this visit — never stack the two overlays.
+  const votePromptSeenRemote = useRef(false);
+  const votePromoBlocked = useRef(false);
 
   const closeTour = useCallback(() => {
     setTourRun(false);
@@ -297,7 +302,10 @@ export default function GuildDashboard() {
     if (status !== 'authenticated') return;
     fetch('/api/me/flags')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.tourSeen) tourSeenRemote.current = true; })
+      .then((d) => {
+        if (d?.tourSeen) tourSeenRemote.current = true;
+        if (d?.votePromptSeen) votePromptSeenRemote.current = true;
+      })
       .catch(() => { /* fall back to localStorage */ })
       .finally(() => setFlagsReady(true));
   }, [status]);
@@ -310,7 +318,7 @@ export default function GuildDashboard() {
     tourChecked.current = true;
     let seen = tourSeenRemote.current;
     try { if (localStorage.getItem('lp_tour_v1')) seen = true; } catch { /* ignore */ }
-    if (!seen) setTourRun(true);
+    if (!seen) { votePromoBlocked.current = true; setTourRun(true); }
   }, [data, flagsReady]);
 
   // Resolve names for warned users (settings data) and top-warned (stats).
@@ -1229,6 +1237,7 @@ export default function GuildDashboard() {
       </div>
 
       <DashboardTour run={tourRun} onClose={closeTour} onSectionChange={(s) => setSection(s as Section)} />
+      <VotePromo active={flagsReady && !!data && !tourRun && !votePromoBlocked.current && !votePromptSeenRemote.current} />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
