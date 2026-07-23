@@ -166,6 +166,23 @@ export async function getGuildStats(guildId: string): Promise<GuildStats> {
   return apiFetch<GuildStats>(`/api/guild/${guildId}/stats`);
 }
 
+export interface GuildOverviewEntry {
+  totalWarnings: number;
+  warnedUsers: number;
+  activeBlockers: number;
+  /** Actions per day, oldest→newest, last 7 days. */
+  last7: number[];
+  today: number;
+  known: boolean;
+}
+
+export async function getGuildsOverview(ids: string[]): Promise<{ guilds: Record<string, GuildOverviewEntry> }> {
+  return apiFetch(`/api/guilds/overview`, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function resetUserWarns(guildId: string, userId: string): Promise<void> {
   await apiFetch(`/api/guild/${guildId}/warns/${userId}`, { method: "DELETE" });
 }

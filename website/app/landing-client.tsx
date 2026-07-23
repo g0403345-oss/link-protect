@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, useInView } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Shield, ArrowRight, Check, ExternalLink, Smartphone, Bell, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -22,7 +22,7 @@ function PhoneShot({ src, alt, raised }: { src: string; alt: string; raised?: bo
 
 function AppSection() {
   const features = [
-    { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 14 blockers, apply presets, set warning thresholds and blacklists — right from your phone.' },
+    { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 16 shields, apply presets, set warning thresholds and blacklists — right from your phone.' },
     { icon: Bell, title: 'Instant push alerts', desc: 'Know the moment the bot goes offline or a protection rule fires in one of your servers.' },
     { icon: Lock, title: 'Face ID locked', desc: 'Your moderation panel stays private behind Face ID — plus a Home Screen widget for live status.' },
   ];
@@ -84,14 +84,42 @@ function AppStoreBadge() {
   );
 }
 
-/* ── Discord window mockup ───────────────────────────────────── */
+/* ── Discord window mockup — loops through real threat stories ── */
+const MOCK_SCENES = [
+  {
+    user: 'Jake', avatarBg: '#f0b232', avatarFg: '#111', initial: 'J',
+    pre: 'yo check this out lol',
+    link: 'discord.gift/free-nitro-xyz',
+    verdict: '🚫 Nitro Scam blocked', sub: 'Jake — Warning 1/5',
+    extra: 'Message deleted automatically.',
+  },
+  {
+    user: 'Mia', avatarBg: '#eb459e', avatarFg: '#fff', initial: 'M',
+    pre: 'is this trade site legit??',
+    link: 'steamcommunlty.ru/trade/offer',
+    verdict: '🎣 Phishing blocked', sub: 'Look-alike domain detected',
+    extra: 'steamcommunlty ≠ steamcommunity — deleted.',
+  },
+  {
+    user: 'Scammer', avatarBg: '#f23f43', avatarFg: '#fff', initial: 'S',
+    pre: '🎁 $5,600 giveaway for everyone!!',
+    link: 'gozawin.com/claim-now',
+    verdict: '🛡️ Scam Shield triggered', sub: 'Same spam in 3 channels',
+    extra: 'All copies deleted · account banned.',
+  },
+];
+
 function DiscordMockup() {
+  const [scene, setScene] = useState(0);
   const [phase, setPhase] = useState<'idle' | 'typing' | 'blocked'>('idle');
   useEffect(() => {
+    // Each scene: message sits → bot "scans" → block embed → next story.
     const t1 = setTimeout(() => setPhase('typing'), 900);
     const t2 = setTimeout(() => setPhase('blocked'), 2100);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
+    const t3 = setTimeout(() => { setPhase('idle'); setScene((s) => (s + 1) % MOCK_SCENES.length); }, 5600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [scene]);
+  const sc = MOCK_SCENES[scene];
 
   return (
     <div style={{ width: '100%', maxWidth: 520, borderRadius: 12, overflow: 'hidden', border: '1px solid #2e2e36', background: '#1e1f22', boxShadow: '0 32px 80px rgba(0,0,0,0.55)', userSelect: 'none' }}>
@@ -126,49 +154,49 @@ function DiscordMockup() {
           </div>
           <div style={{ flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
             {/* normal message */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0b232', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#111' }}>J</div>
+            <motion.div key={`pre-${scene}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: sc.avatarBg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: sc.avatarFg }}>{sc.initial}</div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#f0b232' }}>Jake</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: sc.avatarBg }}>{sc.user}</span>
                   <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
                 </div>
-                <span style={{ fontSize: 13, color: '#dbdee1' }}>yo check this out lol</span>
+                <span style={{ fontSize: 13, color: '#dbdee1' }}>{sc.pre}</span>
               </div>
-            </div>
-            {/* phishing link */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f0b232', flexShrink: 0 }} />
+            </motion.div>
+            {/* the malicious link */}
+            <motion.div key={`link-${scene}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }} style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: sc.avatarBg, flexShrink: 0 }} />
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#f0b232' }}>Jake</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: sc.avatarBg }}>{sc.user}</span>
                   <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
                 </div>
-                <span style={{ fontSize: 13, color: '#5865f2', background: 'rgba(88,101,242,0.08)', padding: '1px 4px', borderRadius: 3, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>discord.gift/free-nitro-xyz</span>
+                <span style={{ fontSize: 13, color: '#5865f2', background: 'rgba(88,101,242,0.08)', padding: '1px 4px', borderRadius: 3, textDecoration: phase === 'blocked' ? 'line-through' : 'underline', textDecorationStyle: phase === 'blocked' ? 'solid' : 'dotted', opacity: phase === 'blocked' ? 0.45 : 1, transition: 'opacity 0.3s' }}>{sc.link}</span>
               </div>
-            </div>
+            </motion.div>
             {/* bot response */}
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: phase === 'blocked' ? 1 : 0, y: phase === 'blocked' ? 0 : 6 }} transition={{ duration: 0.3 }} style={{ display: 'flex', gap: 8 }}>
+            <motion.div key={`bot-${scene}`} initial={false} animate={{ opacity: phase === 'blocked' ? 1 : 0, y: phase === 'blocked' ? 0 : 6 }} transition={{ duration: 0.3 }} style={{ display: 'flex', gap: 8 }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#5865f2', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Shield size={14} color="#fff" strokeWidth={2.5} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#5865f2' }}>LinkProtect</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#5865f2' }}>Link Protect</span>
                   <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
                   <span style={{ fontSize: 10, fontWeight: 600, color: '#5865f2', background: 'rgba(88,101,242,0.15)', padding: '1px 5px', borderRadius: 3 }}>BOT</span>
                 </div>
-                <div style={{ borderLeft: '3px solid #f23f43', background: '#2b2d31', borderRadius: '0 6px 6px 0', padding: '8px 10px', fontSize: 12, maxWidth: 210 }}>
-                  <div style={{ fontWeight: 700, color: '#f23f43', marginBottom: 3 }}>🚫 Nitro Scam blocked</div>
-                  <div style={{ color: '#949ba4' }}>Jake — Warning 1/5</div>
-                  <div style={{ color: '#52535a', marginTop: 2 }}>Message deleted automatically.</div>
+                <div style={{ borderLeft: '3px solid #f23f43', background: '#2b2d31', borderRadius: '0 6px 6px 0', padding: '8px 10px', fontSize: 12, maxWidth: 230 }}>
+                  <div style={{ fontWeight: 700, color: '#f23f43', marginBottom: 3 }}>{sc.verdict}</div>
+                  <div style={{ color: '#949ba4' }}>{sc.sub}</div>
+                  <div style={{ color: '#52535a', marginTop: 2 }}>{sc.extra}</div>
                 </div>
               </div>
             </motion.div>
             {/* typing */}
             {phase === 'typing' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 11, color: '#6d6f78', paddingLeft: 40 }}>
-                LinkProtect is scanning...
+                Link Protect is scanning...
               </motion.div>
             )}
           </div>
@@ -243,32 +271,64 @@ function LiveStats() {
   );
 }
 
-/* ── Feature row ──────────────────────────────────────────────── */
-function Feature({ badge, title, description, bullets, visual, flip = false }: {
-  badge: string; title: string; description: string; bullets: string[]; visual: React.ReactNode; flip?: boolean;
+/* ── Bento feature card ───────────────────────────────────────── */
+function BentoCard({ span, badge, title, description, bullets, visual, row = false }: {
+  span: number; badge: string; title: string; description: string;
+  bullets?: string[]; visual: React.ReactNode; row?: boolean;
 }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-      className="feature-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', direction: flip ? 'rtl' : 'ltr' }}>
-      <div style={{ direction: 'ltr' }}>
-        <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: '#5865f2', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 99, padding: '3px 10px', marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{badge}</div>
-        <h3 style={{ fontSize: 32, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>{title}</h3>
-        <p style={{ fontSize: 16, color: '#6d6f78', lineHeight: 1.65, marginBottom: 20 }}>{description}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {bullets.map((b) => (
-            <div key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(35,165,90,0.12)', border: '1px solid rgba(35,165,90,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                <Check size={10} color="#23a55a" strokeWidth={3} />
+    <motion.div
+      initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      className="bento-card noise"
+      style={{ gridColumn: `span ${span}`, position: 'relative', background: '#111113', border: '1px solid #1e1e22', borderRadius: 18, padding: 26, display: 'flex', flexDirection: row ? 'row' : 'column', gap: 24, alignItems: row ? 'center' : 'stretch', overflow: 'hidden', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+      onMouseEnter={(e) => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'rgba(88,101,242,0.45)'; el.style.boxShadow = '0 14px 44px rgba(88,101,242,0.10)'; }}
+      onMouseLeave={(e) => { const el = e.currentTarget as HTMLElement; el.style.borderColor = '#1e1e22'; el.style.boxShadow = 'none'; }}>
+      <div style={{ flex: row ? '1 1 0' : 'none', minWidth: 0 }}>
+        <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: '#5865f2', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 99, padding: '3px 10px', marginBottom: 14, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{badge}</div>
+        <h3 style={{ fontSize: row ? 28 : 22, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 10 }}>{title}</h3>
+        <p style={{ fontSize: 14.5, color: '#6d6f78', lineHeight: 1.6, marginBottom: bullets?.length ? 16 : 0 }}>{description}</p>
+        {bullets && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {bullets.map((b) => (
+              <div key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                <div style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(35,165,90,0.12)', border: '1px solid rgba(35,165,90,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                  <Check size={9} color="#23a55a" strokeWidth={3} />
+                </div>
+                <span style={{ fontSize: 13.5, color: '#949ba4', lineHeight: 1.5 }}>{b}</span>
               </div>
-              <span style={{ fontSize: 14, color: '#949ba4', lineHeight: 1.5 }}>{b}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-      <div style={{ direction: 'ltr' }}>{visual}</div>
+      <div style={{ flex: row ? '1 1 0' : 'none', minWidth: 0 }}>{visual}</div>
     </motion.div>
+  );
+}
+
+/* ── Shield wall tile (3D tilt + cursor glow) ─────────────────── */
+function ShieldTile({ name, icon }: { name: string; icon: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onMove = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `perspective(520px) rotateY(${(px * 14).toFixed(1)}deg) rotateX(${(-py * 14).toFixed(1)}deg) translateY(-2px)`;
+    el.style.setProperty('--gx', `${((px + 0.5) * 100).toFixed(0)}%`);
+    el.style.setProperty('--gy', `${((py + 0.5) * 100).toFixed(0)}%`);
+  };
+  const onLeave = () => { if (ref.current) ref.current.style.transform = 'none'; };
+  return (
+    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave} className="lp-shield"
+      style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: '16px 10px 13px', textAlign: 'center', transition: 'transform 0.15s ease-out, border-color 0.2s', willChange: 'transform', position: 'relative', overflow: 'hidden', cursor: 'default' }}>
+      <div aria-hidden className="lp-shield-glow" />
+      <div style={{ width: 42, height: 46, margin: '0 auto', clipPath: 'polygon(50% 0%, 100% 14%, 100% 54%, 50% 100%, 0% 54%, 0% 14%)', background: 'linear-gradient(180deg, rgba(88,101,242,0.22), rgba(88,101,242,0.06))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, position: 'relative' }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#949ba4', marginTop: 9, lineHeight: 1.3, position: 'relative' }}>{name}</div>
+    </div>
   );
 }
 
@@ -316,7 +376,7 @@ function LinkScannerVisual() {
       <motion.div key={`${sel}-${scanning}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
         style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #2e2e36' }}>
         {scanning ? (
-          <div style={{ padding: '10px 12px', background: '#1e1f22', fontSize: 12, color: '#6d6f78' }}>🔎 LinkProtect is scanning…</div>
+          <div style={{ padding: '10px 12px', background: '#1e1f22', fontSize: 12, color: '#6d6f78' }}>🔎 Link Protect is scanning…</div>
         ) : s.bad ? (
           <div style={{ padding: '10px 12px', background: '#1e1f22', borderLeft: '3px solid #f23f43' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#f23f43', marginBottom: 2 }}>🚫 {s.verdict}</div>
@@ -502,7 +562,7 @@ export default function LandingClient() {
             <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
-              v2.4.0 — Scam Shield is live
+              v2.4.1 — Developer platform &amp; presets are live
               <ArrowRight size={12} />
             </a>
 
@@ -538,7 +598,7 @@ export default function LandingClient() {
       </section>
 
       {/* STATS (live) */}
-      <section ref={statsRef} style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px' }}>
+      <section ref={statsRef} className="noise" style={{ borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', background: '#111113', padding: '52px 24px', position: 'relative' }}>
         <LiveStats />
       </section>
 
@@ -566,80 +626,62 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* FEATURES — bento grid */}
       <section id="features" style={{ padding: '100px 24px', maxWidth: 1120, margin: '0 auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 96 }}>
-          <Feature
+        <div style={{ textAlign: 'center', marginBottom: 44 }}>
+          <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>Built to fight back.</h2>
+          <p style={{ fontSize: 15, color: '#52535a' }}>Every demo below is interactive — this is exactly what happens in your server.</p>
+        </div>
+        <div className="bento-grid">
+          <BentoCard
+            span={4} row
             badge="Real-time detection"
             title="Catches threats the moment they're sent."
             description="Every message is scanned instantly. Malicious links are deleted before anyone can click them — no delay, no manual review."
             bullets={[
-              'Google Safe Browsing for known malware & phishing',
-              'Pattern-matching for Nitro scams and fake gift links',
-              'Custom domain blacklist per server',
-              'Zero false positives on normal messages',
+              'Google Safe Browsing + our own live threat database',
+              'Pattern-matching for Nitro scams and look-alike domains',
             ]}
             visual={<LinkScannerVisual />}
           />
-
-          <Feature
+          <BentoCard
+            span={2}
+            badge="Warning system"
+            title="Progressive punishment. Your rules."
+            description="Repeat offenders escalate through timeout, kick and ban — at thresholds you set."
+            visual={<WarnSimulator />}
+          />
+          <BentoCard
+            span={2}
+            badge="Silent mode"
+            title="Moderation without the noise."
+            description="Links get deleted quietly, the user gets a private DM — your channels stay clean."
+            visual={<SilentModeVisual />}
+          />
+          <BentoCard
+            span={4} row
             badge="Scam Shield — new"
             title="Hijacked accounts, stopped in seconds."
             description="When an account pastes the same scam into channel after channel, Scam Shield deletes every copy, removes the account, and flags it across the whole Link Protect network."
             bullets={[
-              'Detects the same message hitting several channels within seconds',
-              'Delete only, timeout, kick or ban — your choice',
-              'Known scam accounts are removed the moment they join your server',
+              'Known scam accounts are removed the moment they join',
               'Flags come only from live behaviour — never keywords or reports',
             ]}
             visual={<ScamShieldVisual />}
-            flip
-          />
-
-          <Feature
-            badge="Warning system"
-            title="Progressive punishment. Your rules."
-            description="Repeated offenders get escalating consequences. You control every threshold directly from the dashboard."
-            bullets={[
-              'Configure kick and ban thresholds per server',
-              'Adjustable timeout duration',
-              'Per-user warning history with reasons logged',
-              'One-click warning reset for individual users',
-            ]}
-            visual={<WarnSimulator />}
-          />
-
-          <Feature
-            badge="Silent mode"
-            title="Moderation without the noise."
-            description="Don't want a public warning message cluttering your channel? Enable silent mode — links get deleted, users get a private DM."
-            bullets={[
-              'User receives a private DM explaining the removal',
-              'No embed or message posted in the channel',
-              'Toggle per-server from the dashboard',
-              'Works across all 14 detection shields',
-            ]}
-            visual={<SilentModeVisual />}
-            flip
           />
         </div>
       </section>
 
       {/* WHAT WE BLOCK */}
-      <section id="blockers" style={{ padding: '80px 24px', background: '#111113', borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b' }}>
+      <section id="blockers" className="noise" style={{ padding: '80px 24px', background: '#111113', borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', position: 'relative' }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>16 shields. Every threat covered.</h2>
             <p style={{ fontSize: 15, color: '#52535a' }}>Toggle each protection on or off — per server, per channel.</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
             {BLOCKERS.map(({ name, icon }) => (
-              <div key={name}
-                style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: '#6d6f78', transition: 'border-color 0.15s, color 0.15s', cursor: 'default' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#52535a'; e.currentTarget.style.color = '#f2f3f5'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2e2e36'; e.currentTarget.style.color = '#6d6f78'; }}>
-                <span style={{ fontSize: 16 }}>{icon}</span>{name}
-              </div>
+              <ShieldTile key={name} name={name} icon={icon} />
             ))}
           </div>
         </div>
@@ -664,7 +706,7 @@ export default function LandingClient() {
             Your server deserves<br />real protection.
           </h2>
           <p style={{ fontSize: 16, color: '#52535a', marginBottom: 36, maxWidth: 400, margin: '0 auto 36px' }}>
-            Add LinkProtect in 30 seconds. Works out of the box — no setup required.
+            Add Link Protect in 30 seconds. Works out of the box — no setup required.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href={BOT_INVITE} target="_blank" rel="noreferrer"
@@ -684,6 +726,19 @@ export default function LandingClient() {
         </motion.div>
       </section>
 
+      <style>{`
+        .bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        @media (max-width: 920px) {
+          .bento-grid { grid-template-columns: 1fr; }
+          .bento-card { grid-column: span 1 !important; flex-direction: column !important; }
+        }
+        .lp-shield-glow {
+          position: absolute; inset: 0; opacity: 0; transition: opacity 0.25s; pointer-events: none;
+          background: radial-gradient(130px circle at var(--gx, 50%) var(--gy, 50%), rgba(88,101,242,0.24), transparent 70%);
+        }
+        .lp-shield:hover { border-color: rgba(88,101,242,0.6) !important; }
+        .lp-shield:hover .lp-shield-glow { opacity: 1; }
+      `}</style>
     </div>
   );
 }

@@ -99,9 +99,9 @@ export default function TeamAccess({
                     {(e.username ?? e.id).slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }} title={`Discord ID: ${e.id}`}>
                   <div style={{ fontSize: 13, color: '#f2f3f5', fontWeight: 500 }}>{e.username ?? 'Unknown user'}</div>
-                  <div style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>{e.id}</div>
+                  <div style={{ fontSize: 11, color: '#52535a' }}>Dashboard editor</div>
                 </div>
                 <button onClick={() => remove(e.id)} disabled={saving}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52535a', padding: 4 }}

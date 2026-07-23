@@ -16,6 +16,13 @@ const CAT_EXPLAIN: Record<string, string> = {
   malware: 'This link delivers malicious software — for example a disguised download or a drive-by exploit. Opening it can infect your device and steal saved passwords, tokens and files. Don’t download or run anything from it.',
 };
 
+const SCAN_PHASES = [
+  'Checking the Link Protect threat database…',
+  'Following the redirect chain…',
+  'Consulting Google Safe Browsing…',
+  'Compiling the verdict…',
+];
+
 export default function LinkChecker({ compact = false, detailed = false, initialUrl = '' }: {
   compact?: boolean;
   /** Checker-page mode: deep redirect resolution, explanation + share link. */
@@ -27,7 +34,17 @@ export default function LinkChecker({ compact = false, detailed = false, initial
   const [error, setError] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<LinkVerdict | null>(null);
   const [copied, setCopied] = useState(false);
+  const [phase, setPhase] = useState(0);
   const autoRan = useRef(false);
+
+  // Scan-phase ticker: advances the status line while a check is running.
+  useEffect(() => {
+    if (!loading) { setPhase(0); return; }
+    const id = setInterval(() => {
+      setPhase((p) => Math.min(p + 1, SCAN_PHASES.length - 1));
+    }, detailed ? 650 : 400);
+    return () => clearInterval(id);
+  }, [loading, detailed]);
 
   const check = useCallback(async (value?: string) => {
     const v = (value ?? url).trim();
@@ -71,8 +88,8 @@ export default function LinkChecker({ compact = false, detailed = false, initial
   return (
     <div style={{ width: '100%', maxWidth: compact ? '100%' : 560 }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <Search size={15} color="#52535a" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', flex: 1, borderRadius: 10, overflow: 'hidden' }}>
+          <Search size={15} color="#52535a" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 2 }} />
           <input
             type="text"
             inputMode="url"
@@ -80,22 +97,31 @@ export default function LinkChecker({ compact = false, detailed = false, initial
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') check(); }}
             placeholder="Paste a link, e.g. discord-nitro.ru"
-            style={{ width: '100%', padding: '13px 14px 13px 38px', fontSize: 14, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 10, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit' }}
+            style={{ width: '100%', padding: '13px 14px 13px 38px', fontSize: 14, background: '#18181b', border: `1px solid ${loading ? '#5865f2' : '#2e2e36'}`, borderRadius: 10, color: loading ? '#949ba4' : '#f2f3f5', outline: 'none', fontFamily: 'inherit', transition: 'color 0.2s' }}
             onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}
+            onBlur={(e) => { if (!loading) e.currentTarget.style.borderColor = '#2e2e36'; }}
           />
+          {/* Scan beam sweeping across the input while checking */}
+          {loading && (
+            <div aria-hidden style={{ position: 'absolute', inset: 1, borderRadius: 9, pointerEvents: 'none', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, bottom: 0, width: 90, background: 'linear-gradient(90deg, transparent, rgba(88,101,242,0.28), rgba(127,216,255,0.34), rgba(88,101,242,0.28), transparent)', animation: 'lpScanBeam 1.1s linear infinite', filter: 'blur(1px)' }} />
+            </div>
+          )}
         </div>
         <button onClick={() => check()} disabled={loading || !url.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 20px', fontSize: 14, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', opacity: loading || !url.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>
           {loading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <ShieldCheck size={15} />}
-          Check
+          {loading ? 'Scanning' : 'Check'}
         </button>
       </div>
 
-      {loading && detailed && (
-        <p style={{ marginTop: 12, fontSize: 12, color: '#52535a', textAlign: 'left' }}>
-          Checking threat database, resolving redirects…
-        </p>
+      {loading && (
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5865f2', animation: 'lpScanPulse 0.9s ease-in-out infinite', flexShrink: 0 }} />
+          <span key={phase} style={{ fontSize: 12, color: '#949ba4', animation: 'lpHopIn 0.3s both' }}>
+            {detailed ? SCAN_PHASES[phase] : 'Scanning link…'}
+          </span>
+        </div>
       )}
 
       {error && (
@@ -105,7 +131,7 @@ export default function LinkChecker({ compact = false, detailed = false, initial
       )}
 
       {verdict && (
-        <div style={{ marginTop: 12, padding: '16px 18px', background: '#111113', border: `1px solid ${col}44`, borderRadius: 12, textAlign: 'left' }}>
+        <div style={{ marginTop: 12, padding: '16px 18px', background: '#111113', border: `1px solid ${col}44`, borderRadius: 12, textAlign: 'left', animation: 'lpVerdictIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <div style={{ width: 34, height: 34, borderRadius: 9, background: `${col}1a`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {unsafe ? <ShieldAlert size={18} color={col} /> : <ShieldCheck size={18} color={col} />}
@@ -142,9 +168,9 @@ export default function LinkChecker({ compact = false, detailed = false, initial
                 {hops.map((h, i) => {
                   const last = i === hops.length - 1;
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: (i + 1) * 12 }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: (i + 1) * 12, animation: 'lpHopIn 0.4s both', animationDelay: `${0.25 + i * 0.3}s` }}>
                       <CornerDownRight size={12} color="#52535a" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: last && unsafe ? col : last ? '#f2f3f5' : '#949ba4', fontWeight: last ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: last && unsafe ? col : last ? '#f2f3f5' : '#949ba4', fontWeight: last ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: last && unsafe ? `0 0 12px ${col}66` : 'none' }}>
                         {h.domain}
                       </span>
                       <span style={{ fontSize: 10, color: '#52535a', flexShrink: 0 }}>{h.status}</span>
@@ -181,7 +207,13 @@ export default function LinkChecker({ compact = false, detailed = false, initial
           </div>
         </div>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes lpScanBeam { from { left: -90px; } to { left: 100%; } }
+        @keyframes lpScanPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.75); } }
+        @keyframes lpHopIn { from { opacity: 0; transform: translateX(-7px); } to { opacity: 1; transform: none; } }
+        @keyframes lpVerdictIn { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
+      `}</style>
     </div>
   );
 }

@@ -93,18 +93,27 @@ export function levelInfo(total: number) {
 /** "🔥 N" consecutive-day vote streak chip. Hidden when the streak lapsed. */
 export function StreakChip({ streak, size = 13 }: { streak?: number | null; size?: number }) {
   if (!streak || streak < 1) return null;
+  // The flame grows with the streak (caps at +40%) and starts flickering at a
+  // week — long streaks should FEEL hot.
+  const growth = 1 + Math.min(streak, 30) / 75;
+  const hot = streak >= 7;
+  const blazing = streak >= 30;
   return (
     <span
       title={`${streak}-day vote streak — vote daily to keep it alive!`}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0,
         padding: '1px 6px', borderRadius: 6,
-        background: 'rgba(255,146,43,0.14)', border: '1px solid rgba(255,146,43,0.45)',
-        fontSize: Math.round(size * 0.74), fontWeight: 800, color: '#ff922b',
+        background: blazing ? 'rgba(255,90,30,0.2)' : 'rgba(255,146,43,0.14)',
+        border: `1px solid ${blazing ? 'rgba(255,90,30,0.65)' : 'rgba(255,146,43,0.45)'}`,
+        boxShadow: hot ? `0 0 ${blazing ? 10 : 6}px rgba(255,120,30,${blazing ? 0.45 : 0.28})` : 'none',
+        fontSize: Math.round(size * 0.74), fontWeight: 800, color: blazing ? '#ff7a2b' : '#ff922b',
         lineHeight: 1.4, whiteSpace: 'nowrap',
       }}
     >
-      🔥{streak}
+      <span style={{ fontSize: `${growth}em`, lineHeight: 1, display: 'inline-block', animation: hot ? 'lpFlame 1.6s ease-in-out infinite' : 'none' }}>🔥</span>
+      {streak}
+      {hot && <style>{`@keyframes lpFlame { 0%,100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.14) rotate(3deg); } }`}</style>}
     </span>
   );
 }

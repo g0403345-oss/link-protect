@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Celebration } from '@/components/fx';
 import type { ServerData } from '@/lib/db';
 
 interface ScoreItem {
@@ -39,15 +41,28 @@ const LEVELS: { min: number; label: string; color: string }[] = [
   { min: 0, label: 'At risk', color: '#f23f43' },
 ];
 
-export default function SecurityScore({ data, onNavigate }: {
+export default function SecurityScore({ data, onNavigate, guildId }: {
   data: ServerData;
   onNavigate: (section: string) => void;
+  guildId?: string;
 }) {
   const items = scoreItems(data);
   const score = items.reduce((s, i) => s + (i.met ? i.points : 0), 0);
   const level = LEVELS.find((l) => score >= l.min)!;
   const todo = items.filter((i) => !i.met);
   const done = items.filter((i) => i.met);
+
+  // Celebrate a perfect score — once per server per browser, not on every visit.
+  const [celebrate, setCelebrate] = useState(false);
+  useEffect(() => {
+    if (score !== 100 || !guildId) return;
+    const key = `lp_score100_${guildId}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+      setCelebrate(true);
+    } catch { /* ignore */ }
+  }, [score, guildId]);
 
   const R = 34;
   const C = 2 * Math.PI * R;
@@ -59,9 +74,10 @@ export default function SecurityScore({ data, onNavigate }: {
         <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>Security Score</span>
       </div>
       <div style={{ padding: 18, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
+        <Celebration fire={celebrate} onDone={() => setCelebrate(false)} />
         {/* Ring */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div style={{ position: 'relative', width: 92, height: 92 }}>
+          <div style={{ position: 'relative', width: 92, height: 92, borderRadius: '50%', boxShadow: score === 100 ? '0 0 28px rgba(255,215,0,0.35), 0 0 8px rgba(35,165,90,0.5)' : 'none', transition: 'box-shadow 0.6s' }}>
             <svg width={92} height={92} viewBox="0 0 92 92" style={{ transform: 'rotate(-90deg)' }}>
               <circle cx={46} cy={46} r={R} fill="none" stroke="#1e1e22" strokeWidth={8} />
               <circle cx={46} cy={46} r={R} fill="none" stroke={level.color} strokeWidth={8} strokeLinecap="round"

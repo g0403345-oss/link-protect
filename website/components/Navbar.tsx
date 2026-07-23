@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { LogOut, LayoutDashboard, ChevronDown, Shield, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, ChevronDown, Shield, Settings, Menu, X } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
 import { SupporterBadge, levelInfo, rankMeta } from '@/components/SupporterBadge';
@@ -32,7 +32,11 @@ export default function Navbar() {
       ];
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // mobile burger panel
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the mobile panel on navigation.
+  useEffect(() => { setNavOpen(false); }, [pathname]);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 24);
@@ -76,8 +80,8 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
-          <Image src="/logo.webp" alt="LinkProtect" width={30} height={30} style={{ borderRadius: 8 }} />
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>LinkProtect</span>
+          <Image src="/logo.webp" alt="Link Protect" width={30} height={30} style={{ borderRadius: 8 }} />
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>Link Protect</span>
         </Link>
 
         {/* Center links */}
@@ -102,7 +106,12 @@ export default function Navbar() {
         </div>
 
         {/* Right */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          {/* Mobile burger — the center links are hidden on small screens */}
+          <button className="mobile-only" onClick={() => setNavOpen(!navOpen)} aria-label="Menu"
+            style={{ width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: navOpen ? '#18181b' : 'transparent', border: `1px solid ${navOpen ? '#2e2e36' : 'transparent'}`, color: '#949ba4' }}>
+            {navOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
           {session && <NotificationBell isAdmin={isAdmin(session.user?.id)} />}
           {session ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
@@ -210,6 +219,27 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile nav panel */}
+      {navOpen && (
+        <div className="mobile-only" style={{ flexDirection: 'column', background: 'rgba(14,14,16,0.98)', borderBottom: '1px solid #2e2e36', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '8px 16px 14px' }}>
+          {navLinks.map((link) => {
+            const external = link.href.startsWith('http');
+            const common: React.CSSProperties = { display: 'block', padding: '11px 12px', fontSize: 15, fontWeight: 600, color: '#c9ccd4', textDecoration: 'none', borderRadius: 8 };
+            return external ? (
+              <a key={link.label} href={link.href} target="_blank" rel="noreferrer" style={common} onClick={() => setNavOpen(false)}>{link.label}</a>
+            ) : (
+              <Link key={link.label} href={link.href} style={common} onClick={() => setNavOpen(false)}>{link.label}</Link>
+            );
+          })}
+          {!session && (
+            <Link href="/login" onClick={() => setNavOpen(false)}
+              style={{ display: 'block', padding: '11px 12px', fontSize: 15, fontWeight: 600, color: '#7289da', textDecoration: 'none', borderRadius: 8 }}>
+              Log in
+            </Link>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

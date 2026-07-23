@@ -21,6 +21,8 @@ import MemberModeration from '@/components/MemberModeration';
 import DashboardTour from '@/components/DashboardTour';
 import SecurityScore from '@/components/SecurityScore';
 import DeveloperPanel from '@/components/DeveloperPanel';
+import PresetsCard from '@/components/PresetsCard';
+import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import VotePromo from '@/components/VotePromo';
@@ -197,6 +199,8 @@ export default function GuildDashboard() {
   const votePromoBlocked = useRef(false);
   // Approved developers get the extra Developer tab (badge embed etc.).
   const [devApproved, setDevApproved] = useState(false);
+  // Subtle per-server accent glow derived from the guild icon's average color.
+  const tint = useGuildTint(guildId, guildInfo?.icon);
 
   const closeTour = useCallback(() => {
     setTourRun(false);
@@ -454,6 +458,10 @@ export default function GuildDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
+      {/* Server-tinted backdrop — each dashboard subtly takes on its server's color */}
+      {tint && (
+        <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, background: `radial-gradient(720px circle at 18% -5%, ${tint}1f, transparent 62%), radial-gradient(540px circle at 92% 110%, ${tint}12, transparent 60%)` }} />
+      )}
       <Navbar />
 
       {/* Breadcrumb bar */}
@@ -565,7 +573,7 @@ export default function GuildDashboard() {
                       )}
                     </div>
                   </Card>
-                  <SecurityScore data={data} onNavigate={(s) => selectSection(s as Section)} />
+                  <SecurityScore data={data} guildId={guildId} onNavigate={(s) => selectSection(s as Section)} />
                 </div>
               )}
 
@@ -581,6 +589,7 @@ export default function GuildDashboard() {
               {section === 'blockers' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Link Blockers" description="Toggle which types of links are blocked in your server" icon={AlertTriangle} />
+                  <PresetsCard guildId={guildId} onToast={addToast} onApplied={refreshDataSilently} />
                   <Card title="Platform Blockers" tourId="blockers">
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {[

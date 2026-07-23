@@ -9,24 +9,24 @@ import Script from 'next/script';
 export const metadata: Metadata = {
   metadataBase: new URL('https://link-protect.com'),
   title: {
-    default: 'LinkProtect — Protect Your Discord Server',
-    template: '%s | LinkProtect',
+    default: 'Link Protect — Protect Your Discord Server',
+    template: '%s | Link Protect',
   },
   description:
-    'LinkProtect is a powerful Discord moderation bot that automatically blocks unwanted links, warns users, and keeps your server safe with zero effort.',
+    'Link Protect is a powerful Discord moderation bot that automatically blocks unwanted links, warns users, and keeps your server safe with zero effort.',
   keywords: ['Discord bot', 'link protection', 'moderation', 'Discord security', 'anti-spam'],
-  authors: [{ name: 'LinkProtect' }],
+  authors: [{ name: 'Link Protect' }],
   openGraph: {
     type: 'website',
     url: 'https://link-protect.com',
-    title: 'LinkProtect — Protect Your Discord Server',
+    title: 'Link Protect — Protect Your Discord Server',
     description:
       'Automatically block unwanted links, warn users, and keep your server safe.',
-    siteName: 'LinkProtect',
+    siteName: 'Link Protect',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LinkProtect — Protect Your Discord Server',
+    title: 'Link Protect — Protect Your Discord Server',
     description:
       'Automatically block unwanted links, warn users, and keep your server safe.',
   },

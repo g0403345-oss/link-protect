@@ -8,16 +8,36 @@ import Navbar from '@/components/Navbar';
 import LinkChecker from '@/components/LinkChecker';
 import { BOT_INVITE } from '@/lib/discord';
 
-export const metadata: Metadata = {
-  title: 'Is this link safe? — Link Protect URL Checker',
-  description:
-    'Check any Discord or web link against Link Protect\'s live threat database and Google Safe Browsing. Instantly find out if a URL is a phishing, scam, nitro or malware link.',
-  alternates: { canonical: '/check' },
-  openGraph: {
+// Shared results (/check?url=…) get a dynamic OG card showing the actual
+// verdict — a warning link posted in Discord previews as a red warning card.
+export async function generateMetadata(
+  { searchParams }: { searchParams: Promise<{ url?: string | string[] }> },
+): Promise<Metadata> {
+  const params = await searchParams;
+  const shared = typeof params.url === 'string' ? params.url.slice(0, 300) : '';
+  const base: Metadata = {
     title: 'Is this link safe? — Link Protect URL Checker',
-    description: 'Paste a link to check it against the Link Protect threat database and Google Safe Browsing.',
-  },
-};
+    description:
+      'Check any Discord or web link against Link Protect\'s live threat database and Google Safe Browsing. Instantly find out if a URL is a phishing, scam, nitro or malware link.',
+    alternates: { canonical: '/check' },
+    openGraph: {
+      title: 'Is this link safe? — Link Protect URL Checker',
+      description: 'Paste a link to check it against the Link Protect threat database and Google Safe Browsing.',
+    },
+  };
+  if (!shared) return base;
+  const og = `/api/og/check?url=${encodeURIComponent(shared)}`;
+  return {
+    ...base,
+    title: 'Link check result — Link Protect',
+    openGraph: {
+      title: 'Link check result — Link Protect',
+      description: 'Live verdict from the Link Protect threat database.',
+      images: [{ url: og, width: 1200, height: 630 }],
+    },
+    twitter: { card: 'summary_large_image', images: [og] },
+  };
+}
 
 const STEPS = [
   { icon: Database, title: 'Our threat database', body: 'First we match the link against scam, phishing and malware domains caught live across thousands of Discord servers — instant and free.' },

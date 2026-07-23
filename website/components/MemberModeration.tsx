@@ -107,11 +107,11 @@ export default function MemberModeration({ guildId, onToast, onChanged }: Props)
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {results.map((m) => (
                 <button key={m.id} onClick={() => { setSelected(m); setResults([]); setQuery(''); }}
+                  title={`Discord ID: ${m.id}`}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d6f78', flexShrink: 0 }}>{name(m).slice(0, 2).toUpperCase()}</div>
                   <div style={{ minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name(m)}</p>
-                    <p style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>{m.id}</p>
                   </div>
                 </button>
               ))}
@@ -125,9 +125,9 @@ export default function MemberModeration({ guildId, onToast, onChanged }: Props)
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8 }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#6d6f78', flexShrink: 0 }}>{name(selected).slice(0, 2).toUpperCase()}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }} title={`Discord ID: ${selected.id}`}>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>{name(selected)}</p>
-              <p style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>{selected.id}</p>
+              <p style={{ fontSize: 11, color: '#52535a' }}>Selected member</p>
             </div>
             <button onClick={() => { setSelected(null); setReason(''); setMinutes(''); setConfirming(null); }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#52535a', display: 'flex', padding: 4 }}>

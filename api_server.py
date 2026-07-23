@@ -3134,6 +3134,9 @@ def _trends_payload(guild_id: str, days: int) -> dict:
     ).fetchall()
     KINDS = ("warned", "kicked", "banned", "timeout")
     per_day: dict = defaultdict(lambda: {k: 0 for k in KINDS})
+    # Event markers: days on which Scam Shield / raid protection fired (these
+    # actions are already counted in their kind — markers are extra context).
+    events: dict = defaultdict(lambda: {"scamshield": 0, "raid": 0})
     reasons: Counter = Counter()
     totals: Counter = Counter()
     for r in rows:
@@ -3141,14 +3144,22 @@ def _trends_payload(guild_id: str, days: int) -> dict:
         act = r["action"] if r["action"] in KINDS else "warned"
         per_day[day][act] += 1
         totals[act] += 1
-        if r["reason"]:
-            reasons[r["reason"]] += 1
+        reason = r["reason"] or ""
+        if reason.startswith("Scam Shield"):
+            events[day]["scamshield"] += 1
+        elif "raid" in reason.lower():
+            events[day]["raid"] += 1
+        if reason:
+            reasons[reason] += 1
     series = []
     for i in range(days - 1, -1, -1):
         day = time.strftime("%Y-%m-%d", time.gmtime(now - i * 86400))
         d = per_day.get(day)
         entry = {"date": day, **({k: 0 for k in KINDS} if d is None else d)}
         entry["count"] = sum(entry[k] for k in KINDS)
+        ev = events.get(day)
+        entry["scamshield"] = ev["scamshield"] if ev else 0
+        entry["raid"] = ev["raid"] if ev else 0
         series.append(entry)
     return {
         "days": days, "total": len(rows),
@@ -3162,6 +3173,54 @@ def _trends_payload(guild_id: str, days: int) -> dict:
 @require_auth
 async def guild_trends(request: Request, guild_id: str, days: int = 14):
     return _trends_payload(guild_id, days)
+
+
+class OverviewBody(BaseModel):
+    ids: list[str]
+
+
+@app.post("/api/guilds/overview")
+@require_auth
+async def guilds_overview(request: Request, body: OverviewBody):
+    """Batch stats for the dashboard's all-servers overview + sparklines:
+    one call instead of 2×N. The website filters ids to guilds the user
+    actually manages before calling."""
+    ids = [str(i) for i in (body.ids or []) if str(i).isdigit()][:50]
+    if not ids:
+        return {"guilds": {}}
+    c = _get_conn()
+    now = int(time.time())
+    since = now - 7 * 86400
+    ph = ",".join("?" * len(ids))
+    rows = c.execute(
+        f"SELECT guild_id, timestamp FROM actions WHERE guild_id IN ({ph}) AND timestamp>=?",
+        (*[int(i) for i in ids], since),
+    ).fetchall()
+    per = {i: [0] * 7 for i in ids}
+    today = {i: 0 for i in ids}
+    day_start_today = now - (now % 86400)  # UTC day boundary
+    for r in rows:
+        gid = str(r["guild_id"])
+        idx = min(6, max(0, (r["timestamp"] - since) // 86400))
+        per[gid][idx] += 1
+        if r["timestamp"] >= day_start_today:
+            today[gid] += 1
+    out = {}
+    for gid in ids:
+        data = _get_server(gid)
+        tw = wu = ab = 0
+        if data:
+            warn = data.get("warn", {}) or {}
+            for uid, ud in warn.items():
+                if uid in ("kick", "ban", "timeout"):
+                    continue
+                if isinstance(ud, dict) and ud.get("Warn", 0) > 0:
+                    tw += ud["Warn"]
+                    wu += 1
+            ab = sum(1 for v in (data.get("protect") or {}).values() if v)
+        out[gid] = {"totalWarnings": tw, "warnedUsers": wu, "activeBlockers": ab,
+                    "last7": per[gid], "today": today[gid], "known": data is not None}
+    return {"guilds": out}
 
 
 @app.get("/api/actions")
