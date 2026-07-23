@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Settings, RefreshCw, Search, Activity, X, ChevronLeft, AlertTriangle, Ban, Clock, Hash, ShieldAlert, List, Flag, Scale } from 'lucide-react';
+import { Shield, Settings, RefreshCw, Search, Activity, X, ChevronLeft, AlertTriangle, Ban, Clock, Hash, ShieldAlert, List, Flag, Scale, Code2 } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import AdminThreatData from '@/components/AdminThreatData';
@@ -12,6 +12,7 @@ import AdminReports from '@/components/AdminReports';
 import AdminAppeals from '@/components/AdminAppeals';
 import AdminProtectionStats from '@/components/AdminProtectionStats';
 import AdminFlagged from '@/components/AdminFlagged';
+import AdminDevRequests from '@/components/AdminDevRequests';
 import { ADMIN_USER_ID } from '@/lib/admin';
 
 interface GuildInfo { name: string; icon: string | null; }
@@ -82,7 +83,7 @@ export default function AdminPanel() {
   const [lockSaving, setLockSaving] = useState(false);
 
   // Active admin tab
-  const [view, setView] = useState<'servers' | 'threats' | 'reports' | 'appeals' | 'protection' | 'flagged'>('servers');
+  const [view, setView] = useState<'servers' | 'threats' | 'reports' | 'appeals' | 'protection' | 'flagged' | 'developers'>('servers');
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return; }
@@ -361,6 +362,7 @@ export default function AdminPanel() {
               { id: 'reports', label: 'Reports', icon: Flag },
               { id: 'appeals', label: 'Appeals', icon: Scale },
               { id: 'flagged', label: 'Flagged Accounts', icon: Ban },
+              { id: 'developers', label: 'Developers', icon: Code2 },
               { id: 'protection', label: 'Protection Stats', icon: Activity },
             ] as const).map(t => {
               const active = view === t.id;
@@ -382,6 +384,8 @@ export default function AdminPanel() {
           {view === 'protection' && <AdminProtectionStats />}
 
           {view === 'flagged' && <AdminFlagged />}
+
+          {view === 'developers' && <AdminDevRequests />}
 
           {view === 'servers' && (
           <>

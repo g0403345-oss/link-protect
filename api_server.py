@@ -1681,6 +1681,101 @@ async def set_user_flags(request: Request, user_id: str, body: UserFlagsBody):
     return _flags_payload(flags)
 
 
+# ── Developer access ─────────────────────────────────────────────────────────
+# Users apply from the website's Settings page; the request lands in the
+# operator admin panel (+ bell notification), the decision is pushed back to
+# the user's bell. Approved developers see the Developer tab in the dashboard.
+
+class DevRequestBody(BaseModel):
+    message: str | None = None
+
+
+class DevDecideBody(BaseModel):
+    accept: bool
+
+
+def _dev_key(user_id: str) -> str:
+    return f"user:{user_id}:dev"
+
+
+def _dev_get(user_id: str) -> dict:
+    try:
+        row = _get_conn().execute("SELECT value FROM kv WHERE path=?", (_dev_key(user_id),)).fetchone()
+        return json.loads(row["value"]) if row else {}
+    except Exception:
+        return {}
+
+
+def _dev_payload(d: dict) -> dict:
+    return {"status": d.get("status") or "none", "message": d.get("message"),
+            "requestedAt": d.get("requestedAt") or 0, "decidedAt": d.get("decidedAt") or 0}
+
+
+@app.get("/api/user/{user_id}/dev")
+@require_auth
+async def get_dev_status(request: Request, user_id: str):
+    return _dev_payload(_dev_get(user_id))
+
+
+@app.post("/api/user/{user_id}/dev/request")
+@require_auth
+async def request_dev_access(request: Request, user_id: str, body: DevRequestBody):
+    _, aname = _web_actor(request)
+    d = _dev_get(user_id)
+    if d.get("status") in ("pending", "approved"):
+        return _dev_payload(d)  # idempotent — no duplicate requests or pings
+    d = {"status": "pending", "message": (body.message or "").strip()[:500] or None,
+         "requestedAt": int(time.time()), "decidedAt": 0,
+         "username": aname or d.get("username")}
+    _kv_set(_dev_key(user_id), d)
+    who = aname or f"User …{user_id[-4:]}"
+    _notify("user", ADMIN_USER_ID, "dev_request", "Developer access request",
+            f"{who} requests developer access" + (f": {d['message']}" if d["message"] else ""))
+    return _dev_payload(d)
+
+
+@app.get("/api/admin/dev/requests")
+@require_auth
+async def admin_dev_requests(request: Request):
+    rows = _get_conn().execute("SELECT path, value FROM kv WHERE path LIKE 'user:%:dev'").fetchall()
+    entries = []
+    for r in rows:
+        try:
+            d = json.loads(r["value"])
+        except Exception:
+            continue
+        uid = r["path"].split(":")[1]
+        entries.append({"userId": uid, "username": d.get("username"), **_dev_payload(d)})
+    # Pending first, newest on top.
+    entries.sort(key=lambda e: (e["status"] != "pending", -(e["requestedAt"] or 0)))
+    # Fill in current Discord names/avatars where we can (best-effort).
+    resolved = {u["id"]: u for u in await _resolve_users([e["userId"] for e in entries])}
+    for e in entries:
+        u = resolved.get(e["userId"])
+        if u and u.get("username"):
+            e["username"] = u["username"]
+        e["avatarUrl"] = _avatar_url(e["userId"], u.get("avatar") if u else None)
+    return {"requests": entries}
+
+
+@app.post("/api/admin/dev/requests/{user_id}/decide")
+@require_auth
+async def admin_decide_dev(request: Request, user_id: str, body: DevDecideBody):
+    d = _dev_get(user_id)
+    if not d.get("status"):
+        raise HTTPException(status_code=404, detail="No developer request from this user")
+    accept = bool(body.accept)
+    d["status"] = "approved" if accept else "denied"
+    d["decidedAt"] = int(time.time())
+    _kv_set(_dev_key(user_id), d)
+    _notify("user", user_id, "dev_decision",
+            "Developer access approved 🎉" if accept else "Developer access request declined",
+            ("You now have developer access — open any server dashboard and check the new "
+             "Developer tab.") if accept else
+            "Your request wasn't approved this time. You can apply again from Settings.")
+    return {"ok": True, **_dev_payload(d)}
+
+
 @app.get("/api/mobile/admin/config")
 async def mobile_get_admin_config(request: Request):
     await _require_admin(request)

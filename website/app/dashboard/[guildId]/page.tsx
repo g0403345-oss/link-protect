@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -27,7 +27,7 @@ import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'scamshield' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit';
+type Section = 'overview' | 'blockers' | 'scamshield' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
 
 interface ScamShieldStats { flaggedTotal: number; flaggedWeek: number; guildCatches: number; }
 
@@ -195,6 +195,8 @@ export default function GuildDashboard() {
   // tour is (or was) running this visit — never stack the two overlays.
   const votePromptSeenRemote = useRef(false);
   const votePromoBlocked = useRef(false);
+  // Approved developers get the extra Developer tab (badge embed etc.).
+  const [devApproved, setDevApproved] = useState(false);
 
   const closeTour = useCallback(() => {
     setTourRun(false);
@@ -298,6 +300,14 @@ export default function GuildDashboard() {
   }, [guildId]);
 
   useEffect(() => { if (status === 'authenticated') { fetchData(); fetchStats(); fetchActions(); } }, [status, fetchData, fetchStats, fetchActions]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetch('/api/me/dev')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setDevApproved(d?.status === 'approved'))
+      .catch(() => {});
+  }, [status]);
 
   // Load the per-account "tour seen" flag before deciding whether to auto-launch.
   useEffect(() => {
@@ -439,6 +449,7 @@ export default function GuildDashboard() {
     { id: 'stats',        label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
     { id: 'log',          label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
     { id: 'audit',        label: 'Audit Log',      icon: History,       desc: 'Who changed what' },
+    ...(devApproved ? [{ id: 'developer' as Section, label: 'Developer', icon: Code2, desc: 'Badge & embeds' }] : []),
   ];
 
   return (
@@ -523,7 +534,20 @@ export default function GuildDashboard() {
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
-                  <SecurityScore data={data} onNavigate={(s) => selectSection(s as Section)} />
+                  <Card title="Warning Thresholds">
+                    <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
+                      {[
+                        { label: 'Kick at', value: warn.kick ?? 0, color: '#f0b232' },
+                        { label: 'Ban at', value: warn.ban ?? 0, color: '#f23f43' },
+                        { label: 'Timeout at', value: warn.timeout?.warnings ?? 0, color: '#5865f2' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 32, fontWeight: 900, color, letterSpacing: '-0.03em' }}>{value}</div>
+                          <div style={{ fontSize: 12, color: '#52535a', marginTop: 4 }}>{label} warnings</div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
                   <Card title="Active Protections">
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {Object.entries(protect).map(([k, v]) => v ? (
@@ -541,21 +565,19 @@ export default function GuildDashboard() {
                       )}
                     </div>
                   </Card>
-                  <Card title="Warning Thresholds">
-                    <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
-                      {[
-                        { label: 'Kick at', value: warn.kick ?? 0, color: '#f0b232' },
-                        { label: 'Ban at', value: warn.ban ?? 0, color: '#f23f43' },
-                        { label: 'Timeout at', value: warn.timeout?.warnings ?? 0, color: '#5865f2' },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div style={{ fontSize: 32, fontWeight: 900, color, letterSpacing: '-0.03em' }}>{value}</div>
-                          <div style={{ fontSize: 12, color: '#52535a', marginTop: 4 }}>{label} warnings</div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
+                  <SecurityScore data={data} onNavigate={(s) => selectSection(s as Section)} />
+                </div>
+              )}
+
+              {/* DEVELOPER (approved developers only) */}
+              {section === 'developer' && devApproved && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SectionHeader title="Developer" description="Integrations and embeds for your own website and tools" icon={Code2} />
                   <BadgeCard guildId={guildId} />
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
+                    <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <p style={{ fontSize: 12, color: '#6d6f78' }}>More developer features are on the way — tell us what you need via the Report button above.</p>
+                  </div>
                 </div>
               )}
 

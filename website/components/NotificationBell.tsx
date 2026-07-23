@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, ShieldAlert, MessageSquare, Settings, Flag, CheckCheck } from 'lucide-react';
+import { Bell, ShieldAlert, MessageSquare, Settings, Flag, CheckCheck, Code2 } from 'lucide-react';
 import type { WebNotification } from '@/lib/db';
 import ReportThread from '@/components/ReportThread';
 
@@ -11,6 +11,8 @@ const META: Record<string, { icon: typeof Bell; color: string }> = {
   report_status: { icon: MessageSquare, color: '#23a55a' },
   warn: { icon: ShieldAlert, color: '#f0b232' },
   settings: { icon: Settings, color: '#949ba4' },
+  dev_request: { icon: Code2, color: '#f0b232' },
+  dev_decision: { icon: Code2, color: '#23a55a' },
 };
 
 function relTime(ts: number) {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
+import { LogOut, LayoutDashboard, ChevronDown, Shield, Settings } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
 import { SupporterBadge, levelInfo, rankMeta } from '@/components/SupporterBadge';
@@ -164,6 +164,13 @@ export default function Navbar() {
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#b5bac1'; }}>
                     <LayoutDashboard size={14} />
                     Dashboard
+                  </Link>
+                  <Link href="/settings" onClick={() => setMenuOpen(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', fontSize: 13, fontWeight: 500, color: '#b5bac1', textDecoration: 'none', borderRadius: 6, transition: 'background 0.1s, color 0.1s' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#232329'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#b5bac1'; }}>
+                    <Settings size={14} />
+                    Settings
                   </Link>
                   {isAdmin(session.user?.id) && (
                     <Link href="/dashboard/admin" onClick={() => setMenuOpen(false)}

@@ -307,7 +307,7 @@ export interface WebNotification {
   id: number;
   scope: "user" | "guild";
   scopeId: string;
-  type: "report_new" | "report_reply" | "report_status" | "settings" | "warn";
+  type: "report_new" | "report_reply" | "report_status" | "settings" | "warn" | "dev_request" | "dev_decision";
   title: string;
   body: string | null;
   reportId: number | null;
@@ -387,6 +387,43 @@ export async function forwardVote(body: { user: string; type?: string; isWeekend
 
 export async function getUserFlags(userId: string): Promise<UserFlags> {
   return apiFetch(`/api/user/${userId}/flags`);
+}
+
+// ── Developer access (apply in Settings → approve in the admin panel) ────────
+
+export interface DevStatus {
+  status: "none" | "pending" | "approved" | "denied";
+  message: string | null;
+  requestedAt: number;
+  decidedAt: number;
+}
+
+export interface DevRequestEntry extends DevStatus {
+  userId: string;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
+export async function getDevStatus(userId: string): Promise<DevStatus> {
+  return apiFetch(`/api/user/${userId}/dev`);
+}
+
+export async function requestDevAccess(userId: string, message?: string): Promise<DevStatus> {
+  return apiFetch(`/api/user/${userId}/dev/request`, {
+    method: "POST",
+    body: JSON.stringify({ message: message ?? null }),
+  });
+}
+
+export async function getDevRequests(): Promise<{ requests: DevRequestEntry[] }> {
+  return apiFetch(`/api/admin/dev/requests`);
+}
+
+export async function decideDevRequest(userId: string, accept: boolean): Promise<void> {
+  await apiFetch(`/api/admin/dev/requests/${userId}/decide`, {
+    method: "POST",
+    body: JSON.stringify({ accept }),
+  });
 }
 
 export async function setUserFlags(
