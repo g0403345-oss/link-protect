@@ -8,7 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
-import { SupporterBadge, StreakChip, levelInfo, rankMeta } from '@/components/SupporterBadge';
+import { SupporterBadge, levelInfo, rankMeta } from '@/components/SupporterBadge';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function Navbar() {
@@ -121,11 +121,10 @@ export default function Navbar() {
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 132, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
                       {session.user?.name}
                     </span>
                     {vote?.supporter && <SupporterBadge size={11} total={vote.total} />}
-                    {vote?.supporter && <StreakChip size={11} streak={vote.streak} />}
                   </div>
                   {/* Tiny milestone level bar — progress to the next badge tier. */}
                   {vote && vote.total > 0 && (() => {
@@ -144,6 +143,12 @@ export default function Navbar() {
                         <span style={{ fontSize: 8.5, fontWeight: 700, color: '#6d6f78', lineHeight: 1, whiteSpace: 'nowrap' }}>
                           {lv.next ? `${vote.total}/${lv.next}` : 'MAX'}
                         </span>
+                        {vote.streak >= 1 && (
+                          <span title={`${vote.streak}-day vote streak — vote daily to keep it alive!`}
+                            style={{ fontSize: 9, fontWeight: 800, color: '#ff922b', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                            🔥{vote.streak}
+                          </span>
+                        )}
                       </div>
                     );
                   })()}
