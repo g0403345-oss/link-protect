@@ -117,6 +117,21 @@ input[type='number'] { -moz-appearance: textfield; }
   .nav-levelbar { min-width: 44px !important; }
   .nav-inner { padding: 0 12px !important; gap: 10px !important; }
 
+  /* Leaderboard podium: 3-across doesn't fit on phones — stack as rows,
+     gold first, with avatar/name left and the vote count on the right. */
+  .lp-podium { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+  .lp-podium-card {
+    flex-direction: row !important; align-items: center !important;
+    max-width: none !important; transform: none !important;
+    padding: 12px 14px !important; gap: 12px !important;
+  }
+  .lp-podium-gold { order: -1; }
+  .lp-podium-medal { font-size: 22px !important; }
+  .lp-podium-ava > div { width: 44px !important; height: 44px !important; }
+  .lp-podium-info { align-items: flex-start !important; flex: 1 !important; }
+  .lp-podium-info > div:last-child { justify-content: flex-start !important; }
+  .lp-podium-votes { margin-left: auto !important; margin-top: 0 !important; }
+
   /* Guild dashboard — sidebar → horizontal tab strip */
   .guild-sidebar { display: none !important; }
   .guild-main { padding: 16px !important; }
@@ -130,6 +145,12 @@ input[type='number'] { -moz-appearance: textfield; }
   .stats-3col-dashboard { grid-template-columns: 1fr 1fr !important; }
   .stats-4col { grid-template-columns: 1fr 1fr !important; }
   .thresholds-3col { grid-template-columns: 1fr !important; gap: 20px !important; }
+}
+
+@media (max-width: 480px) {
+  /* Leaderboard rows: drop the Supporter chip so name + streak + votes fit. */
+  .lb-sprt { display: none !important; }
+  .lb-votes { min-width: 44px !important; font-size: 12px !important; }
 }
 
 /* Animated gold treatment for the #1 voter (leaderboard, vote banner, nav pill) */

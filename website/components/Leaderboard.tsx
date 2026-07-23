@@ -31,7 +31,7 @@ function PodiumCard({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean })
   const isGold = entry.rank === 1;
   return (
     <div
-      className={isGold ? 'lp-gold-anim' : undefined}
+      className={`lp-podium-card${isGold ? ' lp-podium-gold lp-gold-anim' : ''}`}
       style={{
         flex: 1, maxWidth: 200, transform: isGold ? 'translateY(-12px)' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -39,19 +39,24 @@ function PodiumCard({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean })
         borderRadius: 16,
         background: isGold ? undefined : `linear-gradient(180deg, ${meta.color}12, transparent)`,
         border: `1px solid ${meta.color}${isGold ? '' : '40'}`,
+        minWidth: 0,
       }}
     >
-      <div style={{ fontSize: isGold ? 30 : 24, lineHeight: 1 }}>{meta.medal}</div>
-      <Avatar entry={entry} size={isGold ? 68 : 52} ring={meta.glow} />
-      <div style={{ fontSize: isGold ? 15 : 13.5, fontWeight: 700, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', textAlign: 'center' }}>
-        {entry.username ?? `User …${entry.id.slice(-4)}`}
+      <div className="lp-podium-medal" style={{ fontSize: isGold ? 30 : 24, lineHeight: 1, flexShrink: 0 }}>{meta.medal}</div>
+      <span className="lp-podium-ava" style={{ display: 'flex', flexShrink: 0 }}>
+        <Avatar entry={entry} size={isGold ? 68 : 52} ring={meta.glow} />
+      </span>
+      <div className="lp-podium-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%' }}>
+        <div style={{ fontSize: isGold ? 15 : 13.5, fontWeight: 700, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+          {entry.username ?? `User …${entry.id.slice(-4)}`}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <SupporterBadge total={entry.total} />
+          <StreakChip streak={entry.streak} />
+          {isMe && <YouChip />}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <SupporterBadge total={entry.total} />
-        <StreakChip streak={entry.streak} />
-        {isMe && <YouChip />}
-      </div>
-      <div style={{ marginTop: 2, fontSize: 20, fontWeight: 900, color: meta.color, letterSpacing: '-0.02em' }}>
+      <div className="lp-podium-votes" style={{ marginTop: 2, fontSize: 20, fontWeight: 900, color: meta.color, letterSpacing: '-0.02em', whiteSpace: 'nowrap', flexShrink: 0 }}>
         {entry.votes}
         <span style={{ fontSize: 11, fontWeight: 600, color: '#949ba4', marginLeft: 4 }}>{entry.votes === 1 ? 'vote' : 'votes'}</span>
       </div>
@@ -136,7 +141,7 @@ export default function Leaderboard() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 14, marginTop: 12, marginBottom: 22 }}>
+            <div className="lp-podium" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 14, marginTop: 12, marginBottom: 22 }}>
               {podium.map((e) => <PodiumCard key={e.id} entry={e} isMe={e.id === myId} />)}
             </div>
 
@@ -153,9 +158,9 @@ export default function Leaderboard() {
                     </span>
                     {isMe && <YouChip />}
                     <span style={{ flex: 1 }} />
-                    <SupporterBadge total={e.total} />
+                    <span className="lb-sprt" style={{ display: 'inline-flex' }}><SupporterBadge total={e.total} /></span>
                     <StreakChip streak={e.streak} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#b5bac1', minWidth: 56, textAlign: 'right' }}>
+                    <span className="lb-votes" style={{ fontSize: 13, fontWeight: 700, color: '#b5bac1', minWidth: 56, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {e.votes} {e.votes === 1 ? 'vote' : 'votes'}
                     </span>
                   </div>
