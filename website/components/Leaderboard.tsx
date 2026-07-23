@@ -99,6 +99,8 @@ export default function Leaderboard() {
   const top3 = board.slice(0, 3);
   const rest = board.slice(3);
   const podium = [top3[1], top3[0], top3[2]].filter(Boolean) as LeaderboardEntry[];
+  // The free-spot CTA targets visitors who aren't on the board yet.
+  const onBoard = !!myId && board.some((e) => e.id === myId);
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', borderRadius: 22, overflow: 'hidden', border: '1px solid #26262c', background: '#0d0d10', boxShadow: '0 24px 64px rgba(0,0,0,0.45)' }}>
@@ -138,11 +140,12 @@ export default function Leaderboard() {
               {podium.map((e) => <PodiumCard key={e.id} entry={e} isMe={e.id === myId} />)}
             </div>
 
+            {(rest.length > 0 || !onBoard) && (
             <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, overflow: 'hidden' }}>
-              {rest.map((e) => {
+              {rest.map((e, i) => {
                 const isMe = e.id === myId;
                 return (
-                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid #18181b', background: isMe ? 'rgba(240,178,50,0.06)' : 'transparent', boxShadow: isMe ? 'inset 2px 0 0 #f0b232' : 'none' }}>
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < rest.length - 1 || !onBoard ? '1px solid #18181b' : 'none', background: isMe ? 'rgba(240,178,50,0.06)' : 'transparent', boxShadow: isMe ? 'inset 2px 0 0 #f0b232' : 'none' }}>
                     <span style={{ width: 22, fontSize: 13, fontWeight: 800, color: isMe ? '#f0b232' : '#52535a', textAlign: 'center' }}>{e.rank}</span>
                     <Avatar entry={e} size={32} />
                     <span style={{ minWidth: 0, fontSize: 14, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -159,6 +162,7 @@ export default function Leaderboard() {
                 );
               })}
               {/* Next free spot — a small nudge that the board is claimable. */}
+              {!onBoard && (
               <a href={VOTE_URL} target="_blank" rel="noreferrer"
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', textDecoration: 'none', background: 'rgba(88,101,242,0.04)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(88,101,242,0.1)')}
@@ -172,7 +176,9 @@ export default function Leaderboard() {
                   Vote now <ArrowRight size={13} />
                 </span>
               </a>
+              )}
             </div>
+            )}
           </>
         )}
       </div>
