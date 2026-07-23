@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, ArrowRight, Check, ExternalLink, Smartphone, Bell, Lock } from 'lucide-react';
+import {
+  Shield, ArrowRight, Check, ExternalLink, Smartphone, Bell, Lock,
+  Gift, Fish, EyeOff, Bug, Mail, Youtube, Twitch, Gamepad2, Search, Link2,
+  Image as ImageIcon, ClipboardList, Pin, Globe, ShieldAlert, Siren, type LucideIcon,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import LinkChecker from '@/components/LinkChecker';
@@ -307,7 +311,7 @@ function BentoCard({ span, badge, title, description, bullets, visual, row = fal
 }
 
 /* ── Shield wall tile (3D tilt + cursor glow) ─────────────────── */
-function ShieldTile({ name, icon }: { name: string; icon: string }) {
+function ShieldTile({ name, icon: Icon }: { name: string; icon: LucideIcon }) {
   const ref = useRef<HTMLDivElement>(null);
   const onMove = (e: React.MouseEvent) => {
     const el = ref.current;
@@ -324,8 +328,8 @@ function ShieldTile({ name, icon }: { name: string; icon: string }) {
     <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave} className="lp-shield"
       style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: '16px 10px 13px', textAlign: 'center', transition: 'transform 0.15s ease-out, border-color 0.2s', willChange: 'transform', position: 'relative', overflow: 'hidden', cursor: 'default' }}>
       <div aria-hidden className="lp-shield-glow" />
-      <div style={{ width: 42, height: 46, margin: '0 auto', clipPath: 'polygon(50% 0%, 100% 14%, 100% 54%, 50% 100%, 0% 54%, 0% 14%)', background: 'linear-gradient(180deg, rgba(88,101,242,0.22), rgba(88,101,242,0.06))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, position: 'relative' }}>
-        {icon}
+      <div style={{ width: 42, height: 46, margin: '0 auto', clipPath: 'polygon(50% 0%, 100% 14%, 100% 54%, 50% 100%, 0% 54%, 0% 14%)', background: 'linear-gradient(180deg, rgba(88,101,242,0.24), rgba(88,101,242,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <Icon size={17} color="#96a4ff" strokeWidth={2} style={{ marginTop: -3 }} />
       </div>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#949ba4', marginTop: 9, lineHeight: 1.3, position: 'relative' }}>{name}</div>
     </div>
@@ -530,16 +534,16 @@ function SilentModeVisual() {
   );
 }
 
-/* ── Block type chips ─────────────────────────────────────────── */
-const BLOCKERS = [
-  { name: 'Nitro Scams', icon: '🎮' }, { name: 'Phishing Links', icon: '🎣' },
-  { name: 'NSFW Sites', icon: '🔞' }, { name: 'Malware URLs', icon: '🦠' },
-  { name: 'Discord Invites', icon: '📨' }, { name: 'YouTube Links', icon: '▶️' },
-  { name: 'Twitch Streams', icon: '🟣' }, { name: 'Steam Links', icon: '🎮' },
-  { name: 'Google Links', icon: '🔍' }, { name: 'URL Shorteners', icon: '🔗' },
-  { name: 'GIF Links', icon: '🖼️' }, { name: 'Custom Blacklist', icon: '📋' },
-  { name: 'Link-only channels', icon: '📌' }, { name: 'All external links', icon: '🌐' },
-  { name: 'Scam Spam', icon: '🛡️' }, { name: 'Raid Protection', icon: '🚨' },
+/* ── Block type chips (lucide icons — no emoji) ───────────────── */
+const BLOCKERS: { name: string; icon: LucideIcon }[] = [
+  { name: 'Nitro Scams', icon: Gift }, { name: 'Phishing Links', icon: Fish },
+  { name: 'NSFW Sites', icon: EyeOff }, { name: 'Malware URLs', icon: Bug },
+  { name: 'Discord Invites', icon: Mail }, { name: 'YouTube Links', icon: Youtube },
+  { name: 'Twitch Streams', icon: Twitch }, { name: 'Steam Links', icon: Gamepad2 },
+  { name: 'Google Links', icon: Search }, { name: 'URL Shorteners', icon: Link2 },
+  { name: 'GIF Links', icon: ImageIcon }, { name: 'Custom Blacklist', icon: ClipboardList },
+  { name: 'Link-only channels', icon: Pin }, { name: 'All external links', icon: Globe },
+  { name: 'Scam Spam', icon: ShieldAlert }, { name: 'Raid Protection', icon: Siren },
 ];
 
 /* ── Main ─────────────────────────────────────────────────────── */

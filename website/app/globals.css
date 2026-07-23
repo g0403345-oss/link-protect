@@ -110,6 +110,12 @@ input[type='number'] { -moz-appearance: textfield; }
 
   /* Navbar */
   .nav-center-links { display: none !important; }
+  /* Keep the account pill on-screen: drop the wordmark, shorten the username,
+     tighten the pill's level bar so logo + burger + bell + pill always fit. */
+  .nav-wordmark { display: none !important; }
+  .nav-username { max-width: 68px !important; }
+  .nav-levelbar { min-width: 44px !important; }
+  .nav-inner { padding: 0 12px !important; gap: 10px !important; }
 
   /* Guild dashboard — sidebar → horizontal tab strip */
   .guild-sidebar { display: none !important; }

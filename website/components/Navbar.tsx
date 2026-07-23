@@ -76,12 +76,12 @@ export default function Navbar() {
       backdropFilter: scrolled ? 'blur(16px)' : 'none',
       WebkitBackdropFilter: scrolled ? 'blur(16px)' : 'none',
     }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', gap: 32 }}>
+      <div className="nav-inner" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', gap: 32 }}>
 
         {/* Logo */}
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
           <Image src="/logo.webp" alt="Link Protect" width={30} height={30} style={{ borderRadius: 8 }} />
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>Link Protect</span>
+          <span className="nav-wordmark" style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>Link Protect</span>
         </Link>
 
         {/* Center links */}
@@ -130,7 +130,7 @@ export default function Navbar() {
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 132, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
+                    <span className="nav-username" style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 132, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
                       {session.user?.name}
                     </span>
                     {vote?.supporter && <SupporterBadge size={11} total={vote.total} />}
@@ -140,6 +140,7 @@ export default function Navbar() {
                     const lv = levelInfo(vote.total);
                     return (
                       <div
+                        className="nav-levelbar"
                         title={`Level ${lv.level} · ${lv.name}${lv.next ? ` — ${lv.next - vote.total} more ${lv.next - vote.total === 1 ? 'vote' : 'votes'} to level up` : ' — max level!'}`}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', minWidth: 72 }}
                       >

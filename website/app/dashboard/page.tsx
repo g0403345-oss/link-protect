@@ -56,8 +56,11 @@ export default function DashboardPage() {
     try { localStorage.setItem('lp_dash_view', v); } catch { /* ignore */ }
   };
 
-  const fetchGuilds = () => {
-    setLoadState('loading');
+  // Stale-while-revalidate via sessionStorage: repeat visits paint the full
+  // list (and sparklines) instantly from cache, then refresh in the background
+  // — the page never waits on Discord round-trips to show something.
+  const fetchGuilds = (background = false) => {
+    if (!background) setLoadState('loading');
     fetch('/api/guilds')
       .then((r) => {
         if (r.status === 401) {
@@ -72,6 +75,7 @@ export default function DashboardPage() {
       .then((d: EnrichedGuild[]) => {
         setGuilds(d);
         setLoadState('success');
+        try { sessionStorage.setItem('lp_guilds_v1', JSON.stringify(d)); } catch { /* ignore */ }
         const ids = d.filter((g) => g.botPresent).map((g) => g.id);
         if (ids.length) {
           fetch('/api/me/overview', {
@@ -79,16 +83,33 @@ export default function DashboardPage() {
             body: JSON.stringify({ ids }),
           })
             .then((r) => (r.ok ? r.json() : null))
-            .then((o) => { if (o?.guilds) setOverview(o.guilds); })
+            .then((o) => {
+              if (o?.guilds) {
+                setOverview(o.guilds);
+                try { sessionStorage.setItem('lp_overview_v1', JSON.stringify(o.guilds)); } catch { /* ignore */ }
+              }
+            })
             .catch(() => { /* sparklines are progressive enhancement */ });
         }
       })
-      .catch(() => setLoadState('error'));
+      .catch(() => { if (!background) setLoadState('error'); });
   };
 
   useEffect(() => {
-    if (status === 'authenticated') fetchGuilds();
-    else if (status === 'unauthenticated') setLoadState('success');
+    if (status === 'authenticated') {
+      let cached = false;
+      try {
+        const g = sessionStorage.getItem('lp_guilds_v1');
+        if (g) {
+          setGuilds(JSON.parse(g) as EnrichedGuild[]);
+          setLoadState('success');
+          cached = true;
+        }
+        const o = sessionStorage.getItem('lp_overview_v1');
+        if (o) setOverview(JSON.parse(o));
+      } catch { /* corrupt cache — fall through to a normal load */ }
+      fetchGuilds(cached);
+    } else if (status === 'unauthenticated') setLoadState('success');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -168,7 +189,7 @@ export default function DashboardPage() {
                   </button>
                 ))}
               </div>
-              <button onClick={fetchGuilds} disabled={loadState === 'loading'}
+              <button onClick={() => fetchGuilds()} disabled={loadState === 'loading'}
                 style={{ width: 36, height: 36, borderRadius: 8, background: '#18181b', border: '1px solid #2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <RefreshCw size={14} color="#6d6f78" style={{ animation: loadState === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
               </button>
@@ -179,7 +200,15 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* All-servers aggregate */}
+          {/* All-servers aggregate — skeleton keeps the layout stable while
+              the batch stats load, so nothing jumps into place late. */}
+          {!totals && loadState === 'success' && guilds.some((g) => g.botPresent) && (
+            <div className="overview-panel" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ height: 62, background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              ))}
+            </div>
+          )}
           {totals && (
             <div className="overview-panel" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
               {[
@@ -232,7 +261,7 @@ export default function DashboardPage() {
         {loadState === 'error' && (
           <div style={{ padding: '12px 16px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 8, fontSize: 13, color: '#f23f43', display: 'flex', gap: 10 }}>
             Failed to load servers.
-            <button onClick={fetchGuilds} style={{ background: 'none', border: 'none', color: '#f23f43', cursor: 'pointer', textDecoration: 'underline', fontSize: 13 }}>Retry</button>
+            <button onClick={() => fetchGuilds()} style={{ background: 'none', border: 'none', color: '#f23f43', cursor: 'pointer', textDecoration: 'underline', fontSize: 13 }}>Retry</button>
           </div>
         )}
 
