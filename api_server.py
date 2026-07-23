@@ -5,15 +5,18 @@ Start: uvicorn api_server:app --host 0.0.0.0 --port 3001
 """
 
 import asyncio
+import ipaddress
 import json
 import os
 import re
+import socket
 import sqlite3
 import threading
 import time
 import traceback
 from functools import wraps
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -672,12 +675,78 @@ async def _safe_browsing_unsafe(url: str) -> bool:
         return False
 
 
+def _threat_db_hit(c: sqlite3.Connection, raw: str, domain: str):
+    """blocked_links row matching this exact URL or its domain, if any."""
+    ph = ",".join("?" * len(_CHECK_THREAT_CATS))
+    return c.execute(
+        f"SELECT category, source, hits FROM blocked_links "
+        f"WHERE (url=? OR domain=?) AND category IN ({ph}) "
+        f"ORDER BY hits DESC LIMIT 1",
+        (raw, domain, *_CHECK_THREAT_CATS),
+    ).fetchone()
+
+
+def _seen_on_servers(c: sqlite3.Connection, domain: str) -> int:
+    row = c.execute(
+        "SELECT COUNT(DISTINCT g.guild_id) AS n FROM blocked_link_guilds g "
+        "JOIN blocked_links b ON b.url = g.url WHERE b.domain=?",
+        (domain,),
+    ).fetchone()
+    return row["n"] if row else 0
+
+
+def _host_is_private(host: str) -> bool:
+    """SSRF guard for the redirect resolver: True for hosts that resolve to
+    loopback/private/link-local/reserved addresses — or don't resolve at all."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return True
+    try:
+        return any(not ipaddress.ip_address(i[4][0]).is_global for i in infos)
+    except ValueError:
+        return True
+
+
+async def _resolve_redirects(url: str, max_hops: int = 6) -> list[dict]:
+    """Follow HTTP redirects manually — shorteners hide their real target behind
+    them. Body is never read (stream, headers only) and every hop is SSRF-guarded.
+    Returns the hops AFTER the submitted URL; best-effort (partial chain on error)."""
+    hops: list[dict] = []
+    current = url if re.match(r"^https?://", url, re.IGNORECASE) else f"https://{url}"
+    seen = {current}
+    try:
+        async with httpx.AsyncClient(
+            timeout=5, headers={"User-Agent": "Mozilla/5.0 (LinkProtect-Checker)"}
+        ) as client:
+            for _ in range(max_hops):
+                parsed = urlparse(current)
+                if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                    break
+                if await asyncio.to_thread(_host_is_private, parsed.hostname):
+                    break
+                async with client.stream("GET", current, follow_redirects=False) as r:
+                    status, location = r.status_code, r.headers.get("location")
+                if status not in (301, 302, 303, 307, 308) or not location:
+                    break
+                nxt = urljoin(current, location)
+                if nxt in seen or len(nxt) > 500:
+                    break
+                seen.add(nxt)
+                hops.append({"url": nxt, "domain": _domain_of(nxt), "status": status})
+                current = nxt
+    except Exception:
+        pass
+    return hops
+
+
 @app.get("/api/check")
 @require_auth
-async def check_link(request: Request, url: str = Query(default="")):
+async def check_link(request: Request, url: str = Query(default=""), deep: int = Query(default=0)):
     """Verdict for a single URL: our own threat DB first (free, instant), then a
     cached Google Safe Browsing lookup. Called by the website's public /api/check
-    proxy (which adds rate limiting)."""
+    proxy (which adds rate limiting). With deep=1 the redirect chain is resolved
+    too and every hop is checked — catches threats hidden behind shorteners."""
     raw = (url or "").strip()[:500]
     if not raw or "." not in raw:
         raise HTTPException(status_code=400, detail="Provide a url to check")
@@ -686,57 +755,77 @@ async def check_link(request: Request, url: str = Query(default="")):
         raise HTTPException(status_code=400, detail="That doesn't look like a valid link")
 
     c = _get_conn()
-    ph = ",".join("?" * len(_CHECK_THREAT_CATS))
-    hit = c.execute(
-        f"SELECT category, source, hits FROM blocked_links "
-        f"WHERE (url=? OR domain=?) AND category IN ({ph}) "
-        f"ORDER BY hits DESC LIMIT 1",
-        (raw, domain, *_CHECK_THREAT_CATS),
-    ).fetchone()
+    hit = _threat_db_hit(c, raw, domain)
     if hit:
-        servers = c.execute(
-            "SELECT COUNT(DISTINCT g.guild_id) AS n FROM blocked_link_guilds g "
-            "JOIN blocked_links b ON b.url = g.url WHERE b.domain=?",
-            (domain,),
-        ).fetchone()
         return {
             "url": raw, "domain": domain, "safe": False,
             "category": hit["category"], "source": "threat-db",
             "reason": f"Flagged as {hit['category']} in the Link Protect threat database.",
-            "seenOnServers": servers["n"] if servers else 0,
+            "seenOnServers": _seen_on_servers(c, domain),
             "hits": hit["hits"] or 0,
         }
+
+    redirects: list[dict] = []
+    if deep:
+        redirects = await _resolve_redirects(raw)
+        for hop in redirects:
+            hop_hit = _threat_db_hit(c, hop["url"], hop["domain"])
+            if hop_hit:
+                return {
+                    "url": raw, "domain": domain, "safe": False,
+                    "category": hop_hit["category"], "source": "threat-db",
+                    "reason": (f"This link redirects to {hop['domain']}, which is flagged "
+                               f"as {hop_hit['category']} in the Link Protect threat database."),
+                    "seenOnServers": _seen_on_servers(c, hop["domain"]),
+                    "hits": hop_hit["hits"] or 0,
+                    "redirects": redirects,
+                    "finalUrl": redirects[-1]["url"], "finalDomain": redirects[-1]["domain"],
+                }
 
     seen = c.execute("SELECT hits FROM seen_domains WHERE domain=?", (domain,)).fetchone()
     circulating = seen["hits"] if seen else 0
 
-    cached = c.execute("SELECT malicious FROM scanned_urls WHERE url=?", (raw,)).fetchone()
-    if cached and cached["malicious"] is not None:
-        malicious = bool(cached["malicious"])
-    else:
-        malicious = await _safe_browsing_unsafe(raw)
-        try:
-            c.execute(
-                "INSERT INTO scanned_urls(url, domain, malicious, scanned_at) VALUES(?,?,?,?) "
-                "ON CONFLICT(url) DO UPDATE SET malicious=excluded.malicious, scanned_at=excluded.scanned_at",
-                (raw, domain, 1 if malicious else 0, int(time.time())),
-            )
-            c.commit()
-        except Exception:
-            pass
+    # Safe Browsing on the submitted URL — and, in deep mode, on the redirect
+    # target too (the submitted shortener itself is usually clean).
+    to_scan = [raw] + ([redirects[-1]["url"]] if redirects else [])
+    malicious_url = None
+    for u in to_scan:
+        cached = c.execute("SELECT malicious FROM scanned_urls WHERE url=?", (u,)).fetchone()
+        if cached and cached["malicious"] is not None:
+            malicious = bool(cached["malicious"])
+        else:
+            malicious = await _safe_browsing_unsafe(u)
+            try:
+                c.execute(
+                    "INSERT INTO scanned_urls(url, domain, malicious, scanned_at) VALUES(?,?,?,?) "
+                    "ON CONFLICT(url) DO UPDATE SET malicious=excluded.malicious, scanned_at=excluded.scanned_at",
+                    (u, _domain_of(u), 1 if malicious else 0, int(time.time())),
+                )
+                c.commit()
+            except Exception:
+                pass
+        if malicious:
+            malicious_url = u
+            break
 
-    if malicious:
+    extra = ({"redirects": redirects,
+              "finalUrl": redirects[-1]["url"], "finalDomain": redirects[-1]["domain"]}
+             if redirects else ({} if not deep else {"redirects": []}))
+
+    if malicious_url:
+        behind = malicious_url != raw
         return {
             "url": raw, "domain": domain, "safe": False, "category": "malware",
             "source": "safe-browsing",
-            "reason": "Google Safe Browsing flagged this link as dangerous.",
-            "seenOnServers": 0, "hits": circulating,
+            "reason": ("Google Safe Browsing flagged the destination behind this link as dangerous."
+                       if behind else "Google Safe Browsing flagged this link as dangerous."),
+            "seenOnServers": 0, "hits": circulating, **extra,
         }
     return {
         "url": raw, "domain": domain, "safe": True, "category": None, "source": "clean",
         "reason": ("No threat on record." if not circulating
                    else "Seen circulating on Discord but not flagged as malicious."),
-        "seenOnServers": 0, "hits": circulating,
+        "seenOnServers": 0, "hits": circulating, **extra,
     }
 
 

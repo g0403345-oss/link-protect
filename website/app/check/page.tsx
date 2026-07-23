@@ -21,8 +21,9 @@ export const metadata: Metadata = {
 
 const STEPS = [
   { icon: Database, title: 'Our threat database', body: 'First we match the link against scam, phishing and malware domains caught live across thousands of Discord servers — instant and free.' },
-  { icon: ScanSearch, title: 'Google Safe Browsing', body: 'If we have no record yet, the link is checked against Google Safe Browsing’s list of known-dangerous sites.' },
-  { icon: ShieldCheck, title: 'Instant verdict', body: 'You get a clear safe / dangerous result, the threat category, and how many servers have already seen it.' },
+  { icon: Link2, title: 'Redirects unwrapped', body: 'Shorteners like bit.ly hide their real target. We follow the full redirect chain server-side and check every hop — you see exactly where the link really leads.' },
+  { icon: ScanSearch, title: 'Google Safe Browsing', body: 'If we have no record yet, the link and its final destination are checked against Google Safe Browsing’s list of known-dangerous sites.' },
+  { icon: ShieldCheck, title: 'Instant verdict', body: 'You get a clear safe / dangerous result, why it matters, and a shareable link so you can warn others with one click.' },
 ];
 
 const DETECTS = [
@@ -45,7 +46,10 @@ function Section({ children, style }: { children: React.ReactNode; style?: React
   return <section style={{ maxWidth: 920, margin: '0 auto', padding: '0 24px', ...style }}>{children}</section>;
 }
 
-export default function CheckPage() {
+export default async function CheckPage({ searchParams }: { searchParams: Promise<{ url?: string | string[] }> }) {
+  // Shared result links (/check?url=…) pre-fill the checker and auto-run.
+  const params = await searchParams;
+  const sharedUrl = typeof params.url === 'string' ? params.url.slice(0, 500) : '';
   return (
     <div style={{ minHeight: '100vh', paddingTop: 60 }}>
       <Navbar />
@@ -63,7 +67,7 @@ export default function CheckPage() {
           scams blocked across thousands of Discord servers — plus Google Safe Browsing.
         </p>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <LinkChecker />
+          <LinkChecker detailed initialUrl={sharedUrl} />
         </div>
         <p style={{ fontSize: 12, color: '#52535a', marginTop: 14 }}>
           Tip: never log in to a link you’re unsure about — check it here first.

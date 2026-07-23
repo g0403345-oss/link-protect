@@ -19,6 +19,8 @@ import TeamAccess from '@/components/TeamAccess';
 import WarnLogConfig from '@/components/WarnLogConfig';
 import MemberModeration from '@/components/MemberModeration';
 import DashboardTour from '@/components/DashboardTour';
+import SecurityScore from '@/components/SecurityScore';
+import BadgeCard from '@/components/BadgeCard';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import VotePromo from '@/components/VotePromo';
@@ -521,6 +523,7 @@ export default function GuildDashboard() {
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
+                  <SecurityScore data={data} onNavigate={(s) => selectSection(s as Section)} />
                   <Card title="Active Protections">
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {Object.entries(protect).map(([k, v]) => v ? (
@@ -552,6 +555,7 @@ export default function GuildDashboard() {
                       ))}
                     </div>
                   </Card>
+                  <BadgeCard guildId={guildId} />
                 </div>
               )}
 

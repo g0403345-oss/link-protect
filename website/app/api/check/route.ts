@@ -28,8 +28,11 @@ export async function GET(req: NextRequest) {
   if (!url) {
     return NextResponse.json({ error: 'Provide a link to check.' }, { status: 400 });
   }
+  // deep=1 (checker page only) also resolves the redirect chain server-side —
+  // slower, so the compact home-page checker doesn't request it.
+  const deep = req.nextUrl.searchParams.get('deep') === '1' ? '&deep=1' : '';
   try {
-    const res = await fetch(`${BOT_API_URL}/api/check?url=${encodeURIComponent(url)}`, {
+    const res = await fetch(`${BOT_API_URL}/api/check?url=${encodeURIComponent(url)}${deep}`, {
       headers: { Authorization: `Bearer ${BOT_API_SECRET}` },
       cache: 'no-store',
     });

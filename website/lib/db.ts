@@ -196,6 +196,10 @@ export interface LinkVerdict {
   reason: string;
   seenOnServers: number;
   hits: number;
+  /** Deep check (checker page) only: resolved redirect hops after the submitted URL. */
+  redirects?: { url: string; domain: string; status: number }[];
+  finalUrl?: string;
+  finalDomain?: string;
 }
 
 export async function checkLink(url: string): Promise<LinkVerdict> {
