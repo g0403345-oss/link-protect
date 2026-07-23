@@ -499,7 +499,7 @@ async def on_shard_ready(shard_id: int):
 async def on_ready():
     print(f"✅ Eingeloggt als {bot.user}")
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,
-            name="https://norecoil.de"))
+            name="https://link-protect.com"))
     # on_ready fires again after reconnects — a bare start() then raises
     # "Task is already launched and is not completed."
     if not update_topgg_stats.is_running():
@@ -1093,32 +1093,6 @@ async def _warn_reset(ctx, member: discord.Member):
                 pass  # No access to the configured log channel.
 
 
-@bot.slash_command(name="advertise", description="See latest payed advertise")
-async def _advertise(ctx):
-    await ctx.defer()
-    embed = discord.Embed(title="NORECOIL.DE - PREMIUM GAMING SCRIPTS",url="https://norecoil.de",
-                          description="🔥Anti Recoil for first person shooter Games 2025",colour=0x00f576)
-    embed.add_field(name="> ⭐  Available Games:",value="",inline=False)
-    embed.add_field(name="",value="```✅ Valorant```",inline=True)
-    embed.add_field(name="",value="```✅ CS 2```",inline=True)
-    embed.add_field(name="",value="```✅ R6 ```",inline=True)
-    embed.add_field(name="",value="```✅ Warzone```",inline=True)
-    embed.add_field(name="",value="```✅ Apex Legends```",inline=True)
-    embed.add_field(name="",value="```✅ PUBG```",inline=True)
-    embed.add_field(name="",value="```✅ The Finals```",inline=True)
-    embed.add_field(name="",value="```✅ Battlefield```",inline=True)
-    embed.add_field(name="",value="```✅ Rust```",inline=True)
-    embed.add_field(name="> 🔥  Advantages",value="- **24/7** support                    - Controls your mouse, not the game\n- Anticheat safe                  - Get **FREE Updates**\n- **20% OFF**",inline=False)
-    embed.add_field(name="",value="```✅ SAFE AND SECURE```",inline=True)
-    embed.add_field(name="",value="```✅ Money-back```",inline=True)
-    embed.add_field(name="> 💰   Payment  Methodes",value="_Choose one of your favourite payment methodes:_\n**Visa - Mastercard - Paypal - Apple Pay - Google Pay -** __safe via Stripe__",inline=False)
-    embed.add_field(name="",value="See for yourself and **[click here to visit Norecoil.de](https://norecoil.de)**",inline=False)
-    embed.set_image(
-        url="https://cdn.discordapp.com/attachments/1377248736916279347/1447212422111821986/image.png?ex=6936cd19&is=69357b99&hm=0ac66dc59a09896070c4426e97554dbaecac289c79609ba0b14b2799fd60454f&")
-    embed.set_footer(text="Norecoil.de © - since 2024",
-                     icon_url="https://cdn.discordapp.com/attachments/1377248736916279347/1447214780724154560/image.png?ex=6936cf4b&is=69357dcb&hm=24b896ed54e52e385eaa01f99915e872686676ba10ff2d0f9eb51e6917493268&")
-    await ctx.respond(embed=embed)
-
 @bot.slash_command(name="invite", description="Invite Link Protect in YOUR Sever")
 async def _invite(ctx):
     await ctx.defer()
@@ -1212,8 +1186,6 @@ async def _dashboard(ctx):
         embed.set_footer(text="For blocking your own links, use /link-blacklist")
     else:
         embed.set_footer(text="Need help? Join the support server /support")
-    embed.set_image(
-        url="https://cdn.discordapp.com/attachments/1377248736916279347/1447212422111821986/image.png?ex=6936cd19&is=69357b99&hm=0ac66dc59a09896070c4426e97554dbaecac289c79609ba0b14b2799fd60454f&")
     embed.add_field(
         name="``Web Dashboard``",
         value=f"Manage all your settings on the website:\n🌐 **[link-protect.com](https://link-protect.com/dashboard/{guild_id})**",
