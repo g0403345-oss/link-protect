@@ -323,7 +323,33 @@ async def _boot_sync_once():
 
 
 bot.loop.create_task(_boot_sync_once())
-API_KEY = '6d4d6172480f35c0246c23707521c5d37b91317741e6f262a1052ee770d18dcf'
+
+# ── Brand / embed design system ───────────────────────────────────────────────
+# One version string, one color, one footer — every reply goes through
+# brand_embed() so the bot looks like a single product, not 61 commands.
+BOT_VERSION = "2.4.1"
+BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
+_EMBED_KINDS = {
+    "brand": BRAND_COLOR,
+    "success": 0x23A55A,
+    "error": 0xF23F43,
+    "info": 0xF0B232,
+}
+
+
+def brand_embed(title: str = "", description: str = "", *, kind: str = "brand",
+                footer: bool = True) -> discord.Embed:
+    e = discord.Embed(title=title, description=description,
+                      color=_EMBED_KINDS.get(kind, BRAND_COLOR))
+    if footer:
+        e.set_footer(text="Link Protect • link-protect.com")
+    return e
+
+
+# Secrets come from the environment (systemd drop-in on the Pi) — never from
+# source. Missing values degrade gracefully instead of crashing.
+SAFE_BROWSING_KEY = os.environ.get("SAFE_BROWSING_KEY", "")
+TOPGG_TOKEN = os.environ.get("TOPGG_TOKEN", "")
 
 # ── Command redirect mode ─────────────────────────────────────────────────────
 # When the super-admin turns this on (admin panel on web/app → kv config:lock_commands),
@@ -343,6 +369,8 @@ SETTINGS_COMMANDS = {
     "enable-role", "disable-role", "enable-only-link", "disable-only-link",
     # warning configuration
     "warn-kick", "warn-ban", "warn-timeout", "warn-decay",
+    # presets
+    "setup-preset",
     # per-channel rules (channel-rules stays — it's read-only)
     "channel-mode", "channel-block", "channel-reset",
     # logging + blacklist
@@ -424,9 +452,11 @@ for filename in os.listdir('./cogs'):
 
 
 async def post_stats():
+    if not TOPGG_TOKEN:
+        return  # no token configured — skip silently
     url = "https://top.gg/api/bots/888390889892892684/stats"
     headers = {
-        "Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijg4ODM5MDg4OTg5Mjg5MjY4NCIsImJvdCI6dHJ1ZSwiaWF0IjoxNjM2NjU1NTM2fQ.txNDT50-BQ1z7Uuwjqhen6vbCXX9IQ2gLWtbUHOVgmM",
+        "Authorization": TOPGG_TOKEN,
         "Content-Type": "application/json",
     }
     data = {"server_count": len(bot.guilds)}
@@ -569,14 +599,14 @@ async def on_guild_join(guild):
     total_voice_channels = len(guild.voice_channels)
     total_channels = total_text_channels + total_voice_channels
     create = guild.created_at.strftime("%d.%m.%Y, %H:%M")
-    embed = discord.Embed(title=f"{guild.name} (ID: {guild.id})", color=0x7a7aff)
+    embed = discord.Embed(title=f"{guild.name} (ID: {guild.id})", color=BRAND_COLOR)
     embed.add_field(name=" ", value=f"Owner: <@{owner_id}>", inline=False)
-    embed.add_field(name="Members:", value=f"```{guild.member_count}```", inline=True)
-    embed.add_field(name=f"Total channel:", value=f"```{total_channels}```", inline=True)
-    embed.add_field(name=f"Text channel:", value=f"```{total_text_channels}```", inline=True)
-    embed.add_field(name=f"Voice channel:", value=f"```{total_voice_channels}```", inline=True)
-    embed.add_field(name=f"Createt at:", value=f"```{create}```", inline=True)
-    embed.set_footer(text=f"Total Server: {len(bot.guilds)}")
+    embed.add_field(name="Members", value=f"```{guild.member_count}```", inline=True)
+    embed.add_field(name="Total channels", value=f"```{total_channels}```", inline=True)
+    embed.add_field(name="Text channels", value=f"```{total_text_channels}```", inline=True)
+    embed.add_field(name="Voice channels", value=f"```{total_voice_channels}```", inline=True)
+    embed.add_field(name="Created at", value=f"```{create}```", inline=True)
+    embed.set_footer(text=f"Total servers: {len(bot.guilds)}")
     channel = bot.get_channel(889218205636247582)
     await channel.send(embed=embed)
     try:
@@ -587,26 +617,25 @@ async def on_guild_join(guild):
         return
     except discord.HTTPException as e:
         return
-    embed = discord.Embed(
-        title="Welcome to Link Protect V2!",
-        description="Hey! Thanks for your Invite. I'm here to help you keep your server safe and organized.",
-        color=0x7a7aff)
-    embed.add_field(name="Features", value=(
-        "🔒 **Malware Protection**: \nBlocks malicious links to protect your server.\n"
-        "🔗 **Link Detection**: \nDeletes unwanted links (e.g., YouTube, Nitro, Bit.ly, NSFW, Google, Twitch, Discord invites, GIFs).\n"
-        "🛠️ **Customizable Management**: \nSet which links to block and configure kick/ban settings.\n"
-        "🔒 **Control Access**: \nDefine which channels, roles, or members can send links.\n"
-        "📝 **Warning System**: \nConfigure warning thresholds and actions with `/warn-kick` and `/warn-ban`.\n"
-        "🕵️‍♂️ **Malware Scanner**: \nUse `/enable-link-scanner` to verify links with green (safe) and red (unsafe) indicators.\n"
-        "⚠️ **Manage Warnings**: \nView `/warnings @User`, delete `/warn-delete @User`, or reset all with `/warn-delete-server`.\n"
-        "🚫 **Log Management**: \nCreate logs with `/enable-warn-log #channelname` and disable with `/disable-warn-log`.\n"
-        "🐞 **Feedback & Reporting**: \nReport issues with `/bug-report`.\n"
-        "🔄 **Updates**: \nCheck for updates with `/update`."))
-    embed.add_field(name="Take Time",
-                    value="Use ``/`` and go through the commands of Link Protect. Every command has a description to show you what it does. If you need help, use /report and send a help message",
-                    inline=False)
-    embed.add_field(name="**NEW**",
-                    value="💰 Now you can also try the [VIP CASINO MASTER](https://discord.com/oauth2/authorize?client_id=1370064293697163326&permissions=2147608640&integration_type=0&scope=bot) Bot!")
+    embed = brand_embed(
+        "Welcome to Link Protect 👋",
+        f"Thanks for adding me to **{guild.name}**! I block phishing, scams, "
+        "malware and unwanted links — automatically, before they spread.",
+    )
+    embed.add_field(name="🚀 Set up in 30 seconds", value=(
+        "Run **`/setup-preset`** in your server and pick a protection level "
+        "(Minimal · Balanced · Strict) — or fine-tune everything in the "
+        "[web dashboard](https://link-protect.com/dashboard)."), inline=False)
+    embed.add_field(name="🛡️ What I protect you from", value=(
+        "• Phishing, nitro scams & malware links\n"
+        "• Cross-channel scam spam (Scam Shield) & link raids\n"
+        "• Unwanted links — invites, shorteners, NSFW and more\n"
+        "• Repeat offenders, via warnings with auto timeout/kick/ban"), inline=False)
+    embed.add_field(name="🔗 Good to know", value=(
+        "**`/help`** shows every command · **`/dashboard`** shows your settings\n"
+        "[Web dashboard](https://link-protect.com/dashboard) · "
+        "[iOS app](https://link-protect.com) · "
+        "[Support server](https://discord.gg/BjDC9t329E)"), inline=False)
     try:
         await owner.send(embed=embed)
     except Exception as e:
@@ -726,10 +755,7 @@ async def database(ctx):
 @database.error
 async def database_error(ctx, error):
     if isinstance(error, commands.NotOwner):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="These z- commands are only for the bot owner.",
-            color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "These z- commands are only for the bot owner.", kind="error")
         await ctx.respond(embed=embed, ephemeral=True)
 
 
@@ -784,11 +810,7 @@ async def nootification(ctx):
 @nootification.error
 async def nootification_error(ctx, error):
     if isinstance(error, commands.NotOwner):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="These z- commands are only for the bot owner.",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", "These z- commands are only for the bot owner.", kind="error")
         await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="help", description="Get all commands and information")
@@ -798,7 +820,7 @@ async def _help(ctx):
         title="📖 Link Protect — All Commands",
         description="Everything you can configure. Most settings are also available on the "
                     "**[web dashboard](https://link-protect.com/dashboard)** and in the **iOS app**.",
-        color=0x7a7aff,
+        color=BRAND_COLOR,
     )
     embed.add_field(
         name="🔒 Link Blockers",
@@ -888,6 +910,22 @@ async def _help(ctx):
 # length 2 — /update intentionally only shows the latest two releases.
 _CHANGELOG = [
     {
+        "version": "2.4.1",
+        "date": "23.07.2026",
+        "fields": [
+            ("✨ New Features",
+             " • /setup-preset — set up full protection with one command\n"
+             "   (Minimal · Balanced · Strict).\n"
+             " • Web: Security Score, deep link checker with redirect\n"
+             "   tracing, and a developer platform (API, webhooks).\n"
+             " • Manual /warn now escalates exactly like automatic\n"
+             "   warnings — incl. timeout, decay and clear error hints."),
+            ("🎨 Polish",
+             " • One consistent look for all bot replies.\n"
+             " • Rewritten welcome message with a real quick-start."),
+        ],
+    },
+    {
         "version": "2.4.0",
         "date": "16.07.2026",
         "fields": [
@@ -962,7 +1000,7 @@ async def _ping(ctx):
     t_start = time.monotonic()
     await ctx.followup.send("⏱️ Measuring…")
     api_ms = round((time.monotonic() - t_start) * 1000)
-    embed = discord.Embed(title="🏓 Pong!", color=0x7a7aff)
+    embed = discord.Embed(title="🏓 Pong!", color=BRAND_COLOR)
     embed.add_field(name="Gateway", value=f"```{gateway_ms if gateway_ms is not None else '—'} ms```", inline=True)
     embed.add_field(name="API Roundtrip", value=f"```{api_ms} ms```", inline=True)
     if gateway_ms is None:
@@ -983,7 +1021,7 @@ async def _stats(ctx):
     guild_count = len(bot.guilds)
     user_count = sum(g.member_count or 0 for g in bot.guilds)
     shard_count = bot.shard_count or 1
-    embed = discord.Embed(title="📊 Link Protect — Stats", color=0x7a7aff)
+    embed = discord.Embed(title="📊 Link Protect — Stats", color=BRAND_COLOR)
     embed.add_field(name="Servers", value=f"```{guild_count:,}```", inline=True)
     embed.add_field(name="Users", value=f"```{user_count:,}```", inline=True)
     embed.add_field(name="Shards", value=f"```{shard_count}```", inline=True)
@@ -993,7 +1031,7 @@ async def _stats(ctx):
     h, rem = divmod(uptime_s, 3600)
     m, s = divmod(rem, 60)
     embed.add_field(name="Uptime", value=f"```{h}h {m}m {s}s```", inline=True)
-    embed.add_field(name="Version", value="```2.1.0```", inline=True)
+    embed.add_field(name="Version", value=f"```{BOT_VERSION}```", inline=True)
     await ctx.respond(embed=embed)
 
 
@@ -1004,10 +1042,10 @@ async def _check_link(ctx, url: discord.Option(str, "URL to scan (must start wit
         url = "https://" + url
     SAFE_BROWSING_URL = (
         "https://safebrowsing.googleapis.com/v4/threatMatches:find"
-        "?key=AIzaSyAHR6g2nl9mGhie60t8p9Ns4utZv_8OR9c"
+        f"?key={SAFE_BROWSING_KEY}"
     )
     payload = {
-        "client": {"clientId": "link-protect-bot", "clientVersion": "2.0"},
+        "client": {"clientId": "link-protect-bot", "clientVersion": BOT_VERSION},
         "threatInfo": {
             "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING",
                             "POTENTIALLY_HARMFUL_APPLICATION", "UNWANTED_SOFTWARE"],
@@ -1093,25 +1131,115 @@ async def _warn_reset(ctx, member: discord.Member):
                 pass  # No access to the configured log channel.
 
 
-@bot.slash_command(name="invite", description="Invite Link Protect in YOUR Sever")
+@bot.slash_command(name="invite", description="Invite Link Protect to your server")
 async def _invite(ctx):
     await ctx.defer()
-    embed = discord.Embed(title="Invite Link Protect", description=" ", color=discord.Color.dark_blue())
-    embed.add_field(name=" ",
-                    value="Its easy, simple and fast\nto invite Link Protect in to\nyour Server, just click [here](https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376537111638&integration_type=0&scope=bot)")
-    embed.set_thumbnail(
-        url="https://cdn.discordapp.com/attachments/1377248736916279347/1401505929257816114/image.png?ex=6890859c&is=688f341c&hm=33256df0538f3e15e9a962326979c34358304568251f3f83e17aaf02eceeda6a&")
+    embed = brand_embed(
+        "➕ Invite Link Protect",
+        "Protect another server in 30 seconds — "
+        "[**click here to invite Link Protect**](https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376537111638&integration_type=0&scope=bot)",
+    )
     await ctx.respond(embed=embed)
 
 
-@bot.slash_command(name="support", description="Invite Link Protect in YOUR Sever")
+@bot.slash_command(name="support", description="Join the Link Protect support server")
 async def _support(ctx):
     await ctx.defer()
-    embed = discord.Embed(title="SUPPORT", description=" ", color=discord.Color.dark_blue())
-    embed.add_field(name=" ", value="Join the support server\nby clicking [here](https://discord.gg/BjDC9t329E)\n")
-    embed.set_thumbnail(
-        url="https://cdn.discordapp.com/attachments/1402320666346131527/1402323483354202112/Unbenannt_47-Photoroom.png?ex=68937f04&is=68922d84&hm=4f18ad5e934e02d40489afafb81041dc84d98fc9691068136f8a7476fbfc19aa&")
+    embed = brand_embed(
+        "💬 Support",
+        "Questions, bug reports or feature ideas?\n"
+        "[**Join the support server**](https://discord.gg/BjDC9t329E) — we usually reply within a few hours.",
+    )
     await ctx.respond(embed=embed)
+
+
+# ── One-command setup presets (mirrors the iOS app's Quick Setup) ─────────────
+# Only security-relevant settings are touched — taste blockers like YouTube or
+# GIFs are never changed by a preset.
+_PRESETS = {
+    "minimal": {
+        "label": "Minimal", "emoji": "🟢",
+        "protect": {"malware": True, "nitro": True, "bit": False, "nsfw": False, "invite": False},
+        "raid": False, "scam": False, "join_check": False,
+        "blurb": "Just the essentials: malware/phishing and nitro-scam links are blocked.",
+    },
+    "balanced": {
+        "label": "Balanced", "emoji": "🔵",
+        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": False},
+        "raid": True, "scam": True, "join_check": False,
+        "blurb": "Recommended: threat blockers plus raid protection and Scam Shield.",
+    },
+    "strict": {
+        "label": "Strict", "emoji": "🔴",
+        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": True},
+        "raid": True, "scam": True, "join_check": True,
+        "blurb": "Maximum protection: everything in Balanced plus invite blocking and the known-scammer join check.",
+    },
+}
+
+
+@bot.slash_command(name="setup-preset",
+                   description="Set up protection with one command: Minimal, Balanced or Strict")
+async def _setup_preset(ctx, preset: discord.Option(str, "Protection level",
+                                                    choices=["minimal", "balanced", "strict"])):
+    await ctx.defer()
+    if not (ctx.author.guild_permissions.manage_guild or ctx.author.guild_permissions.administrator):
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Missing permission",
+            "You need `Manage Server` or `Administrator` permission to apply a preset.",
+            kind="error"))
+        return
+    p = _PRESETS[preset]
+    guild_id = str(ctx.guild.id)
+
+    def _apply():
+        for key, val in p["protect"].items():
+            db.reference(f"/servers/{guild_id}/protect/{key}").set(val)
+        db.reference(f"/servers/{guild_id}/raid/enabled").set(p["raid"])
+        db.reference(f"/servers/{guild_id}/scamguard/enabled").set(p["scam"])
+        db.reference(f"/servers/{guild_id}/scamguard/join_check").set(p["join_check"])
+        # Make escalation actually work out of the box — but never overwrite
+        # thresholds the server has already configured.
+        warn = db.reference(f"/servers/{guild_id}/warn").get() or {}
+        touched_warn = False
+        timeout_cfg = warn.get("timeout") or {}
+        if preset != "minimal" and not warn.get("kick") and not warn.get("ban") \
+                and not timeout_cfg.get("warnings"):
+            db.reference(f"/servers/{guild_id}/warn/timeout").set({"warnings": 3, "time": 10})
+            db.reference(f"/servers/{guild_id}/warn/kick").set(5)
+            db.reference(f"/servers/{guild_id}/warn/ban").set(8)
+            touched_warn = True
+        return touched_warn
+
+    try:
+        touched_warn = await asyncio.to_thread(_apply)
+    except Exception as e:
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Error", f"Couldn't apply the preset.\n```{str(e)[:200]}```", kind="error"))
+        return
+
+    def onoff(v):
+        return "✅" if v else "▫️"
+    lines = [
+        f"{onoff(p['protect']['malware'])} Malware & phishing blocker",
+        f"{onoff(p['protect']['nitro'])} Nitro-scam blocker",
+        f"{onoff(p['protect']['nsfw'])} NSFW blocker",
+        f"{onoff(p['protect']['bit'])} URL-shortener blocker",
+        f"{onoff(p['protect']['invite'])} Discord-invite blocker",
+        f"{onoff(p['raid'])} Raid protection",
+        f"{onoff(p['scam'])} Scam Shield (cross-channel spam)",
+        f"{onoff(p['join_check'])} Known-scammer join check",
+    ]
+    embed = brand_embed(f"{p['emoji']} Preset applied — {p['label']}", p["blurb"], kind="success")
+    embed.add_field(name="Your protection now", value="\n".join(lines), inline=False)
+    if touched_warn:
+        embed.add_field(name="⚠️ Warning thresholds",
+                        value="Set to sensible defaults: timeout at 3 (10 min) · kick at 5 · ban at 8.",
+                        inline=False)
+    embed.add_field(name="Fine-tuning",
+                    value=f"Everything can be adjusted in the [web dashboard](https://link-protect.com/dashboard/{guild_id}).",
+                    inline=False)
+    await ctx.followup.send(embed=embed)
 
 
 @bot.slash_command(name="dashboard", description="Show dashboard and status")
@@ -1147,7 +1275,7 @@ async def _dashboard(ctx):
     timeout_time = timeout_data.get("time", 0)
     log_channel = log_data.get("log-channel", 0)
     only_link_channel = log_data.get("link", 0)
-    embed = discord.Embed(title="Dashboard", color=0x7a7aff)
+    embed = discord.Embed(title="Dashboard", color=BRAND_COLOR)
     embed.add_field(name="``Link Protection Blocker``", value=f" ", inline=False)
     embed.add_field(name="Google:", value=f"{status(protect_data['google'])} `- {'ON' if protect_data['google'] else 'OFF'}`", inline=True)
     embed.add_field(name="Youtube:", value=f"{status(protect_data['youtube'])} `- {'ON' if protect_data['youtube'] else 'OFF'}`", inline=True)
@@ -1183,7 +1311,7 @@ async def _dashboard(ctx):
     embed.add_field(name="``Malware Secure``", value=" ", inline = False)
     embed.add_field(name=f"Malware Link Scanner is currently {status(protect_data['malware'])} `- {'ON' if protect_data['malware'] else 'OFF'}`", value=f"", inline=True)
     if link_data == 0:
-        embed.set_footer(text="For blocking your own links, use /link-blacklist")
+        embed.set_footer(text="For blocking your own links, use /link-enable")
     else:
         embed.set_footer(text="Need help? Join the support server /support")
     embed.add_field(
@@ -1211,34 +1339,27 @@ async def _enable_google(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     google_enabled = protect_data.get("google", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Google blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Google blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if google_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Google blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Google blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/google").set(True))
-        embed = discord.Embed(title="GOOGLE", description="The Google blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Google blocker enabled", "The Google blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1247,9 +1368,7 @@ async def _disgoogle(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1257,20 +1376,17 @@ async def _disgoogle(ctx):
         all_enabled = protect_data.get("all", False)
         google_enabled = protect_data.get("google", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Google blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Google blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/google").set(False))
-            embed = discord.Embed(title="GOOGLE", description="The Google blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Google blocker disabled", "The Google blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Google blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Google blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1280,34 +1396,27 @@ async def _enable_youtube(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     youtube_enabled = protect_data.get("youtube", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The YouTube blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The YouTube blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if youtube_enabled == True:
-        embed = discord.Embed(title="INFO", description="The YouTube blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The YouTube blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/youtube").set(True))
-        embed = discord.Embed(title="YOUTUBE", description="The YouTube blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ YouTube blocker enabled", "The YouTube blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1316,9 +1425,7 @@ async def _disyoutube(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1326,20 +1433,17 @@ async def _disyoutube(ctx):
         all_enabled = protect_data.get("all", False)
         youtube_enabled = protect_data.get("youtube", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The YouTube blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The YouTube blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/youtube").set(False))
-            embed = discord.Embed(title="YOUTUBE", description="The YouTube blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ YouTube blocker disabled", "The YouTube blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The YouTube blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The YouTube blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1349,34 +1453,27 @@ async def _enable_nsfw(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     nsfw_enabled = protect_data.get("nsfw", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The NSFW blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The NSFW blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if nsfw_enabled == True:
-        embed = discord.Embed(title="INFO", description="The NFSW blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The NFSW blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nsfw").set(True))
-        embed = discord.Embed(title="NFSW", description="The NFSW blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ NFSW blocker enabled", "The NFSW blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1385,9 +1482,7 @@ async def _disnsfw(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1395,20 +1490,17 @@ async def _disnsfw(ctx):
         all_enabled = protect_data.get("all", False)
         nsfw_enabled = protect_data.get("nsfw", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The NSFW blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The NSFW blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nsfw").set(False))
-            embed = discord.Embed(title="NSFW", description="The NSFW blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ NSFW blocker disabled", "The NSFW blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The NSFW blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The NSFW blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1418,33 +1510,27 @@ async def _enablegif(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     gif_enabled = protect_data.get("gif", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The GIF blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The GIF blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if gif_enabled == True:
-        embed = discord.Embed(title="INFO", description="The GIF blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The GIF blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/gif").set(True))
-        embed = discord.Embed(title="GIF", description="The GIF blocker has been enabled.", color=discord.Color.green())
+        embed = brand_embed("✅ GIF blocker enabled", "The GIF blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1453,9 +1539,7 @@ async def _disgif(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1463,20 +1547,17 @@ async def _disgif(ctx):
         all_enabled = protect_data.get("all", False)
         gif_enabled = protect_data.get("gif", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The GIF blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The GIF blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/gif").set(False))
-            embed = discord.Embed(title="GIF", description="The GIF blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ GIF blocker disabled", "The GIF blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The GIF blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The GIF blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1486,34 +1567,27 @@ async def _enableinvite(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     invite_enabled = protect_data.get("invite", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Invite blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Invite blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if invite_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Invite blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Invite blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/invite").set(True))
-        embed = discord.Embed(title="INVITE", description="The Invite blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Invite blocker enabled", "The Invite blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1522,9 +1596,7 @@ async def _disinvite(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1532,20 +1604,17 @@ async def _disinvite(ctx):
         all_enabled = protect_data.get("all", False)
         invite_enabled = protect_data.get("invite", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Invite blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Invite blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/invite").set(False))
-            embed = discord.Embed(title="INVITE", description="The Invite blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Invite blocker disabled", "The Invite blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Invite blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Invite blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1555,34 +1624,27 @@ async def _enablebitly(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     bitly_enabled = protect_data.get("bit", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Bitly blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Bitly blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if bitly_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Bitly blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Bitly blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/bit").set(True))
-        embed = discord.Embed(title="BITLY", description="The Bitly blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Bitly blocker enabled", "The Bitly blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1591,9 +1653,7 @@ async def _disbitly(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1601,20 +1661,17 @@ async def _disbitly(ctx):
         all_enabled = protect_data.get("all", False)
         bitly_enabled = protect_data.get("bit", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Bitly blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Bitly blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/bit").set(False))
-            embed = discord.Embed(title="BITLY", description="The Bitly blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Bitly blocker disabled", "The Bitly blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Bitly blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Bitly blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1624,34 +1681,27 @@ async def _enablenitro(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     nitro_enabled = protect_data.get("nitro", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Nitro blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Nitro blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if nitro_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Nitro blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Nitro blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nitro").set(True))
-        embed = discord.Embed(title="NITRO", description="The Nitro blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Nitro blocker enabled", "The Nitro blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1660,9 +1710,7 @@ async def _disnitroy(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1670,20 +1718,17 @@ async def _disnitroy(ctx):
         all_enabled = protect_data.get("all", False)
         nitro_enabled = protect_data.get("nitro", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Nitro blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Nitro blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nitro").set(False))
-            embed = discord.Embed(title="NITRO", description="The Nitro blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Nitro blocker disabled", "The Nitro blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Nitro blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Nitro blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1693,34 +1738,27 @@ async def _enabletwitch(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     twitch_enabled = protect_data.get("twitch", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Twitch blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Twitch blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if twitch_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Twitch blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Twitch blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/twitch").set(True))
-        embed = discord.Embed(title="TWITCH", description="The Twitch blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Twitch blocker enabled", "The Twitch blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1729,9 +1767,7 @@ async def _distwitch(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1739,20 +1775,17 @@ async def _distwitch(ctx):
         all_enabled = protect_data.get("all", False)
         twitch_enabled = protect_data.get("twitch", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Twitch blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Twitch blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/twitch").set(False))
-            embed = discord.Embed(title="TWITCH", description="The Twitch blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Twitch blocker disabled", "The Twitch blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Twitch blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Twitch blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1761,34 +1794,27 @@ async def _enablesteam(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     all_enabled = protect_data.get("all", False)
     steam_enabled = protect_data.get("steam", False)
     if all_enabled == True:
-        embed = discord.Embed(title="⛔ ERROR", description="The Steam blocker is included in `all`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The Steam blocker is included in `all`", kind="error")
         embed.set_footer(text="Use /disable-all to manage specific links")
         await ctx.followup.send(embed=embed)
         return
     if steam_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Steam blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Steam blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/steam").set(True))
-        embed = discord.Embed(title="STEAM", description="The Steam blocker has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("✅ Steam blocker enabled", "The Steam blocker has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 
@@ -1797,9 +1823,7 @@ async def _dissteam(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1807,20 +1831,17 @@ async def _dissteam(ctx):
         all_enabled = protect_data.get("all", False)
         steam_enabled = protect_data.get("steam", False)
         if all_enabled == True:
-            embed = discord.Embed(title="⛔ ERROR", description="The Steam blocker is included in `all`",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "The Steam blocker is included in `all`", kind="error")
             embed.set_footer(text="Use /disable-all to manage specific links")
             await ctx.followup.send(embed=embed)
             return
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/steam").set(False))
-            embed = discord.Embed(title="STEAM", description="The Steam blocker has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("✅ Steam blocker disabled", "The Steam blocker has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Steam blocker is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Steam blocker is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1830,16 +1851,11 @@ async def _enable_silent(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        await ctx.followup.send(embed=discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions.",
-            color=discord.Color.red()))
+        await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions.", kind="error"))
         return
     current = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").get())
     if current:
-        await ctx.followup.send(embed=discord.Embed(
-            title="INFO", description="Silent mode is already enabled.",
-            color=discord.Color.orange()))
+        await ctx.followup.send(embed=brand_embed("ℹ️ Info", "Silent mode is already enabled.", kind="info"))
         return
     await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").set(True))
     embed = discord.Embed(
@@ -1857,16 +1873,10 @@ async def _disable_silent(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        await ctx.followup.send(embed=discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions.",
-            color=discord.Color.red()))
+        await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions.", kind="error"))
         return
     await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").set(False))
-    await ctx.followup.send(embed=discord.Embed(
-        title="🔔 Silent Mode Disabled",
-        description="Warning messages are now sent publicly in the channel again.",
-        color=discord.Color.green()))
+    await ctx.followup.send(embed=brand_embed("🔔 Silent Mode Disabled", "Warning messages are now sent publicly in the channel again.", kind="success"))
 
 
 @bot.slash_command(name="enable-malware-secure", description="Enable the malware check for your server")
@@ -1874,27 +1884,21 @@ async def _enablemalware(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
     malware_enabled = protect_data.get("malware", False)
     if malware_enabled == True:
-        embed = discord.Embed(title="INFO", description="The Malware Secuire is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The Malware Secuire is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     try:
         await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/malware").set(True))
-        embed = discord.Embed(title="MALWARE SECURE", description="The Malware Secure has been enabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("MALWARE SECURE", "The Malware Secure has been enabled.", kind="success")
         await ctx.followup.send(embed=embed)
     except Exception as e:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Something went wrong.\nUse /support for help.\n```{str(e)}```",
-                              color=discord.Color.dark_red())
+        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
         await ctx.followup.send(embed=embed)
 
 @bot.slash_command(name="disable-malware-secure", description="Disable the malware check for your server")
@@ -1902,9 +1906,7 @@ async def _dismalware(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     else:
@@ -1912,13 +1914,11 @@ async def _dismalware(ctx):
         steam_enabled = protect_data.get("malware", False)
         try:
             await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/malware").set(False))
-            embed = discord.Embed(title="MALWARE SECURE", description="The Malware Secure has been disabled.",
-                                  color=discord.Color.green())
+            embed = brand_embed("MALWARE SECURE", "The Malware Secure has been disabled.", kind="success")
             await ctx.followup.send(embed=embed)
             return
         except:
-            embed = discord.Embed(title="INFO", description="The Malware Secure is already disabled.",
-                                  color=discord.Color.orange())
+            embed = brand_embed("ℹ️ Info", "The Malware Secure is already disabled.", kind="info")
             await ctx.followup.send(embed=embed)
             return
 
@@ -1927,16 +1927,13 @@ async def _enable_all(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_ref = db.reference(f"/servers/{guild_id}/protect")
     protect_data = protect_ref.get() or {}
     if protect_data.get("all", False):
-        embed = discord.Embed(title="INFO", description="The All Link blocker is already enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "The All Link blocker is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     safe_ref = db.reference(f"/servers/{guild_id}/safe")
@@ -1945,8 +1942,7 @@ async def _enable_all(ctx):
     new_protect = {key: False for key in protect_data if key != "all"}
     new_protect["all"] = True
     protect_ref.set(new_protect)
-    embed = discord.Embed(title="ALL", description="The All Links blocker has been enabled.",
-                          color=discord.Color.green())
+    embed = brand_embed("✅ All Links blocker enabled", "The All Links blocker has been enabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -1955,17 +1951,14 @@ async def _disable_all(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     protect_ref = db.reference(f"/servers/{guild_id}/protect")
     safe_ref = db.reference(f"/servers/{guild_id}/safe")
     protect_data = protect_ref.get() or {}
     if not protect_data.get("all", False):
-        embed = discord.Embed(title="⛔ ERROR", description="The All Link blocker is already disabled.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "The All Link blocker is already disabled.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     safe_data = safe_ref.get() or {}
@@ -1973,8 +1966,7 @@ async def _disable_all(ctx):
     restored_protect = {key: (safe_data.get(key, False)) for key in protect_data if key != "all"}
     restored_protect["all"] = False
     protect_ref.set(restored_protect)
-    embed = discord.Embed(title="ALL", description="The All Links blocker has been disabled.",
-                          color=discord.Color.green())
+    embed = brand_embed("✅ All Links blocker disabled", "The All Links blocker has been disabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -1983,37 +1975,27 @@ async def _dischannel(ctx, name: discord.Option(str, "Mention the channel to dis
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need Manage Messages or Administrator permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need Manage Messages or Administrator permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not name.startswith("<#") or not name.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a valid channel mention like #channel.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a valid channel mention like #channel.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     channel_id = name.replace("<#", "").replace(">", "")
     ref = db.reference(f"/servers/{guild_id}/channel/channel")
     current_channels = ref.get() or []
     if not isinstance(current_channels, list) or len(current_channels) == 0:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You have no enabled channels.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You have no enabled channels.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if channel_id in current_channels:
         current_channels.remove(channel_id)
         ref.set(current_channels)
-        embed = discord.Embed(title="Channel",
-                              description=f"{name} has been disabled.",
-                              color=discord.Color.green())
+        embed = brand_embed("Channel", f"{name} has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
     else:
-        embed = discord.Embed(title="INFO",
-                              description=f"{name} is not enabled.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{name} is not enabled.", kind="info")
         await ctx.followup.send(embed=embed)
 
 
@@ -2022,16 +2004,11 @@ async def _enchannel(ctx, name: discord.Option(str, "Mention the channel to enab
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need Manage Messages or Administrator permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need Manage Messages or Administrator permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not name.startswith("<#") or not name.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a valid channel mention like #channel.",
-                              color=discord.Color.red()
-                              )
+        embed = brand_embed("⛔ Error", "Please provide a valid channel mention like #channel.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     channel_id = name.replace("<#", "").replace(">", "")
@@ -2041,12 +2018,12 @@ async def _enchannel(ctx, name: discord.Option(str, "Mention the channel to enab
         current_channels = []
         ref.set([])
     if channel_id in current_channels:
-        embed = discord.Embed(title="INFO", description=f"{name} is already enabled.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{name} is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     current_channels.append(channel_id)
     ref.set(current_channels)
-    embed = discord.Embed(title="Channel", description=f"{name} has been enabled.", color=discord.Color.green())
+    embed = brand_embed("Channel", f"{name} has been enabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2056,17 +2033,11 @@ async def _enlink(ctx, channelname: discord.Option(str, "Mention the channel (e.
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions to run this command",
-            color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not channelname.startswith("<#") or not channelname.endswith(">"):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="Please mention a valid channel like `#general`.",
-            color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please mention a valid channel like `#general`.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     channel_id = int(channelname.replace("<#", "").replace(">", ""))
@@ -2074,20 +2045,14 @@ async def _enlink(ctx, channelname: discord.Option(str, "Mention the channel (e.
     ref_onlylink = db.reference(f"/servers/{guild_id}/log/onlylink")
     current = ref_link.get() or 0
     if current == channel_id:
-        embed = discord.Embed(
-            title="INFO",
-            description=f"<#{current}> is already the only link channel.",
-            color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"<#{current}> is already the only link channel.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     ref_link.set(channel_id)
     ref_onlylink.set(True)
     channel = ctx.guild.get_channel(channel_id)
     await channel.send("This channel is set for **Only Links**.")
-    embed = discord.Embed(
-        title="Only Link",
-        description=f"{channel.mention} is now the active Only Link Channel.",
-        color=discord.Color.green())
+    embed = brand_embed("Only Link", f"{channel.mention} is now the active Only Link Channel.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2097,28 +2062,19 @@ async def _dislink(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions to run this command",
-            color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref_link = db.reference(f"/servers/{guild_id}/log/link")
     ref_onlylink = db.reference(f"/servers/{guild_id}/log/onlylink")
     current = ref_link.get() or 0
     if current == 0:
-        embed = discord.Embed(
-            title="INFO",
-            description="No 'Only Link' channel is currently enabled.",
-            color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "No 'Only Link' channel is currently enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     ref_link.set(0)
     ref_onlylink.set(False)
-    embed = discord.Embed(
-        title="Only Link",
-        description=f"<#{current}> has been disabled as the 'Only Link' channel.",
-        color=discord.Color.green())
+    embed = brand_embed("Only Link", f"<#{current}> has been disabled as the 'Only Link' channel.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2127,30 +2083,27 @@ async def _dismember(ctx, member: discord.Option(str, "Mention the member to dis
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need Manage Messages or Administrator permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need Manage Messages or Administrator permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not member.startswith("<@") or not member.endswith(">"):
-        embed = discord.Embed(
-            title="⛔ ERROR", description="Please provide a member mention like @username", color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a member mention like @username", kind="error")
         await ctx.followup.send(embed=embed)
         return
     member_id = member.replace("<@", "").replace(">", "").replace("!", "")
     ref = db.reference(f"/servers/{guild_id}/channel/member")
     member_list = ref.get()
     if not isinstance(member_list, list) or len(member_list) == 0:
-        embed = discord.Embed(title="INFO", description="You have no enabled members.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "You have no enabled members.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     if member_id in member_list:
         member_list.remove(member_id)
         ref.set(member_list)
-        embed = discord.Embed(title="Member", description=f"{member} has been disabled.", color=discord.Color.green())
+        embed = brand_embed("Member", f"{member} has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
     else:
-        embed = discord.Embed(title="INFO", description=f"{member} is not enabled.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{member} is not enabled.", kind="info")
         await ctx.followup.send(embed=embed)
 
 
@@ -2159,15 +2112,11 @@ async def _enmember(ctx, member: discord.Option(str, "Mention the member to enab
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need Manage Messages or Administrator permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need Manage Messages or Administrator permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not member.startswith("<@") or not member.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a valid member mention like @username.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a valid member mention like @username.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     member_id = member.replace("<@", "").replace(">", "").replace("!", "")
@@ -2177,12 +2126,12 @@ async def _enmember(ctx, member: discord.Option(str, "Mention the member to enab
         member_list = []
         ref.set([])
     if member_id in member_list:
-        embed = discord.Embed(title="INFO", description=f"{member} is already enabled.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{member} is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     member_list.append(member_id)
     ref.set(member_list)
-    embed = discord.Embed(title="Member", description=f"{member} has been enabled.", color=discord.Color.green())
+    embed = brand_embed("Member", f"{member} has been enabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2191,30 +2140,27 @@ async def _disrole(ctx, role: discord.Option(str, "Mention the role to disable (
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not role.startswith("<@&") or not role.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a role mention like `@rolename`", color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a role mention like `@rolename`", kind="error")
         await ctx.followup.send(embed=embed)
         return
     role_id = role.replace("<@&", "").replace(">", "")
     ref = db.reference(f"/servers/{guild_id}/channel/role")
     role_list = ref.get()
     if not isinstance(role_list, list) or len(role_list) == 0:
-        embed = discord.Embed(title="INFO", description="You have no enabled roles.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", "You have no enabled roles.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     if role_id in role_list:
         role_list.remove(role_id)
         ref.set(role_list)
-        embed = discord.Embed(title="Role", description=f"{role} has been disabled.", color=discord.Color.green())
+        embed = brand_embed("Role", f"{role} has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
     else:
-        embed = discord.Embed(title="INFO", description=f"{role} is not enabled.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{role} is not enabled.", kind="info")
         await ctx.followup.send(embed=embed)
 
 
@@ -2223,15 +2169,11 @@ async def _enrole(ctx, role: discord.Option(str, "Mention the role to enable (e.
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not role.startswith("<@&") or not role.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a valid role mention like `@rolename`.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a valid role mention like `@rolename`.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     role_id = role.replace("<@&", "").replace(">", "")
@@ -2241,12 +2183,12 @@ async def _enrole(ctx, role: discord.Option(str, "Mention the role to enable (e.
         role_list = []
         ref.set([])
     if role_id in role_list:
-        embed = discord.Embed(title="INFO", description=f"{role} is already enabled.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{role} is already enabled.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     role_list.append(role_id)
     ref.set(role_list)
-    embed = discord.Embed(title="Role", description=f"{role} has been enabled.", color=discord.Color.green())
+    embed = brand_embed("Role", f"{role} has been enabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
 @bot.slash_command(
@@ -2260,11 +2202,7 @@ async def _warntimeout(
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions to run this command",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref_warn = db.reference(f"/servers/{guild_id}/warn")
@@ -2277,27 +2215,15 @@ async def _warntimeout(
             "warnings": 0,
             "time": 0
         })
-        embed = discord.Embed(
-            title="Warn-timeout",
-            description="Warn-timeout has been disabled.",
-            color=discord.Color.green()
-        )
+        embed = brand_embed("Warn-timeout", "Warn-timeout has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
         return
     if time <= 0:
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="Timeout duration must be greater than 0 minutes.",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", "Timeout duration must be greater than 0 minutes.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if warnings == current_warnings and time == current_time:
-        embed = discord.Embed(
-            title="INFO",
-            description=f"Warn-timeout was already set to ``{warnings}`` warnings → ``{time}`` minutes.",
-            color=discord.Color.orange()
-        )
+        embed = brand_embed("ℹ️ Info", f"Warn-timeout was already set to ``{warnings}`` warnings → ``{time}`` minutes.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     ref_warn.child("timeout").set({
@@ -2321,9 +2247,7 @@ async def _warnkick(ctx, number: discord.Option(int, "Number of warnings before 
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref_warn = db.reference(f"/servers/{guild_id}/warn")
@@ -2332,24 +2256,19 @@ async def _warnkick(ctx, number: discord.Option(int, "Number of warnings before 
     current_ban = warn_data.get("ban", 0)
     if int(number) == 0:
         ref_warn.child("kick").set(0)
-        embed = discord.Embed(title="Warn-kick", description="Kick has been disabled.", color=discord.Color.green())
+        embed = brand_embed("Warn-kick", "Kick has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
         return
     if current_ban > 0 and int(number) >= current_ban:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Please disable warn-ban or set warn-ban higher than ``{int(number)}`` to set warn-kick.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", f"Please disable warn-ban or set warn-ban higher than ``{int(number)}`` to set warn-kick.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if int(number) == current_kick:
-        embed = discord.Embed(title="INFO", description=f"Kick was already set to ``{number}``.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"Kick was already set to ``{number}``.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     ref_warn.child("kick").set(int(number))
-    embed = discord.Embed(title="Warn-kick",
-                          description=f"Warn-Kick has been changed from ``{current_kick}`` to ``{number}``.",
-                          color=discord.Color.green())
+    embed = brand_embed("Warn-kick", f"Warn-Kick has been changed from ``{current_kick}`` to ``{number}``.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2358,9 +2277,7 @@ async def _warnban(ctx, number: discord.Option(int, "Number of warnings before b
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref_warn = db.reference(f"/servers/{guild_id}/warn")
@@ -2369,24 +2286,19 @@ async def _warnban(ctx, number: discord.Option(int, "Number of warnings before b
     current_kick = warn_data.get("kick", 0)
     if int(number) == 0:
         ref_warn.child("ban").set(0)
-        embed = discord.Embed(title="Warn-ban", description="Ban has been disabled.", color=discord.Color.green())
+        embed = brand_embed("Warn-ban", "Ban has been disabled.", kind="success")
         await ctx.followup.send(embed=embed)
         return
     if current_kick > 0 and int(number) <= current_kick:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"Please disable warn-kick or set warn-kick lower than ``{int(number)}`` to set warn-ban.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", f"Please disable warn-kick or set warn-kick lower than ``{int(number)}`` to set warn-ban.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if int(number) == current_ban:
-        embed = discord.Embed(title="INFO", description=f"Ban was already set to ``{number}``.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"Ban was already set to ``{number}``.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     ref_warn.child("ban").set(int(number))
-    embed = discord.Embed(title="Warn-ban",
-                          description=f"Warn-Ban has been changed from ``{current_ban}`` to ``{number}``.",
-                          color=discord.Color.green())
+    embed = brand_embed("Warn-ban", f"Warn-Ban has been changed from ``{current_ban}`` to ``{number}``.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2408,10 +2320,7 @@ def _is_mod(ctx) -> bool:
 
 
 async def _deny(ctx):
-    await ctx.followup.send(embed=discord.Embed(
-        title="⛔ ERROR",
-        description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-        color=discord.Color.red()))
+    await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error"))
 
 
 @bot.slash_command(name="warn-decay",
@@ -2425,10 +2334,7 @@ async def _warndecay(ctx, days: discord.Option(int, "Warnings older than this ma
     days = int(days)
     if days <= 0:
         ref.set({"enabled": False, "days": 0})
-        embed = discord.Embed(
-            title="🕒 Warning Decay — Off",
-            description="Old warnings will **no longer expire**. Every warning a member has is kept until you reset it manually.",
-            color=discord.Color.green())
+        embed = brand_embed("🕒 Warning Decay — Off", "Old warnings will **no longer expire**. Every warning a member has is kept until you reset it manually.", kind="success")
         return await ctx.followup.send(embed=embed)
     if days > 3650:
         days = 3650
@@ -2566,82 +2472,32 @@ async def _channelreset(ctx, channel: discord.Option(discord.TextChannel, "Chann
         return await _deny(ctx)
     guild_id = str(ctx.guild.id)
     _ov_ref(guild_id).child(str(channel.id)).delete()
-    embed = discord.Embed(
-        title="⚙️ Channel Rules",
-        description=f"{channel.mention} now **follows the server-wide settings** again. Any custom rules were removed.",
-        color=discord.Color.green())
+    embed = brand_embed("⚙️ Channel Rules", f"{channel.mention} now **follows the server-wide settings** again. Any custom rules were removed.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
 @bot.slash_command(name="warn", description="Warn a user")
 async def warn_user(ctx, member: discord.Member,
                     reason: discord.Option(str, "Reason", required=False) = "No reason provided."):
+    """Manual warn — runs through the SAME engine as automatic link-block warns
+    (shared.apply_warn_member), so timeout/kick/ban thresholds, warning decay
+    and permission-failure diagnostics behave identically on both paths."""
     await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
-        await ctx.followup.send(embed=embed)
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Missing permission",
+            "You need `Manage Messages` or `Administrator` permission to run this command.",
+            kind="error"))
         return
-    ref_warn = db.reference(f"/servers/{guild_id}/warn")
-    warn_data = ref_warn.get() or {}
-    kick = warn_data.get("kick", 0)
-    ban = warn_data.get("ban", 0)
-    member_ref = ref_warn.child(f"{user_id}")
-    user_data = member_ref.get() or {"Warn": 0, "reason": []}
-    current_warn = user_data.get("Warn", 0) + 1
-    reasons = user_data.get("reason", [])
-    reasons.append(reason)
-    member_ref.update({
-        "Warn": current_warn,
-        "reason": reasons})
-    embed = discord.Embed(title="WARN",
-                          description=f"{ctx.author.mention} has warned {member.mention} for:\n -  {reason}",
-                          color=0x7a7aff)
-    embed.add_field(name="Total warnings", value=f"{member.name} now has ``{current_warn}`` warning(s).")
-    await ctx.followup.send(embed=embed)
-    if kick > 0 and current_warn >= kick:
-        try:
-            await member.kick(reason=f"{kick} warnings")
-            embed_kick = discord.Embed(title="WARN-KICK",
-                                       description=f"{member.mention} has been kicked for reaching ``{kick}`` warnings.",
-                                       color=discord.Color.light_grey())
-            await ctx.followup.send(embed=embed_kick)
-        except:
-            embed_err = discord.Embed(title="⛔ ERROR",
-                                      description=f"I could not kick {member.mention}. Check my permissions.",
-                                      color=discord.Color.red())
-            await ctx.followup.send(embed=embed_err)
-    if ban > 0 and current_warn >= ban:
-        try:
-            await member.ban(reason=f"{ban} warnings")
-            embed_ban = discord.Embed(title="WARN-BAN",
-                                      description=f"{member.mention} has been banned for reaching ``{ban}`` warnings.",
-                                      color=discord.Color.red())
-            await ctx.followup.send(embed=embed_ban)
-        except:
-            embed_err = discord.Embed(title="⛔ ERROR",
-                                      description=f"I could not ban {member.mention}. Check my permissions.",
-                                      color=discord.Color.red())
-            await ctx.followup.send(embed=embed_err)
-    log_ref = db.reference(f"/servers/{guild_id}/log/log-channel")
-    log_channel_id = log_ref.get()
-    # log-channel may be stored as an int (command) or a string (dashboard); get_channel needs an int.
-    if log_channel_id and str(log_channel_id) != "0":
-        try:
-            log_channel = bot.get_channel(int(log_channel_id))
-        except (ValueError, TypeError):
-            log_channel = None
-        if log_channel:
-            log_embed = discord.Embed(title="User Warned",
-                                      description=f"{ctx.author.mention} warned {member.mention} for:\n - {reason}",
-                                      color=discord.Color.orange())
-            try:
-                await log_channel.send(embed=log_embed)
-            except discord.Forbidden:
-                pass  # No access to the configured log channel — warn still applied.
+    from cogs.shared import apply_warn_member, get_settings
+    settings = await get_settings(str(ctx.guild.id))
+    await apply_warn_member(bot, member, ctx.channel, settings,
+                            f"{reason} (manual warn)", moderator=ctx.author)
+    await ctx.followup.send(embed=brand_embed(
+        "✅ Warning issued",
+        f"{member.mention} has been warned. Escalation (timeout/kick/ban) follows "
+        "your configured thresholds automatically.",
+        kind="success"), ephemeral=True)
 
 
 @bot.slash_command(name="warnings", description="Show all warnings from a user")
@@ -2675,31 +2531,19 @@ async def _warndel(ctx, member: discord.Member,
     guild_id = str(ctx.guild.id)
     user_id = str(member.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref = db.reference(f"/servers/{guild_id}/warn/{user_id}")
     user_data = ref.get()
     if not user_data:
-        embed = discord.Embed(
-            title="INFO",
-            description=f"{member.mention} has no warnings.",
-            color=discord.Color.orange()
-        )
+        embed = brand_embed("ℹ️ Info", f"{member.mention} has no warnings.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     reasons = user_data.get("reason", [])
     warn_count = user_data.get("Warn", 0)
     if index < 1 or index > len(reasons):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description=f"{member.mention} only has `{len(reasons)}` warning(s).",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", f"{member.mention} only has `{len(reasons)}` warning(s).", kind="error")
         await ctx.followup.send(embed=embed)
         return
     removed = reasons.pop(index - 1)
@@ -2708,11 +2552,7 @@ async def _warndel(ctx, member: discord.Member,
         "Warn": warn_count,
         "reason": reasons
     })
-    embed = discord.Embed(
-        title="WARN DELETE",
-        description=f"Removed warning #{index} from {member.mention}",
-        color=discord.Color.green()
-    )
+    embed = brand_embed("WARN DELETE", f"Removed warning #{index} from {member.mention}", kind="success")
     embed.add_field(name="Deleted Reason", value=removed)
     embed.add_field(name="Remaining Warnings", value=f"{warn_count}")
     await ctx.followup.send(embed=embed)
@@ -2740,11 +2580,7 @@ async def _warn_delete_server(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(
-            title="⛔ ERROR",
-            description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-            color=discord.Color.red()
-        )
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref = db.reference(f"/servers/{guild_id}/warn")
@@ -2760,11 +2596,7 @@ async def _warn_delete_server(ctx):
     # Only delete individual user entries, preserve kick/ban/timeout settings
     for uid in cleared_keys:
         db.reference(f"/servers/{guild_id}/warn/{uid}").delete()
-    embed = discord.Embed(
-        title="WARN DELETE",
-        description=f"Deleted all warnings of **{total_users}** user(s).",
-        color=discord.Color.green()
-    )
+    embed = brand_embed("WARN DELETE", f"Deleted all warnings of **{total_users}** user(s).", kind="success")
     embed.add_field(name="Total Warnings Removed", value=f"{total_warns}")
     await ctx.followup.send(embed=embed)
     log_ref = db.reference(f"/servers/{guild_id}/log")
@@ -2772,11 +2604,7 @@ async def _warn_delete_server(ctx):
     if log_data.get("Activated") == True and log_data.get("log-channel", 0) != 0:
         log_channel = bot.get_channel(int(log_data["log-channel"]))
         if log_channel:
-            log_embed = discord.Embed(
-                title="[AUTO-MOD] All Warnings Deleted",
-                description=f"{ctx.author.mention} deleted **all warnings** on this server.",
-                color=discord.Color.red()
-            )
+            log_embed = brand_embed("[AUTO-MOD] All Warnings Deleted", f"{ctx.author.mention} deleted **all warnings** on this server.", kind="error")
             log_embed.add_field(name="Total Users", value=f"{total_users}")
             log_embed.add_field(name="Total Warnings", value=f"{total_warns}")
             try:
@@ -2831,7 +2659,7 @@ async def _modstats(ctx):
 
     embed = discord.Embed(
         title=f"📊 Moderation Stats — {ctx.guild.name}",
-        color=0x7a7aff,
+        color=BRAND_COLOR,
     )
     embed.add_field(name="⚠️ Total Warnings", value=f"```{total_warns}```", inline=True)
     embed.add_field(name="👥 Warned Users", value=f"```{warned_users}```", inline=True)
@@ -2867,15 +2695,11 @@ async def _enwarnlog(ctx, channelname):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     if not channelname.startswith("<#") or not channelname.endswith(">"):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="Please provide a valid channel mention like `#general`.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "Please provide a valid channel mention like `#general`.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     match = re.match(r'<#(\d+)>$', channelname)
@@ -2884,9 +2708,7 @@ async def _enwarnlog(ctx, channelname):
     current_data = log_ref.get() or {}
     current_log_channel = current_data.get("log-channel", 0)
     if str(current_log_channel) == str(channel_id_str):
-        embed = discord.Embed(title="INFO",
-                              description=f"This channel is already set for warn-logs: <#{channel_id_str}>",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"This channel is already set for warn-logs: <#{channel_id_str}>", kind="info")
         await ctx.followup.send(embed=embed)
         return
     if match:
@@ -2894,9 +2716,7 @@ async def _enwarnlog(ctx, channelname):
         try:
             await channel.send("This channel is set for **warn-logs**")
         except:
-            embed = discord.Embed(title="⛔ ERROR",
-                                  description="I do not have permission to send messages in the selected channel.",
-                                  color=discord.Color.red())
+            embed = brand_embed("⛔ Error", "I do not have permission to send messages in the selected channel.", kind="error")
             await ctx.followup.send(embed=embed)
             return
         log_ref.update({
@@ -2905,7 +2725,7 @@ async def _enwarnlog(ctx, channelname):
         })
         embed = discord.Embed(title="Warn-Log",
                               description=f"Warn-logs have been enabled in <#{channel.id}>",
-                              color=0x7a7aff)
+                              color=BRAND_COLOR)
         await ctx.followup.send(embed=embed)
 
 
@@ -2914,17 +2734,13 @@ async def _diswarnlog(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     log_ref = db.reference(f"/servers/{guild_id}/log")
     current_data = log_ref.get() or {}
     if not current_data.get("Activated", False):
-        embed = discord.Embed(title="INFO",
-                              description=f"Warn-log system was never activated.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"Warn-log system was never activated.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     log_ref.update({
@@ -2933,7 +2749,7 @@ async def _diswarnlog(ctx):
     })
     embed = discord.Embed(title="Warn-Log",
                           description=f"Warn-log has been disabled.",
-                          color=0x7a7aff)
+                          color=BRAND_COLOR)
     await ctx.followup.send(embed=embed)
 
 
@@ -2942,16 +2758,12 @@ async def enable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="⛔ ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     regex = re.compile(r'^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$')
     if re.match(regex, link) is None:
-        embed = discord.Embed(title="⛔ ERROR",
-                              description=f"{link} is not a valid link.\nUse format: `https://domain.com` or `domain.com/path`",
-                              color=discord.Color.red())
+        embed = brand_embed("⛔ Error", f"{link} is not a valid link.\nUse format: `https://domain.com` or `domain.com/path`", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref = db.reference(f"/servers/{server_id}/link/links")
@@ -2960,13 +2772,12 @@ async def enable_link(ctx, link: str):
         current_links = [] if not current_links else list(current_links.values()) if isinstance(current_links, dict) else []
         ref.set(current_links)
     if link not in current_links:
-        embed = discord.Embed(title="INFO", description=f"{link} is not currently blacklisted.",
-                              color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{link} is not currently blacklisted.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     current_links.remove(link)
     ref.set(current_links)
-    embed = discord.Embed(title="LINK", description=f"{link} has been whitelisted.", color=discord.Color.green())
+    embed = brand_embed("LINK", f"{link} has been whitelisted.", kind="success")
     await ctx.followup.send(embed=embed)
 
 
@@ -2976,9 +2787,7 @@ async def disable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
+        embed = brand_embed("ERROR", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     regex = re.compile(
@@ -2986,9 +2795,7 @@ async def disable_link(ctx, link: str):
         r'([\da-z\.-]+)\.([a-z\.]{2,6})'
         r'([\/\w \.-]*)*\/?$')
     if re.match(regex, link) is None:
-        embed = discord.Embed(title="ERROR",
-                              description=f"{link} is not a valid link.\nUse format: `https://domain.com` or `domain.com/path`",
-                              color=discord.Color.red())
+        embed = brand_embed("ERROR", f"{link} is not a valid link.\nUse format: `https://domain.com` or `domain.com/path`", kind="error")
         await ctx.followup.send(embed=embed)
         return
     ref = db.reference(f"/servers/{server_id}/link/links")
@@ -2998,12 +2805,12 @@ async def disable_link(ctx, link: str):
                                                                                                 dict) else []
         ref.set(current_links)
     if link in current_links:
-        embed = discord.Embed(title="INFO", description=f"{link} is already blacklisted.", color=discord.Color.orange())
+        embed = brand_embed("ℹ️ Info", f"{link} is already blacklisted.", kind="info")
         await ctx.followup.send(embed=embed)
         return
     current_links.append(link)
     ref.set(current_links)
-    embed = discord.Embed(title="LINK", description=f"{link} has been blacklisted.", color=discord.Color.red())
+    embed = brand_embed("LINK", f"{link} has been blacklisted.", kind="error")
     await ctx.followup.send(embed=embed)
 
 
@@ -3011,9 +2818,7 @@ async def disable_link(ctx, link: str):
 async def _list_blacklist(ctx):
     await ctx.defer()
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = discord.Embed(title="ERROR",
-                              description="You need `Manage Messages` or `Administrator` permissions to run this command.",
-                              color=discord.Color.red())
+        embed = brand_embed("ERROR", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error")
         await ctx.followup.send(embed=embed)
         return
     server_id = str(ctx.guild.id)

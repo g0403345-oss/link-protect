@@ -980,12 +980,24 @@ def load_flagged_ids_sync() -> set:
 # ── shared warn helper ───────────────────────────────────────────────────────
 
 async def apply_warn(bot, message, settings: dict, reason: str) -> None:
-    """Increment warn count and handle kick/ban/timeout. Send embeds."""
-    guild_id = str(message.guild.id)
-    user_id = str(message.author.id)
+    """Increment warn count and handle kick/ban/timeout for a blocked message."""
+    await apply_warn_member(bot, message.author, message.channel, settings, reason,
+                            content=message.content)
+
+
+async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
+                            *, content: str | None = None, moderator=None) -> None:
+    """The single warn/escalation engine. Blocker cogs call it via apply_warn
+    (content = the removed message); the manual /warn command calls it with
+    moderator set — so both paths escalate, time out, decay and diagnose
+    permission failures identically."""
+    guild = member.guild
+    guild_id = str(guild.id)
+    user_id = str(member.id)
 
     # Record the blocked link(s) for threat-intel (link only — no author stored).
-    await record_blocked(guild_id, category_from_reason(reason), message.content)
+    if content:
+        await record_blocked(guild_id, category_from_reason(reason), content)
 
     warn_ref = DBRef(f"/servers/{guild_id}/warn/{user_id}")
     warn_data = await asyncio.to_thread(warn_ref.get) or {"Warn": 0, "reason": []}
@@ -1001,8 +1013,8 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
     await asyncio.to_thread(warn_ref.set, warn_data)
 
     warn_count = warn_data["Warn"]
-    username = getattr(message.author, "name", str(message.author.id))
-    channel_id = str(message.channel.id)
+    username = getattr(member, "name", str(member.id))
+    channel_id = str(channel.id) if channel else "0"
     await asyncio.to_thread(
         _log_action_sync, int(guild_id), user_id, username, channel_id, "warned", reason, warn_count
     )
@@ -1030,14 +1042,14 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
     if attempted:
         try:
             if attempted == "ban":
-                await message.author.ban(reason=f"Auto-ban: reached {ban_limit} warnings")
+                await member.ban(reason=f"Auto-ban: reached {ban_limit} warnings")
             elif attempted == "kick":
-                await message.author.kick(reason=f"Auto-kick: reached {kick_limit} warnings")
+                await member.kick(reason=f"Auto-kick: reached {kick_limit} warnings")
             else:
                 from datetime import timedelta
                 mins = timeout_minutes or 10
                 until = discord.utils.utcnow() + timedelta(minutes=mins)
-                await message.author.timeout(until=until, reason=f"Auto-timeout: reached {timeout_warns} warnings")
+                await member.timeout(until=until, reason=f"Auto-timeout: reached {timeout_warns} warnings")
             action_succeeded = attempted
             kind = {"ban": "banned", "kick": "kicked", "timeout": "timeout"}[attempted]
             await asyncio.to_thread(
@@ -1045,7 +1057,7 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
                 kind, f"Auto-{kind} (reached {warn_count} warnings)", warn_count,
             )
         except Exception:
-            action_failed = (attempted, _action_failure_reasons(attempted, message.author, message.guild))
+            action_failed = (attempted, _action_failure_reasons(attempted, member, guild))
 
     def _progress_footer():
         """'X more warning(s) → kicked/banned' for the nearest upcoming limit."""
@@ -1083,25 +1095,37 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
                 embed.set_footer(text=ft)
         return embed
 
-    if silent:
+    if moderator is not None:
+        # Manual /warn: always announce in the channel it was issued from —
+        # silent mode only mutes automatic link-block messages.
+        warn_embed = discord.Embed(
+            title="⚠️ Warning issued",
+            description=f"{moderator.mention} warned {member.mention}\n**Reason:** {reason}",
+            color=discord.Color.dark_red(),
+        )
+        try:
+            await channel.send(embed=_decorate(warn_embed))
+        except Exception:
+            pass
+    elif silent:
         # Silent mode: DM the user instead of posting in channel
         try:
             dm_embed = discord.Embed(
                 title="🔗 Your link was removed",
-                description=f"**Server:** {message.guild.name}\n**Channel:** {message.channel.mention}\n**Reason:** {reason}",
+                description=f"**Server:** {guild.name}\n**Channel:** {channel.mention}\n**Reason:** {reason}",
                 color=discord.Color.dark_red(),
             )
-            await message.author.send(embed=_decorate(dm_embed))
+            await member.send(embed=_decorate(dm_embed))
         except Exception:
             pass  # DMs disabled — warn silently only in log
     else:
         warn_embed = discord.Embed(
             title="🔗 Link Blocked",
-            description=f"{message.author.mention} — your message was removed.\n**Reason:** {reason}",
+            description=f"{member.mention} — your message was removed.\n**Reason:** {reason}",
             color=discord.Color.dark_red(),
         )
         try:
-            await message.channel.send(embed=_decorate(warn_embed))
+            await channel.send(embed=_decorate(warn_embed))
         except discord.Forbidden:
             pass  # No permission to post here — message was still removed/warned.
 
@@ -1110,14 +1134,16 @@ async def apply_warn(bot, message, settings: dict, reason: str) -> None:
     log_channel = bot.get_channel(int(log_channel_id)) if log_channel_id else None
     if log_channel:
         log_embed = discord.Embed(
-            title="[AUTO-MOD] Message Removed",
-            description=f"**User:** {message.author.mention} (`{message.author.id}`)\n"
+            title="[MOD] User Warned" if moderator is not None else "[AUTO-MOD] Message Removed",
+            description=f"**User:** {member.mention} (`{member.id}`)\n"
                         f"**Reason:** {reason}\n"
-                        f"**Channel:** {message.channel.mention}"
-                        + (" *(silent mode)*" if silent else ""),
+                        + (f"**Moderator:** {moderator.mention}" if moderator is not None
+                           else f"**Channel:** {channel.mention}"
+                                + (" *(silent mode)*" if silent else "")),
             color=discord.Color.blurple(),
         )
-        log_embed.add_field(name="Content", value=f"```{message.content[:900]}```", inline=False)
+        if content:
+            log_embed.add_field(name="Content", value=f"```{content[:900]}```", inline=False)
         log_embed.add_field(name="Total Warnings", value=str(warn_count))
         if action_succeeded:
             log_embed.add_field(
