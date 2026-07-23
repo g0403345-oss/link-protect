@@ -20,7 +20,7 @@ import WarnLogConfig from '@/components/WarnLogConfig';
 import MemberModeration from '@/components/MemberModeration';
 import DashboardTour from '@/components/DashboardTour';
 import SecurityScore from '@/components/SecurityScore';
-import BadgeCard from '@/components/BadgeCard';
+import DeveloperPanel from '@/components/DeveloperPanel';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import VotePromo from '@/components/VotePromo';
@@ -572,12 +572,8 @@ export default function GuildDashboard() {
               {/* DEVELOPER (approved developers only) */}
               {section === 'developer' && devApproved && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <SectionHeader title="Developer" description="Integrations and embeds for your own website and tools" icon={Code2} />
-                  <BadgeCard guildId={guildId} />
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', background: 'rgba(88,101,242,0.06)', border: '1px solid rgba(88,101,242,0.15)', borderRadius: 8 }}>
-                    <Info size={13} color="#5865f2" style={{ flexShrink: 0, marginTop: 1 }} />
-                    <p style={{ fontSize: 12, color: '#6d6f78' }}>More developer features are on the way — tell us what you need via the Report button above.</p>
-                  </div>
+                  <SectionHeader title="Developer" description="API keys, webhooks, embeds and exports for your own website and tools" icon={Code2} />
+                  <DeveloperPanel guildId={guildId} onToast={addToast} />
                 </div>
               )}
 

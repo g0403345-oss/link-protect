@@ -396,6 +396,7 @@ export interface DevStatus {
   message: string | null;
   requestedAt: number;
   decidedAt: number;
+  beta: boolean;
 }
 
 export interface DevRequestEntry extends DevStatus {
@@ -424,6 +425,87 @@ export async function decideDevRequest(userId: string, accept: boolean): Promise
     method: "POST",
     body: JSON.stringify({ accept }),
   });
+}
+
+export async function setDevBeta(userId: string, enabled: boolean): Promise<DevStatus> {
+  return apiFetch(`/api/user/${userId}/dev/beta`, {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+// ── Developer platform: per-server API keys + webhooks ───────────────────────
+
+export interface DevKey {
+  id: number;
+  label: string | null;
+  prefix: string;
+  createdAt: number;
+  lastUsed: number;
+  totalRequests: number;
+  /** Present only in the create response — shown once, never stored. */
+  key?: string;
+}
+
+export type WebhookEvent =
+  | "link_blocked" | "member_kicked" | "member_banned"
+  | "member_timeout" | "scamshield_catch" | "raid_detected";
+
+export interface DevWebhook {
+  id: number;
+  url: string;
+  secret: string;
+  events: WebhookEvent[];
+  enabled: boolean;
+  createdAt: number;
+  lastStatus: number | null;
+  lastDeliveryAt: number;
+  failureCount: number;
+}
+
+export async function listDevKeys(guildId: string): Promise<{ keys: DevKey[] }> {
+  return apiFetch(`/api/guild/${guildId}/dev/keys`);
+}
+
+export async function createDevKey(guildId: string, label?: string): Promise<DevKey> {
+  return apiFetch(`/api/guild/${guildId}/dev/keys`, {
+    method: "POST",
+    body: JSON.stringify({ label: label ?? null }),
+  });
+}
+
+export async function revokeDevKey(guildId: string, keyId: number): Promise<void> {
+  await apiFetch(`/api/guild/${guildId}/dev/keys/${keyId}`, { method: "DELETE" });
+}
+
+export async function listDevWebhooks(guildId: string): Promise<{ webhooks: DevWebhook[]; events: WebhookEvent[] }> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks`);
+}
+
+export async function createDevWebhook(guildId: string, url: string, events: WebhookEvent[]): Promise<DevWebhook> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks`, {
+    method: "POST",
+    body: JSON.stringify({ url, events }),
+  });
+}
+
+export async function patchDevWebhook(
+  guildId: string,
+  webhookId: number,
+  body: { url?: string; events?: WebhookEvent[]; enabled?: boolean }
+): Promise<DevWebhook> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteDevWebhook(guildId: string, webhookId: number): Promise<void> {
+  await apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}`, { method: "DELETE" });
+}
+
+export async function testDevWebhook(guildId: string, webhookId: number): Promise<{ ok: boolean; status: number }> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}/test`, { method: "POST" });
 }
 
 export async function setUserFlags(

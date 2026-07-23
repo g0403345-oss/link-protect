@@ -5,10 +5,13 @@ Start: uvicorn api_server:app --host 0.0.0.0 --port 3001
 """
 
 import asyncio
+import hashlib
+import hmac
 import ipaddress
 import json
 import os
 import re
+import secrets
 import socket
 import sqlite3
 import threading
@@ -740,13 +743,11 @@ async def _resolve_redirects(url: str, max_hops: int = 6) -> list[dict]:
     return hops
 
 
-@app.get("/api/check")
-@require_auth
-async def check_link(request: Request, url: str = Query(default=""), deep: int = Query(default=0)):
+async def _check_verdict(url: str, deep: int) -> dict:
     """Verdict for a single URL: our own threat DB first (free, instant), then a
-    cached Google Safe Browsing lookup. Called by the website's public /api/check
-    proxy (which adds rate limiting). With deep=1 the redirect chain is resolved
-    too and every hop is checked — catches threats hidden behind shorteners."""
+    cached Google Safe Browsing lookup. With deep=1 the redirect chain is resolved
+    too and every hop is checked — catches threats hidden behind shorteners.
+    Shared by the website checker proxy and the keyed /api/v1/check."""
     raw = (url or "").strip()[:500]
     if not raw or "." not in raw:
         raise HTTPException(status_code=400, detail="Provide a url to check")
@@ -827,6 +828,12 @@ async def check_link(request: Request, url: str = Query(default=""), deep: int =
                    else "Seen circulating on Discord but not flagged as malicious."),
         "seenOnServers": 0, "hits": circulating, **extra,
     }
+
+
+@app.get("/api/check")
+@require_auth
+async def check_link(request: Request, url: str = Query(default=""), deep: int = Query(default=0)):
+    return await _check_verdict(url, deep)
 
 
 # ── User reports (→ operator admin panel) ─────────────────────────────────────
@@ -1708,7 +1715,8 @@ def _dev_get(user_id: str) -> dict:
 
 def _dev_payload(d: dict) -> dict:
     return {"status": d.get("status") or "none", "message": d.get("message"),
-            "requestedAt": d.get("requestedAt") or 0, "decidedAt": d.get("decidedAt") or 0}
+            "requestedAt": d.get("requestedAt") or 0, "decidedAt": d.get("decidedAt") or 0,
+            "beta": bool(d.get("beta"))}
 
 
 @app.get("/api/user/{user_id}/dev")
@@ -1774,6 +1782,416 @@ async def admin_decide_dev(request: Request, user_id: str, body: DevDecideBody):
              "Developer tab.") if accept else
             "Your request wasn't approved this time. You can apply again from Settings.")
     return {"ok": True, **_dev_payload(d)}
+
+
+class DevBetaBody(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/user/{user_id}/dev/beta")
+@require_auth
+async def set_dev_beta(request: Request, user_id: str, body: DevBetaBody):
+    """Early-access opt-in — approved developers get beta features first."""
+    d = _dev_get(user_id)
+    if d.get("status") != "approved":
+        raise HTTPException(status_code=403, detail="Developer access required")
+    d["beta"] = bool(body.enabled)
+    _kv_set(_dev_key(user_id), d)
+    return _dev_payload(d)
+
+
+# ── Developer platform: API keys, /api/v1/*, webhooks ────────────────────────
+# Keys are created per server inside that server's Developer tab (the website
+# already enforces guild access + approved-developer status; the endpoints here
+# re-check the dev status from the actor header as defense in depth). A key
+# grants read-only access to ITS server's stats/trends plus the threat lookup.
+
+def _ensure_dev_tables():
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS dev_api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        prefix TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        label TEXT,
+        created_at INTEGER NOT NULL,
+        last_used INTEGER,
+        total_requests INTEGER NOT NULL DEFAULT 0,
+        revoked INTEGER NOT NULL DEFAULT 0
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS dev_webhooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL,
+        url TEXT NOT NULL,
+        secret TEXT NOT NULL,
+        events TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_by TEXT,
+        created_at INTEGER NOT NULL,
+        last_status INTEGER,
+        last_delivery_at INTEGER,
+        failure_count INTEGER NOT NULL DEFAULT 0
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_dev_webhooks_guild ON dev_webhooks (guild_id)")
+    c.commit()
+
+_ensure_dev_tables()
+
+_WEBHOOK_EVENTS = ("link_blocked", "member_kicked", "member_banned", "member_timeout",
+                   "scamshield_catch", "raid_detected")
+_MAX_KEYS_PER_GUILD = 5
+_MAX_WEBHOOKS_PER_GUILD = 3
+_WEBHOOK_DISABLE_AFTER = 25  # consecutive failures
+
+
+def _hash_key(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _require_dev_actor(request: Request) -> tuple[str, str | None]:
+    aid, aname = _web_actor(request)
+    if not aid or _dev_get(str(aid)).get("status") != "approved":
+        raise HTTPException(status_code=403, detail="Developer access required")
+    return str(aid), aname
+
+
+def _key_row_payload(r) -> dict:
+    return {"id": r["id"], "label": r["label"], "prefix": r["prefix"],
+            "createdAt": r["created_at"], "lastUsed": r["last_used"] or 0,
+            "totalRequests": r["total_requests"]}
+
+
+def _webhook_row_payload(r) -> dict:
+    try:
+        events = json.loads(r["events"])
+    except Exception:
+        events = []
+    return {"id": r["id"], "url": r["url"], "secret": r["secret"], "events": events,
+            "enabled": bool(r["enabled"]), "createdAt": r["created_at"],
+            "lastStatus": r["last_status"], "lastDeliveryAt": r["last_delivery_at"] or 0,
+            "failureCount": r["failure_count"]}
+
+
+class DevKeyBody(BaseModel):
+    label: str | None = None
+
+
+class DevWebhookBody(BaseModel):
+    url: str
+    events: list[str]
+
+
+class DevWebhookPatchBody(BaseModel):
+    url: str | None = None
+    events: list[str] | None = None
+    enabled: bool | None = None
+
+
+@app.get("/api/guild/{guild_id}/dev/keys")
+@require_auth
+async def dev_list_keys(request: Request, guild_id: str):
+    _require_dev_actor(request)
+    rows = _get_conn().execute(
+        "SELECT * FROM dev_api_keys WHERE guild_id=? AND revoked=0 ORDER BY id DESC",
+        (str(guild_id),)).fetchall()
+    return {"keys": [_key_row_payload(r) for r in rows]}
+
+
+@app.post("/api/guild/{guild_id}/dev/keys")
+@require_auth
+async def dev_create_key(request: Request, guild_id: str, body: DevKeyBody):
+    aid, _ = _require_dev_actor(request)
+    c = _get_conn()
+    n = c.execute("SELECT COUNT(*) AS n FROM dev_api_keys WHERE guild_id=? AND revoked=0",
+                  (str(guild_id),)).fetchone()["n"]
+    if n >= _MAX_KEYS_PER_GUILD:
+        raise HTTPException(status_code=409, detail=f"Limit of {_MAX_KEYS_PER_GUILD} active keys per server")
+    key = "lp_" + secrets.token_hex(20)
+    prefix = key[:11]  # "lp_" + 8 hex chars — enough to identify, useless to guess
+    label = (body.label or "").strip()[:60] or None
+    c.execute(
+        "INSERT INTO dev_api_keys(key_hash, prefix, guild_id, user_id, label, created_at) "
+        "VALUES(?,?,?,?,?,?)",
+        (_hash_key(key), prefix, str(guild_id), aid, label, int(time.time())))
+    c.commit()
+    row = c.execute("SELECT * FROM dev_api_keys WHERE key_hash=?", (_hash_key(key),)).fetchone()
+    # The full key is returned exactly once — only its hash is stored.
+    return {**_key_row_payload(row), "key": key}
+
+
+@app.delete("/api/guild/{guild_id}/dev/keys/{key_id}")
+@require_auth
+async def dev_revoke_key(request: Request, guild_id: str, key_id: int):
+    _require_dev_actor(request)
+    c = _get_conn()
+    c.execute("UPDATE dev_api_keys SET revoked=1 WHERE id=? AND guild_id=?",
+              (int(key_id), str(guild_id)))
+    c.commit()
+    return {"ok": True}
+
+
+async def _validate_webhook_url(url: str) -> str:
+    url = (url or "").strip()[:500]
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Webhook URL must be https://")
+    if await asyncio.to_thread(_host_is_private, parsed.hostname):
+        raise HTTPException(status_code=400, detail="Webhook URL must be publicly reachable")
+    return url
+
+
+def _validate_events(events: list[str]) -> list[str]:
+    ev = [e for e in dict.fromkeys(events or []) if e in _WEBHOOK_EVENTS]
+    if not ev:
+        raise HTTPException(status_code=400, detail="Subscribe to at least one valid event")
+    return ev
+
+
+@app.get("/api/guild/{guild_id}/dev/webhooks")
+@require_auth
+async def dev_list_webhooks(request: Request, guild_id: str):
+    _require_dev_actor(request)
+    rows = _get_conn().execute(
+        "SELECT * FROM dev_webhooks WHERE guild_id=? ORDER BY id DESC", (str(guild_id),)).fetchall()
+    return {"webhooks": [_webhook_row_payload(r) for r in rows], "events": list(_WEBHOOK_EVENTS)}
+
+
+@app.post("/api/guild/{guild_id}/dev/webhooks")
+@require_auth
+async def dev_create_webhook(request: Request, guild_id: str, body: DevWebhookBody):
+    aid, _ = _require_dev_actor(request)
+    url = await _validate_webhook_url(body.url)
+    events = _validate_events(body.events)
+    c = _get_conn()
+    n = c.execute("SELECT COUNT(*) AS n FROM dev_webhooks WHERE guild_id=?",
+                  (str(guild_id),)).fetchone()["n"]
+    if n >= _MAX_WEBHOOKS_PER_GUILD:
+        raise HTTPException(status_code=409, detail=f"Limit of {_MAX_WEBHOOKS_PER_GUILD} webhooks per server")
+    secret = "whsec_" + secrets.token_hex(24)
+    c.execute(
+        "INSERT INTO dev_webhooks(guild_id, url, secret, events, created_by, created_at) "
+        "VALUES(?,?,?,?,?,?)",
+        (str(guild_id), url, secret, json.dumps(events), aid, int(time.time())))
+    c.commit()
+    row = c.execute("SELECT * FROM dev_webhooks WHERE guild_id=? ORDER BY id DESC LIMIT 1",
+                    (str(guild_id),)).fetchone()
+    return _webhook_row_payload(row)
+
+
+@app.patch("/api/guild/{guild_id}/dev/webhooks/{wh_id}")
+@require_auth
+async def dev_patch_webhook(request: Request, guild_id: str, wh_id: int, body: DevWebhookPatchBody):
+    _require_dev_actor(request)
+    c = _get_conn()
+    row = c.execute("SELECT * FROM dev_webhooks WHERE id=? AND guild_id=?",
+                    (int(wh_id), str(guild_id))).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    url = await _validate_webhook_url(body.url) if body.url is not None else row["url"]
+    events = json.dumps(_validate_events(body.events)) if body.events is not None else row["events"]
+    enabled = int(body.enabled) if body.enabled is not None else row["enabled"]
+    # Re-enabling clears the failure counter so auto-disable starts fresh.
+    failures = 0 if (body.enabled and not row["enabled"]) else row["failure_count"]
+    c.execute("UPDATE dev_webhooks SET url=?, events=?, enabled=?, failure_count=? WHERE id=?",
+              (url, events, enabled, failures, int(wh_id)))
+    c.commit()
+    return _webhook_row_payload(c.execute("SELECT * FROM dev_webhooks WHERE id=?", (int(wh_id),)).fetchone())
+
+
+@app.delete("/api/guild/{guild_id}/dev/webhooks/{wh_id}")
+@require_auth
+async def dev_delete_webhook(request: Request, guild_id: str, wh_id: int):
+    _require_dev_actor(request)
+    c = _get_conn()
+    c.execute("DELETE FROM dev_webhooks WHERE id=? AND guild_id=?", (int(wh_id), str(guild_id)))
+    c.commit()
+    return {"ok": True}
+
+
+async def _deliver_webhook(wh: dict, event: str, data: dict) -> int:
+    """POST one signed event. Returns the HTTP status (0 = network/SSRF failure)."""
+    body = json.dumps({"event": event, "guildId": str(wh["guild_id"]), "data": data,
+                       "sentAt": int(time.time())}, separators=(",", ":")).encode()
+    sig = hmac.new(wh["secret"].encode(), body, hashlib.sha256).hexdigest()
+    try:
+        parsed = urlparse(wh["url"])
+        if parsed.scheme != "https" or not parsed.hostname or \
+                await asyncio.to_thread(_host_is_private, parsed.hostname):
+            return 0
+        async with httpx.AsyncClient(timeout=6) as client:
+            resp = await client.post(wh["url"], content=body, headers={
+                "Content-Type": "application/json",
+                "User-Agent": "LinkProtect-Webhooks/1.0",
+                "X-LinkProtect-Event": event,
+                "X-LinkProtect-Signature": f"sha256={sig}",
+            })
+            return resp.status_code
+    except Exception:
+        return 0
+
+
+def _record_delivery(wh_id: int, status: int) -> None:
+    try:
+        c = _get_conn()
+        ok = 200 <= status < 300
+        if ok:
+            c.execute("UPDATE dev_webhooks SET last_status=?, last_delivery_at=?, failure_count=0 WHERE id=?",
+                      (status, int(time.time()), wh_id))
+        else:
+            c.execute("UPDATE dev_webhooks SET last_status=?, last_delivery_at=?, "
+                      "failure_count=failure_count+1, "
+                      f"enabled=CASE WHEN failure_count+1 >= {_WEBHOOK_DISABLE_AFTER} THEN 0 ELSE enabled END "
+                      "WHERE id=?",
+                      (status, int(time.time()), wh_id))
+        c.commit()
+    except Exception:
+        pass
+
+
+@app.post("/api/guild/{guild_id}/dev/webhooks/{wh_id}/test")
+@require_auth
+async def dev_test_webhook(request: Request, guild_id: str, wh_id: int):
+    _require_dev_actor(request)
+    row = _get_conn().execute("SELECT * FROM dev_webhooks WHERE id=? AND guild_id=?",
+                              (int(wh_id), str(guild_id))).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    status = await _deliver_webhook(dict(row), "test", {
+        "user_id": "0", "username": "Link Protect", "channel_id": "0",
+        "action": "warned", "reason": "Test event from the Developer tab", "warn_count": 0,
+        "timestamp": int(time.time()),
+    })
+    _record_delivery(row["id"], status)
+    return {"ok": 200 <= status < 300, "status": status}
+
+
+def _classify_action_event(action: str, reason: str) -> str:
+    r = (reason or "").lower()
+    if r.startswith("scam shield"):
+        return "scamshield_catch"
+    if "raid" in r:
+        return "raid_detected"
+    return {"warned": "link_blocked", "kicked": "member_kicked",
+            "banned": "member_banned", "timeout": "member_timeout"}.get(action, "link_blocked")
+
+
+async def _webhook_dispatch_loop():
+    """Watch the actions table and deliver subscribed events to dev webhooks —
+    same cursor pattern as _action_push_loop, so the bot's cogs stay untouched."""
+    try:
+        row = _get_conn().execute("SELECT MAX(id) AS m FROM actions").fetchone()
+        last = row["m"] or 0
+    except Exception:
+        last = 0
+    while True:
+        await asyncio.sleep(10)
+        try:
+            hooks_exist = _get_conn().execute(
+                "SELECT COUNT(*) AS n FROM dev_webhooks WHERE enabled=1").fetchone()["n"]
+            rows = _get_conn().execute(
+                "SELECT * FROM actions WHERE id > ? ORDER BY id ASC LIMIT 100", (last,)).fetchall()
+            if not rows:
+                continue
+            last = rows[-1]["id"]
+            if not hooks_exist:
+                continue  # cursor still advances, so old rows never flood later
+            for r in rows:
+                event = _classify_action_event(r["action"], r["reason"])
+                hooks = _get_conn().execute(
+                    "SELECT * FROM dev_webhooks WHERE guild_id=? AND enabled=1",
+                    (str(r["guild_id"]),)).fetchall()
+                for h in hooks:
+                    try:
+                        subscribed = json.loads(h["events"])
+                    except Exception:
+                        continue
+                    if event not in subscribed:
+                        continue
+                    status = await _deliver_webhook(dict(h), event, {
+                        "user_id": str(r["user_id"]), "username": r["username"],
+                        "channel_id": str(r["channel_id"]), "action": r["action"],
+                        "reason": r["reason"], "warn_count": r["warn_count"],
+                        "timestamp": r["timestamp"],
+                    })
+                    _record_delivery(h["id"], status)
+        except Exception:
+            pass
+
+
+# ── Public v1 API (API-key auth — no internal secret) ────────────────────────
+
+_v1_buckets: dict[int, dict] = {}
+_V1_RATE = 60  # requests per minute per key
+
+
+def _v1_auth(request: Request):
+    key = (request.headers.get("x-api-key") or "").strip()
+    if not key:
+        auth = request.headers.get("authorization") or ""
+        if auth.lower().startswith("bearer "):
+            key = auth[7:].strip()
+    if not key.startswith("lp_"):
+        raise HTTPException(status_code=401, detail="Missing API key (X-Api-Key header)")
+    row = _get_conn().execute(
+        "SELECT * FROM dev_api_keys WHERE key_hash=? AND revoked=0", (_hash_key(key),)).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+    now = time.time()
+    b = _v1_buckets.get(row["id"])
+    if not b or now > b["reset"]:
+        _v1_buckets[row["id"]] = {"n": 1, "reset": now + 60}
+    else:
+        b["n"] += 1
+        if b["n"] > _V1_RATE:
+            raise HTTPException(status_code=429, detail=f"Rate limit exceeded ({_V1_RATE} requests/minute)")
+    try:
+        c = _get_conn()
+        c.execute("UPDATE dev_api_keys SET last_used=?, total_requests=total_requests+1 WHERE id=?",
+                  (int(now), row["id"]))
+        c.commit()
+    except Exception:
+        pass
+    return row
+
+
+@app.get("/api/v1/stats")
+async def v1_stats(request: Request):
+    key = _v1_auth(request)
+    gid = key["guild_id"]
+    data = _get_server(gid)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Server not found (bot removed?)")
+    warn_data = data.get("warn", {})
+    total, users = 0, 0
+    for uid, udata in warn_data.items():
+        if uid in ("kick", "ban", "timeout"):
+            continue
+        if isinstance(udata, dict) and udata.get("Warn", 0) > 0:
+            total += udata["Warn"]
+            users += 1
+    protect = data.get("protect", {}) or {}
+    return {
+        "guildId": str(gid),
+        "totalWarnings": total,
+        "warnedUsers": users,
+        "activeBlockers": sum(1 for v in protect.values() if v),
+        "blockers": {k: bool(v) for k, v in protect.items()},
+        "thresholds": {"kick": warn_data.get("kick", 0), "ban": warn_data.get("ban", 0),
+                       "timeout": (warn_data.get("timeout") or {}).get("warnings", 0)},
+    }
+
+
+@app.get("/api/v1/trends")
+async def v1_trends(request: Request, days: int = 14):
+    key = _v1_auth(request)
+    return _trends_payload(key["guild_id"], days)
+
+
+@app.get("/api/v1/check")
+async def v1_check(request: Request, url: str = Query(default=""), deep: int = Query(default=0)):
+    _v1_auth(request)
+    return await _check_verdict(url, deep)
 
 
 @app.get("/api/mobile/admin/config")
@@ -2703,10 +3121,9 @@ async def guild_actions(request: Request, guild_id: str, limit: int = 50):
     return {"actions": [dict(r) for r in rows]}
 
 
-@app.get("/api/guild/{guild_id}/trends")
-@require_auth
-async def guild_trends(request: Request, guild_id: str, days: int = 14):
-    """Daily action counts (broken down by type) + top reasons, for dashboard charts."""
+def _trends_payload(guild_id: str, days: int) -> dict:
+    """Daily action counts (broken down by type) + top reasons — dashboard charts
+    and the keyed /api/v1/trends."""
     from collections import Counter, defaultdict
     days = max(1, min(days, 60))
     now = int(time.time())
@@ -2739,6 +3156,12 @@ async def guild_trends(request: Request, guild_id: str, days: int = 14):
         "topReasons": [{"reason": k, "count": v} for k, v in reasons.most_common(6)],
         "totals": {k: totals[k] for k in KINDS},
     }
+
+
+@app.get("/api/guild/{guild_id}/trends")
+@require_auth
+async def guild_trends(request: Request, guild_id: str, days: int = 14):
+    return _trends_payload(guild_id, days)
 
 
 @app.get("/api/actions")
@@ -3871,6 +4294,7 @@ async def _start_background_tasks():
     asyncio.create_task(_bot_offline_loop())
     asyncio.create_task(_settings_push_loop())
     asyncio.create_task(_supporter_role_loop())
+    asyncio.create_task(_webhook_dispatch_loop())
 
 
 if __name__ == "__main__":
