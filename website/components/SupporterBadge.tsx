@@ -71,9 +71,28 @@ export function SupporterBadge({ size = 13, total }: { size?: number; total?: nu
   );
 }
 
-/** "🔥 N" consecutive-day vote streak chip. Renders nothing below 2 days. */
+/** Progress toward the next milestone tier — drives the navbar level bar.
+ *  Level 0 = no tier yet, 1–4 = Bronze/Silver/Gold/Diamond. */
+export function levelInfo(total: number) {
+  const thresholds = [10, 50, 100, 500];
+  let level = 0;
+  while (level < 4 && total >= thresholds[level]) level++;
+  const prev = level === 0 ? 0 : thresholds[level - 1];
+  const next = level < 4 ? thresholds[level] : null;
+  const colors = ['#ff6b6e', '#CD7F32', '#C8CCD4', '#FFD700', '#7fd8ff'];
+  const names = ['Voter', 'Bronze', 'Silver', 'Gold', 'Diamond'];
+  return {
+    level,
+    name: names[level],
+    color: colors[level],
+    next,
+    progress: next ? Math.min(1, (total - prev) / (next - prev)) : 1,
+  };
+}
+
+/** "🔥 N" consecutive-day vote streak chip. Hidden when the streak lapsed. */
 export function StreakChip({ streak, size = 13 }: { streak?: number | null; size?: number }) {
-  if (!streak || streak < 2) return null;
+  if (!streak || streak < 1) return null;
   return (
     <span
       title={`${streak}-day vote streak — vote daily to keep it alive!`}

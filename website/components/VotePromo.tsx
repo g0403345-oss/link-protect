@@ -40,7 +40,17 @@ export default function VotePromo({ active }: { active: boolean }) {
   const dismissed = useRef(false);               // never reopen once closed this visit
 
   useEffect(() => {
-    if (!active || open || dismissed.current) return;
+    if (open || dismissed.current) return;
+    // ?votepromo on the dashboard URL force-shows the popup (preview/testing) —
+    // skips the supporter check, the account flag and the snooze.
+    let preview = false;
+    try { preview = new URLSearchParams(window.location.search).has('votepromo'); } catch { /* ignore */ }
+    if (preview) {
+      setOpen(true);
+      requestAnimationFrame(() => setVisible(true));
+      return;
+    }
+    if (!active) return;
     // Snoozed recently? (X button — local, per browser)
     try {
       const until = Number(localStorage.getItem(SNOOZE_KEY) ?? 0);

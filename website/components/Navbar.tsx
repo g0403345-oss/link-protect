@@ -8,7 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { LogOut, LayoutDashboard, ChevronDown, Shield } from 'lucide-react';
 import { isAdmin } from '@/lib/admin';
 import { BOT_INVITE, SUPPORT_SERVER } from '@/lib/discord';
-import { SupporterBadge, StreakChip, rankMeta } from '@/components/SupporterBadge';
+import { SupporterBadge, StreakChip, levelInfo, rankMeta } from '@/components/SupporterBadge';
 import NotificationBell from '@/components/NotificationBell';
 
 export default function Navbar() {
@@ -119,11 +119,35 @@ export default function Navbar() {
                     {session.user?.name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                 )}
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {session.user?.name}
-                </span>
-                {vote?.supporter && <SupporterBadge size={12} total={vote.total} />}
-                {vote?.supporter && <StreakChip size={12} streak={vote.streak} />}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
+                      {session.user?.name}
+                    </span>
+                    {vote?.supporter && <SupporterBadge size={11} total={vote.total} />}
+                    {vote?.supporter && <StreakChip size={11} streak={vote.streak} />}
+                  </div>
+                  {/* Tiny milestone level bar — progress to the next badge tier. */}
+                  {vote && vote.total > 0 && (() => {
+                    const lv = levelInfo(vote.total);
+                    return (
+                      <div
+                        title={`Level ${lv.level} · ${lv.name}${lv.next ? ` — ${lv.next - vote.total} more ${lv.next - vote.total === 1 ? 'vote' : 'votes'} to level up` : ' — max level!'}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', minWidth: 72 }}
+                      >
+                        <span style={{ fontSize: 8.5, fontWeight: 800, color: lv.color, letterSpacing: '0.05em', lineHeight: 1 }}>
+                          LV{lv.level}
+                        </span>
+                        <div style={{ flex: 1, height: 3, borderRadius: 2, background: '#2e2e36', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.max(4, Math.round(lv.progress * 100))}%`, height: '100%', borderRadius: 2, background: lv.color, transition: 'width 0.4s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 8.5, fontWeight: 700, color: '#6d6f78', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                          {lv.next ? `${vote.total}/${lv.next}` : 'MAX'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
                 <ChevronDown size={14} color="#6d6f78" style={{ transition: 'transform 0.15s', transform: menuOpen ? 'rotate(180deg)' : 'none' }} />
               </button>
 
