@@ -26,7 +26,7 @@ struct LPWidgetSnapshot: Codable, Equatable {
         servers: [
             .init(id: "1", name: "Bot Management", warned: 1, blockers: 5, catches: 2),
             .init(id: "2", name: "Support", warned: 6, blockers: 5, catches: 1),
-            .init(id: "3", name: "Norecoil.de", warned: 3, blockers: 4, catches: 0),
+            .init(id: "3", name: "Gaming Lounge", warned: 3, blockers: 4, catches: 0),
         ],
         scamCatches: 3
     )

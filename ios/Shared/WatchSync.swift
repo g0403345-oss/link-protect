@@ -2,6 +2,9 @@ import Foundation
 #if canImport(WatchConnectivity)
 import WatchConnectivity
 #endif
+#if os(watchOS)
+import WidgetKit
+#endif
 
 /// Bridges the latest `LPWidgetSnapshot` between the iPhone app and the Watch
 /// app via WatchConnectivity (App Groups don't sync across devices). Compiled
@@ -48,6 +51,12 @@ final class WatchSync: NSObject, ObservableObject {
         guard let data = context["snapshot"] as? Data,
               let snap = try? JSONDecoder().decode(LPWidgetSnapshot.self, from: data) else { return }
         UserDefaults.standard.set(data, forKey: localKey)
+        #if os(watchOS)
+        // Mirror into the App Group so the watch-face complication (a separate
+        // widget-extension process) sees fresh data, and re-render it.
+        LPWidgetStore.save(snap)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
         DispatchQueue.main.async { self.snapshot = snap }
     }
 }

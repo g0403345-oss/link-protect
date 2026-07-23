@@ -25,6 +25,7 @@ targets:
       - path: Shared
     dependencies:
       - target: LinkProtectWidget
+      - target: LinkProtectShare
       - target: LinkProtectWatch
         embed: true
     settings:
@@ -54,6 +55,17 @@ targets:
         CODE_SIGN_ENTITLEMENTS: LinkProtectWidget/LinkProtectWidget.entitlements
         TARGETED_DEVICE_FAMILY: "1"
 
+  LinkProtectShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LinkProtectShare
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app.share
+        INFOPLIST_FILE: LinkProtectShare/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+
   LinkProtectWatch:
     type: application
     platform: watchOS
@@ -61,13 +73,30 @@ targets:
     sources:
       - path: LinkProtectWatch
       - path: Shared
+    dependencies:
+      - target: LinkProtectWatchWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app.watchkitapp
         INFOPLIST_FILE: LinkProtectWatch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: LinkProtectWatch/LinkProtectWatch.entitlements
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  LinkProtectWatchWidget:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "9.0"
+    sources:
+      - path: LinkProtectWatchWidget
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linkprotect.app.watchkitapp.widget
+        INFOPLIST_FILE: LinkProtectWatchWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: LinkProtectWatchWidget/LinkProtectWatchWidget.entitlements
+        TARGETED_DEVICE_FAMILY: "4"
 
 # Explicit shared scheme so the app scheme always exists and is the default.
 schemes:
