@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Trophy, ArrowRight } from 'lucide-react';
 import type { LeaderboardEntry } from '@/lib/db';
 import { SupporterBadge, StreakChip, rankMeta, VOTE_URL } from './SupporterBadge';
@@ -25,7 +26,7 @@ function Avatar({ entry, size, ring }: { entry: LeaderboardEntry; size: number; 
   );
 }
 
-function PodiumCard({ entry }: { entry: LeaderboardEntry }) {
+function PodiumCard({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const meta = rankMeta(entry.rank)!;
   const isGold = entry.rank === 1;
   return (
@@ -48,6 +49,7 @@ function PodiumCard({ entry }: { entry: LeaderboardEntry }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <SupporterBadge total={entry.total} />
         <StreakChip streak={entry.streak} />
+        {isMe && <YouChip />}
       </div>
       <div style={{ marginTop: 2, fontSize: 20, fontWeight: 900, color: meta.color, letterSpacing: '-0.02em' }}>
         {entry.votes}
@@ -57,7 +59,17 @@ function PodiumCard({ entry }: { entry: LeaderboardEntry }) {
   );
 }
 
+function YouChip() {
+  return (
+    <span style={{ flexShrink: 0, padding: '1px 6px', borderRadius: 6, background: 'rgba(240,178,50,0.14)', border: '1px solid rgba(240,178,50,0.4)', fontSize: 9.5, fontWeight: 800, color: '#f0b232', letterSpacing: '0.05em', lineHeight: 1.5 }}>
+      YOU
+    </span>
+  );
+}
+
 export default function Leaderboard() {
+  const { data: session } = useSession();
+  const myId = session?.user?.id;
   const [data, setData] = useState<{ month: string; leaderboard: LeaderboardEntry[] } | null>(null);
 
   const load = useCallback(() => {
@@ -100,9 +112,10 @@ export default function Leaderboard() {
             Vote &amp; get on the board
           </h2>
           <p style={{ fontSize: 15.5, color: '#6d6f78', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
-            Vote for Link Protect on top.gg to earn a <strong style={{ color: '#ff6b6e' }}>♥ Supporter</strong> badge
-            and role, build a <strong style={{ color: '#ff922b' }}>🔥 daily streak</strong> and climb the milestone
-            tiers — Bronze, Silver, Gold &amp; Diamond.
+            {/* {' '} spacers are load-bearing — the JSX build eats plain spaces around these tags */}
+            Vote for Link Protect on top.gg to earn a <strong style={{ color: '#ff6b6e' }}>♥ Supporter</strong>{' '}
+            badge and role, build a <strong style={{ color: '#ff922b' }}>🔥 daily streak</strong>{' '}
+            and climb the milestone tiers — Bronze, Silver, Gold &amp; Diamond.
           </p>
           <a href={VOTE_URL} target="_blank" rel="noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 22, padding: '12px 24px', fontSize: 14.5, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', boxShadow: '0 8px 24px rgba(88,101,242,0.4)' }}>
@@ -121,26 +134,45 @@ export default function Leaderboard() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 14, marginTop: 12, marginBottom: rest.length ? 22 : 0 }}>
-              {podium.map((e) => <PodiumCard key={e.id} entry={e} />)}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 14, marginTop: 12, marginBottom: 22 }}>
+              {podium.map((e) => <PodiumCard key={e.id} entry={e} isMe={e.id === myId} />)}
             </div>
 
-            {rest.length > 0 && (
-              <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, overflow: 'hidden' }}>
-                {rest.map((e, i) => (
-                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: i < rest.length - 1 ? '1px solid #18181b' : 'none' }}>
-                    <span style={{ width: 22, fontSize: 13, fontWeight: 800, color: '#52535a', textAlign: 'center' }}>{e.rank}</span>
+            <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, overflow: 'hidden' }}>
+              {rest.map((e) => {
+                const isMe = e.id === myId;
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '1px solid #18181b', background: isMe ? 'rgba(240,178,50,0.06)' : 'transparent', boxShadow: isMe ? 'inset 2px 0 0 #f0b232' : 'none' }}>
+                    <span style={{ width: 22, fontSize: 13, fontWeight: 800, color: isMe ? '#f0b232' : '#52535a', textAlign: 'center' }}>{e.rank}</span>
                     <Avatar entry={e} size={32} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ minWidth: 0, fontSize: 14, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {e.username ?? `User …${e.id.slice(-4)}`}
                     </span>
-                    <StreakChip streak={e.streak} />
+                    {isMe && <YouChip />}
+                    <span style={{ flex: 1 }} />
                     <SupporterBadge total={e.total} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#b5bac1', minWidth: 56, textAlign: 'right' }}>{e.votes} votes</span>
+                    <StreakChip streak={e.streak} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#b5bac1', minWidth: 56, textAlign: 'right' }}>
+                      {e.votes} {e.votes === 1 ? 'vote' : 'votes'}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+              {/* Next free spot — a small nudge that the board is claimable. */}
+              <a href={VOTE_URL} target="_blank" rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', textDecoration: 'none', background: 'rgba(88,101,242,0.04)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(88,101,242,0.1)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(88,101,242,0.04)')}>
+                <span style={{ width: 22, fontSize: 13, fontWeight: 800, color: '#5865f2', textAlign: 'center' }}>{board.length + 1}</span>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px dashed #3d3f52', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5865f2', fontSize: 15, fontWeight: 700, flexShrink: 0 }}>?</div>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: '#949ba4' }}>
+                  This spot is free — one vote claims it
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#5865f2', whiteSpace: 'nowrap' }}>
+                  Vote now <ArrowRight size={13} />
+                </span>
+              </a>
+            </div>
           </>
         )}
       </div>
