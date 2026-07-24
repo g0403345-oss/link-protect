@@ -368,15 +368,19 @@ function GuildRow({ guild, index, stats }: { guild: EnrichedGuild; index: number
  * and sparkline live on top. */
 function GuildPoster({ guild, index, stats }: { guild: EnrichedGuild; index: number; stats?: GuildOverviewEntry }) {
   const inner = (
-    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid #1e1e22', background: '#111113', height: 200, display: 'flex', flexDirection: 'column', transition: 'transform 0.18s, border-color 0.18s, box-shadow 0.18s' }}
+    // isolation + the translateZ'd clip layer below keep the blurred backdrop
+    // inside the rounded corners — Safari otherwise paints it square.
+    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', isolation: 'isolate', WebkitMaskImage: '-webkit-radial-gradient(white, black)', border: '1px solid #1e1e22', background: '#111113', height: 200, display: 'flex', flexDirection: 'column', transition: 'transform 0.18s, border-color 0.18s, box-shadow 0.18s' }}
       onMouseEnter={(e) => { const el = e.currentTarget as HTMLElement; el.style.transform = 'translateY(-3px)'; el.style.borderColor = '#5865f2'; el.style.boxShadow = '0 12px 32px rgba(88,101,242,0.18)'; }}
       onMouseLeave={(e) => { const el = e.currentTarget as HTMLElement; el.style.transform = 'none'; el.style.borderColor = '#1e1e22'; el.style.boxShadow = 'none'; }}>
-      {/* Blurred icon backdrop */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={guild.iconUrl} alt="" aria-hidden
-        style={{ position: 'absolute', inset: -20, width: 'calc(100% + 40px)', height: 'calc(100% + 40px)', objectFit: 'cover', filter: 'blur(28px) saturate(1.4)', opacity: 0.35 }}
-        onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,12,0.25) 0%, rgba(10,10,12,0.88) 78%)' }} />
+      {/* Blurred icon backdrop, clipped in its own rounded layer */}
+      <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 14, overflow: 'hidden', transform: 'translateZ(0)' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={guild.iconUrl} alt=""
+          style={{ position: 'absolute', inset: -20, width: 'calc(100% + 40px)', height: 'calc(100% + 40px)', objectFit: 'cover', filter: 'blur(28px) saturate(1.4)', opacity: 0.35 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,12,0.25) 0%, rgba(10,10,12,0.88) 78%)' }} />
+      </div>
 
       <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '18px 14px 0' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
