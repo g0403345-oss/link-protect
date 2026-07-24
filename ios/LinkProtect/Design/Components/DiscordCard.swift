@@ -62,11 +62,16 @@ struct SectionHeader: View {
                 Text(LocalizedStringKey(title))
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                // fixedSize(h:false) forces the subtitle to wrap — inside this
+                // HStack it otherwise reports its full single-line width and
+                // inflates the whole tab (horizontal panning on Overview).
                 Text(LocalizedStringKey(subtitle))
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.faint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, 2)

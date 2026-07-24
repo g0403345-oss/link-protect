@@ -74,12 +74,16 @@ struct GuildConfigView: View {
         case .failed(let message):
             Spacer(); ErrorState(message: message) { Task { await vm.load() } }.padding(20); Spacer()
         case .ready:
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    sectionView
+            // Hard-clamp the content to the scroll view's width: no child's
+            // ideal width can ever make a tab pannable sideways again.
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        sectionView
+                    }
+                    .padding(20)
+                    .frame(width: geo.size.width, alignment: .leading)
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
