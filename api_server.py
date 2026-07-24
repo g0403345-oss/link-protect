@@ -17,6 +17,7 @@ import sqlite3
 import threading
 import time
 import traceback
+import unicodedata
 from functools import wraps
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -446,6 +447,29 @@ def _set_guild_editors(guild_id: str, editors: list) -> list:
     return clean
 
 
+# Codepoints that LOOK blank but aren't classified as marks/format/space:
+# Hangul fillers, braille blank, Mongolian vowel separator.
+_BLANK_LOOKING = {"ㅤ", "ᅟ", "ᅠ", "⠀", "᠎"}
+# Unicode categories that render nothing on their own: marks (a bare combining
+# char like '⃟' U+20DF has no base glyph), format/control chars, separators.
+_INVISIBLE_CATEGORIES = {"Mn", "Me", "Mc", "Cf", "Cc", "Zs", "Zl", "Zp"}
+
+
+def _visible_name(name: str | None) -> str | None:
+    """The name if it actually renders, else None. Discord allows display names
+    made purely of combining marks or zero-width filler — those paint as an
+    empty string in every UI, so callers should fall back."""
+    if not name:
+        return None
+    for ch in name:
+        if ch in _BLANK_LOOKING:
+            continue
+        if unicodedata.category(ch) in _INVISIBLE_CATEGORIES:
+            continue
+        return name  # at least one visible base character
+    return None
+
+
 async def _resolve_users(ids: list) -> list:
     """Best-effort {id, username, avatar} for each user id (for the team UI)."""
     out = []
@@ -461,7 +485,10 @@ async def _resolve_users(ids: list) -> list:
                                      headers={"Authorization": f"Bot {BOT_TOKEN}"}, timeout=5)
                 if r.status_code == 200:
                     u = r.json()
-                    info["username"] = u.get("global_name") or u.get("username")
+                    # Invisible display name → fall back to the @handle, which
+                    # Discord restricts to visible ASCII.
+                    info["username"] = (_visible_name(u.get("global_name"))
+                                        or _visible_name(u.get("username")))
                     info["avatar"] = u.get("avatar")
             except Exception:
                 pass
