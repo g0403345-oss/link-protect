@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -22,6 +22,8 @@ import DashboardTour from '@/components/DashboardTour';
 import SecurityScore from '@/components/SecurityScore';
 import DeveloperPanel from '@/components/DeveloperPanel';
 import PresetsCard from '@/components/PresetsCard';
+import LockdownCard from '@/components/LockdownCard';
+import VerificationTab from '@/components/VerificationTab';
 import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
@@ -29,7 +31,7 @@ import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'scamshield' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
+type Section = 'overview' | 'blockers' | 'scamshield' | 'verification' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
 
 interface ScamShieldStats { flaggedTotal: number; flaggedWeek: number; guildCatches: number; }
 
@@ -446,6 +448,7 @@ export default function GuildDashboard() {
     { id: 'overview',     label: 'Overview',      icon: Shield,        desc: 'Status & summary' },
     { id: 'blockers',     label: 'Link Blockers',  icon: AlertTriangle, desc: 'What gets blocked' },
     ...(SHOW_SCAM_SHIELD ? [{ id: 'scamshield' as Section, label: 'Scam Shield', icon: ShieldAlert, desc: 'Scam spam & known scammers' }] : []),
+    { id: 'verification', label: 'Verification',  icon: UserCheck,     desc: 'Join gate & verify page' },
     { id: 'warnings',     label: 'Warnings',       icon: Ban,           desc: 'Kick, ban & decay' },
     { id: 'channelrules', label: 'Channel Rules',  icon: Target,        desc: 'Per-channel behaviour' },
     { id: 'access',       label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
@@ -542,6 +545,7 @@ export default function GuildDashboard() {
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
+                  <LockdownCard guildId={guildId} onToast={addToast} />
                   <Card title="Warning Thresholds">
                     <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
                       {[
@@ -574,6 +578,14 @@ export default function GuildDashboard() {
                     </div>
                   </Card>
                   <SecurityScore data={data} guildId={guildId} onNavigate={(s) => selectSection(s as Section)} />
+                </div>
+              )}
+
+              {/* VERIFICATION */}
+              {section === 'verification' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SectionHeader title="Verification Gate" description="New members verify on your personal web page — a hurdle scam bots can't take" icon={UserCheck} />
+                  <VerificationTab guildId={guildId} data={data} patch={patch} saving={saving} guildIcon={guildInfo?.icon} />
                 </div>
               )}
 

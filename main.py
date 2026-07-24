@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.4.1"
+BOT_VERSION = "2.5.0"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -910,6 +910,22 @@ async def _help(ctx):
 # length 2 — /update intentionally only shows the latest two releases.
 _CHANGELOG = [
     {
+        "version": "2.5.0",
+        "date": "24.07.2026",
+        "fields": [
+            ("🚨 Emergency Lockdown",
+             " • /lockdown freezes the whole server in seconds: slowmode\n"
+             "   everywhere, invites paused, every link blocked.\n"
+             " • /unlock restores everything exactly as it was.\n"
+             " • Also available as a button in the web dashboard & app."),
+            ("✅ Verification Gate",
+             " • New members verify on your personal page at\n"
+             "   link-protect.com/verify/<server> — one Discord login.\n"
+             " • Quarantine or verified-role mode, minimum account age,\n"
+             "   customizable page. Set it up in the dashboard."),
+        ],
+    },
+    {
         "version": "2.4.1",
         "date": "23.07.2026",
         "fields": [
@@ -1240,6 +1256,88 @@ async def _setup_preset(ctx, preset: discord.Option(str, "Protection level",
                     value=f"Everything can be adjusted in the [web dashboard](https://link-protect.com/dashboard/{guild_id}).",
                     inline=False)
     await ctx.followup.send(embed=embed)
+
+
+# ── Emergency lockdown ────────────────────────────────────────────────────────
+# The heavy lifting (slowmode on every channel, invite pause, link freeze,
+# restore state) lives in api_server.py so web dashboard, iOS app and this
+# command share ONE implementation. The bot calls it over localhost.
+LP_API_URL = os.environ.get("LP_API_URL", "http://127.0.0.1:3002")
+LP_API_SECRET = os.environ.get("BOT_API_SECRET", "")
+
+
+async def _call_lockdown(ctx, active: bool, reason: str | None) -> None:
+    if not (ctx.author.guild_permissions.manage_guild or ctx.author.guild_permissions.administrator):
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Missing permission",
+            "You need `Manage Server` or `Administrator` permission for lockdown controls.",
+            kind="error"))
+        return
+    if not LP_API_SECRET:
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Not configured",
+            "Lockdown isn't configured on this bot instance — use the web dashboard instead.",
+            kind="error"))
+        return
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{LP_API_URL}/api/guild/{ctx.guild.id}/lockdown",
+                json={"active": active, "reason": reason},
+                headers={"Authorization": f"Bearer {LP_API_SECRET}",
+                         "X-Actor-Id": str(ctx.author.id),
+                         "X-Actor-Name": ctx.author.display_name},
+                timeout=aiohttp.ClientTimeout(total=180),
+            ) as resp:
+                d = await resp.json()
+    except Exception:
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Error", "Couldn't reach the lockdown service — try the web dashboard.",
+            kind="error"))
+        return
+    if active:
+        steps = d.get("steps") or {}
+        if d.get("alreadyActive"):
+            await ctx.followup.send(embed=brand_embed(
+                "ℹ️ Already locked down", "This server is already in lockdown — use `/unlock` to lift it.",
+                kind="info"))
+            return
+        embed = brand_embed("🚨 Lockdown active",
+                            "The server is frozen. Lift it any time with `/unlock`.", kind="error")
+        embed.add_field(name="What just happened", value=(
+            f"⏳ Slowmode ({_LOCKDOWN_SLOWMODE_TEXT}) on **{steps.get('slowmode', 0)}** channels\n"
+            f"{'📪 Invites paused' if steps.get('invites') else '📪 Invites: no change (check Manage Server perm)'}\n"
+            f"{'🔗 All links blocked' if steps.get('links') else '🔗 Links were already fully blocked'}"),
+            inline=False)
+        if reason:
+            embed.add_field(name="Reason", value=reason[:200], inline=False)
+        await ctx.followup.send(embed=embed)
+    else:
+        if d.get("alreadyInactive"):
+            await ctx.followup.send(embed=brand_embed(
+                "ℹ️ Not locked down", "This server isn't in lockdown.", kind="info"))
+            return
+        steps = d.get("steps") or {}
+        await ctx.followup.send(embed=brand_embed(
+            "✅ Lockdown lifted",
+            f"Slowmode restored on **{steps.get('slowmode', 0)}** channels, invites and "
+            "link rules are back to normal.", kind="success"))
+
+
+_LOCKDOWN_SLOWMODE_TEXT = "30s"
+
+
+@bot.slash_command(name="lockdown",
+                   description="EMERGENCY: freeze the server — slowmode everywhere, invites paused, all links blocked")
+async def _lockdown_cmd(ctx, reason: discord.Option(str, "What's happening?", required=False) = None):
+    await ctx.defer()
+    await _call_lockdown(ctx, True, reason)
+
+
+@bot.slash_command(name="unlock", description="Lift the lockdown and restore everything")
+async def _unlock_cmd(ctx):
+    await ctx.defer()
+    await _call_lockdown(ctx, False, None)
 
 
 @bot.slash_command(name="dashboard", description="Show dashboard and status")

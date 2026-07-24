@@ -28,11 +28,33 @@ interface Entry {
 const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 
 const ENTRIES: Entry[] = [
+  /* ── Latest ──────────────────────────────────────────────────── */
+  {
+    product: 'bot', date: 'July 24, 2026', ts: d('2026-07-24') + 2, version: '2.5.0',
+    title: 'Emergency lockdown & verification gate',
+    items: [
+      '/lockdown freezes the whole server in seconds — 30s slowmode everywhere, invites paused, every link blocked. /unlock restores everything exactly as it was.',
+      'Verification gate: new members verify on your personal web page; quarantine mode assigns the lock role on join and DMs the verify link automatically.',
+    ],
+  },
+  {
+    product: 'website', date: 'July 24, 2026', ts: d('2026-07-24') + 1,
+    title: 'Verification tab, lockdown button & changelog',
+    items: [
+      'New Verification tab: mode (quarantine / verified role), role picker, minimum account age, and a fully customizable verify page with live preview.',
+      'Live permission check — see instantly whether the bot has the rights and role position the gate and lockdown need.',
+      'Emergency lockdown button on the server overview, with one-click restore.',
+      'Public per-server verify pages at link-protect.com/verify/<server> in your colors.',
+      'This changelog page — and verification-gate adoption in the admin protection graph.',
+    ],
+  },
+
   /* ── iOS App ─────────────────────────────────────────────────── */
   {
     product: 'app', date: 'In development', ts: d('2026-07-25'), upcoming: true,
-    title: 'Share Extension & Watch complications',
+    title: 'Lockdown, verification, Share Extension & Watch complications',
     items: [
+      'Emergency lockdown button and the full verification-gate settings, right in the app.',
       'Check any link straight from the share sheet in Safari, Discord or anywhere else — full verdict with redirect chain, no sign-in needed.',
       'Watch-face complications: bot status, server count and warnings right on your Apple Watch face.',
     ],

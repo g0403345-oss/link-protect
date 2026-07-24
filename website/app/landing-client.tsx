@@ -566,7 +566,7 @@ export default function LandingClient() {
             <Link href="/update"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
-              v2.4.1 — Developer platform &amp; presets are live
+              v2.5.0 — Lockdown &amp; verification gate are live
               <ArrowRight size={12} />
             </Link>
 

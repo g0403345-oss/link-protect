@@ -87,6 +87,13 @@ export interface ServerData {
     action: 'delete' | 'timeout' | 'kick' | 'ban'; timeout_minutes: number;
     join_check: boolean; join_action: 'kick' | 'ban'; min_servers: number;
   };
+  verify?: {
+    enabled?: boolean;
+    role_mode?: 'quarantine' | 'verified';
+    role_id?: string | null;
+    min_account_age_days?: number;
+    page?: { headline?: string; message?: string; accent?: string };
+  };
   overrides?: Record<string, ChannelOverride>;
 }
 
@@ -180,6 +187,59 @@ export async function getGuildsOverview(ids: string[]): Promise<{ guilds: Record
   return apiFetch(`/api/guilds/overview`, {
     method: "POST",
     body: JSON.stringify({ ids }),
+  });
+}
+
+// ── Emergency lockdown + verification gate ───────────────────────────────────
+
+export interface LockdownStatus {
+  active: boolean;
+  since: number;
+  by: string | null;
+  reason: string | null;
+  channelsLimited: number;
+}
+
+export async function getLockdown(guildId: string): Promise<LockdownStatus> {
+  return apiFetch(`/api/guild/${guildId}/lockdown`);
+}
+
+export async function setLockdown(guildId: string, active: boolean, reason?: string): Promise<LockdownStatus & { steps?: { slowmode: number; invites: boolean; links: boolean } }> {
+  // Locking down edits dozens of channels sequentially — give it time.
+  return apiFetch(`/api/guild/${guildId}/lockdown`, {
+    method: "POST",
+    body: JSON.stringify({ active, reason: reason ?? null }),
+  }, 180_000);
+}
+
+export interface VerifyHealthCheck { id: string; ok: boolean; label: string; detail: string; }
+export interface VerifyHealth { ok: boolean; checks: VerifyHealthCheck[]; }
+
+export async function getVerifyHealth(guildId: string): Promise<VerifyHealth> {
+  return apiFetch(`/api/guild/${guildId}/verify/health`);
+}
+
+export async function getVerifyStats(guildId: string): Promise<{ total: number; last7: number }> {
+  return apiFetch(`/api/guild/${guildId}/verify/stats`);
+}
+
+export interface VerifyPublicConfig {
+  enabled: boolean;
+  guildId: string;
+  name: string | null;
+  icon: string | null;
+  minAccountAgeDays: number;
+  page: { headline: string; message: string; accent: string };
+}
+
+export async function getVerifyPublic(guildId: string): Promise<VerifyPublicConfig> {
+  return apiFetch(`/api/guild/${guildId}/verify/public`);
+}
+
+export async function completeVerify(guildId: string, userId: string): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  return apiFetch(`/api/guild/${guildId}/verify/complete`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
   });
 }
 

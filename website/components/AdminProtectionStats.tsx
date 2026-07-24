@@ -10,6 +10,7 @@ interface StatsResponse {
 }
 
 const KEY_META: { key: string; label: string; color: string }[] = [
+  { key: 'verify.enabled',     label: 'Verification Gate', color: '#7fd8ff' },
   { key: 'protect.all',        label: 'Block All Links',   color: '#5865f2' },
   { key: 'protect.malware',    label: 'Malware/Phishing',  color: '#f23f43' },
   { key: 'protect.nitro',      label: 'Nitro Scams',       color: '#eb459e' },

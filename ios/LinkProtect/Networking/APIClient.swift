@@ -98,6 +98,39 @@ struct APIClient {
         return (try? JSONDecoder().decode(ModerationResult.self, from: data)) ?? fallback
     }
 
+    // MARK: Emergency lockdown + verification gate
+
+    func lockdown(_ guildId: String) async throws -> LockdownStatus {
+        if demo { return LockdownStatus() }
+        return try await request("/api/mobile/guild/\(guildId)/lockdown")
+    }
+
+    /// Freeze / unfreeze the server. Editing dozens of channels takes a while —
+    /// the shared session's 20s request timeout is generous enough because the
+    /// API applies slowmode asynchronously per channel, but allow retry on nil.
+    func setLockdown(_ guildId: String, active: Bool, reason: String?) async throws -> LockdownStatus {
+        struct Body: Encodable { let active: Bool; let reason: String? }
+        if demo { return LockdownStatus(active: active, since: Int(Date().timeIntervalSince1970), by: "You", reason: reason, channelsLimited: 4) }
+        let data = try await perform("/api/mobile/guild/\(guildId)/lockdown", method: "POST",
+                                     body: Body(active: active, reason: reason), timeout: 180)
+        return (try? JSONDecoder().decode(LockdownStatus.self, from: data)) ?? LockdownStatus(active: active)
+    }
+
+    func verifyHealth(_ guildId: String) async throws -> VerifyHealth {
+        if demo {
+            return VerifyHealth(ok: true, checks: [
+                .init(id: "manage_roles", ok: true, label: "Manage Roles permission", detail: "Needed to grant/remove the verification role."),
+                .init(id: "manage_channels", ok: true, label: "Manage Channels permission", detail: "Needed for lockdown slowmode."),
+            ])
+        }
+        return try await request("/api/mobile/guild/\(guildId)/verify/health")
+    }
+
+    func verifyStats(_ guildId: String) async throws -> VerifyStats {
+        if demo { return VerifyStats(total: 128, last7: 12) }
+        return try await request("/api/mobile/guild/\(guildId)/verify/stats")
+    }
+
     /// Set or replace a single channel's rule override.
     func setOverride(_ guildId: String, channelId: String, _ override: ChannelOverride) async throws {
         if demo { return }
@@ -297,7 +330,8 @@ struct APIClient {
         _ = try await perform(path, method: method, body: Optional<Int>.none)
     }
 
-    private func perform<B: Encodable>(_ path: String, method: String, body: B?) async throws -> Data {
+    private func perform<B: Encodable>(_ path: String, method: String, body: B?,
+                                       timeout: TimeInterval? = nil) async throws -> Data {
         let token = try await tokenProvider()
         // Join by string so query strings (`?limit=…`) survive — appendingPathComponent
         // would percent-encode the `?`.
@@ -306,6 +340,7 @@ struct APIClient {
         guard let url = URL(string: base + path) else { throw APIError.decoding }
         var req = URLRequest(url: url)
         req.httpMethod = method
+        if let timeout { req.timeoutInterval = timeout }
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")

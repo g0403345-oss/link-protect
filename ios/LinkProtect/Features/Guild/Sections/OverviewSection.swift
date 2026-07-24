@@ -3,6 +3,8 @@ import SwiftUI
 struct OverviewSection: View {
     @ObservedObject var vm: GuildConfigViewModel
     @EnvironmentObject private var push: PushManager
+    @State private var lockdownConfirm = false
+    @State private var lockdownBusy = false
 
     private var data: ServerData { vm.data ?? ServerData() }
 
@@ -20,6 +22,8 @@ struct OverviewSection: View {
                 StatCard(label: "Blockers", value: "\(data.protect.activeCount)",
                          systemImage: "shield.fill", color: Theme.green)
             }
+
+            lockdownCard
 
             DiscordCard("Active Protections") {
                 let tags = activeTags
@@ -59,6 +63,64 @@ struct OverviewSection: View {
                 )
             }
         }
+    }
+
+    // MARK: Emergency lockdown
+
+    @ViewBuilder
+    private var lockdownCard: some View {
+        let active = vm.lockdown?.active ?? false
+        DiscordCard("Emergency Lockdown") {
+            VStack(alignment: .leading, spacing: 10) {
+                if active {
+                    HStack(spacing: 8) {
+                        Image(systemName: "light.beacon.max.fill").foregroundStyle(Theme.red)
+                        Text("Server frozen\(vm.lockdown?.by.map { " · by \($0)" } ?? "")")
+                            .font(LPFont.label).foregroundStyle(Theme.red)
+                    }
+                    Text("Slowmode on \(vm.lockdown?.channelsLimited ?? 0) channels, invites paused, all links blocked.\(vm.lockdown?.reason.map { " Reason: \($0)" } ?? "")")
+                        .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                } else {
+                    Text("Raid in progress? One tap freezes the server: 30s slowmode everywhere, invites paused, every link blocked. Lifting it restores everything.")
+                        .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                }
+                Button {
+                    if active {
+                        Task { await toggleLockdown(false) }
+                    } else {
+                        lockdownConfirm = true
+                    }
+                } label: {
+                    HStack(spacing: 7) {
+                        if lockdownBusy { Spinner(size: 13) }
+                        else { Image(systemName: active ? "lock.open.fill" : "exclamationmark.shield.fill") }
+                        Text(lockdownBusy ? (active ? "Restoring…" : "Freezing server…")
+                             : (active ? "Lift lockdown" : "Activate lockdown"))
+                    }
+                    .font(LPFont.label)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .foregroundStyle(active ? Theme.bg : Color.white)
+                    .background(active ? Theme.green : Theme.red)
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+                .buttonStyle(PressScaleStyle())
+                .disabled(lockdownBusy)
+            }
+        }
+        .task { await vm.loadLockdown() }
+        .confirmationDialog("Freeze the whole server?", isPresented: $lockdownConfirm, titleVisibility: .visible) {
+            Button("Activate lockdown", role: .destructive) { Task { await toggleLockdown(true) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("30s slowmode on every channel, invites paused, all links blocked — until you lift it.")
+        }
+    }
+
+    private func toggleLockdown(_ active: Bool) async {
+        lockdownBusy = true
+        await vm.setLockdown(active: active, reason: nil)
+        lockdownBusy = false
     }
 
     private func threshold(_ label: String, _ value: Int, _ color: Color) -> some View {

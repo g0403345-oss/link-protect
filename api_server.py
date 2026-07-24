@@ -2792,7 +2792,7 @@ _PROTECTION_KEYS = (
     "protect.invite", "protect.youtube", "protect.google", "protect.gif",
     "protect.twitch", "protect.steam", "protect.bit",
     "scamguard.enabled", "scamguard.join_check", "raid.enabled",
-    "silent", "decay.enabled", "log.Activated",
+    "silent", "decay.enabled", "log.Activated", "verify.enabled",
 )
 
 
@@ -3250,6 +3250,420 @@ async def guilds_overview(request: Request, body: OverviewBody):
     return {"guilds": out}
 
 
+# ── Emergency lockdown + verification gate ───────────────────────────────────
+
+BOT_CLIENT_ID = "888390889892892684"  # bot user id == application id
+_LOCKDOWN_SLOWMODE = 30       # seconds applied to every text channel
+_LOCKDOWN_CHANNEL_CAP = 75    # safety cap on channel edits per action
+_PERM_ADMIN = 0x8
+_PERM_MANAGE_GUILD = 0x20
+_PERM_MANAGE_CHANNELS = 0x10
+_PERM_MANAGE_ROLES = 0x10000000
+
+
+def _ensure_verify_table():
+    c = _get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        ts INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_verifications_guild ON verifications (guild_id, ts DESC)")
+    c.commit()
+
+_ensure_verify_table()
+
+
+_VERIFY_DEFAULT_PAGE = {
+    "headline": "Verify to join the conversation",
+    "message": "This server uses Link Protect to keep scam bots out. "
+               "One click with your Discord account and you're in.",
+    "accent": "#5865f2",
+}
+
+
+def _verify_cfg(data: dict | None) -> dict:
+    v = (data or {}).get("verify") or {}
+    page = {**_VERIFY_DEFAULT_PAGE, **(v.get("page") or {})}
+    accent = str(page.get("accent") or "#5865f2")
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+        accent = "#5865f2"
+    return {
+        "enabled": bool(v.get("enabled")),
+        "role_mode": v.get("role_mode") if v.get("role_mode") in ("quarantine", "verified") else "verified",
+        "role_id": str(v.get("role_id") or "") or None,
+        "min_account_age_days": int(v.get("min_account_age_days") or 0),
+        "page": {"headline": str(page["headline"])[:80] or _VERIFY_DEFAULT_PAGE["headline"],
+                 "message": str(page["message"])[:400] or _VERIFY_DEFAULT_PAGE["message"],
+                 "accent": accent},
+    }
+
+
+_BOT_HEADERS = None
+
+
+def _bot_headers() -> dict:
+    global _BOT_HEADERS
+    if _BOT_HEADERS is None:
+        _BOT_HEADERS = {"Authorization": f"Bot {BOT_TOKEN}"}
+    return _BOT_HEADERS
+
+
+async def _post_channel_embed(guild_id: str, title: str, description: str,
+                              color: int = 0x5B6CFF) -> None:
+    """Best-effort embed into the guild's configured log channel."""
+    data = _get_server(guild_id)
+    ch = (data or {}).get("log", {}).get("log-channel")
+    if not ch or str(ch) == "0":
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{DISCORD_API}/channels/{ch}/messages", headers=_bot_headers(),
+                json={"embeds": [{"title": title, "description": description, "color": color,
+                                  "footer": {"text": "Link Protect • link-protect.com"}}]},
+                timeout=8)
+    except Exception:
+        pass
+
+
+async def _bot_guild_permissions(guild_id: str) -> tuple[int, int, list]:
+    """(permission bits, bot's highest role position, all guild roles).
+    Raises HTTPException(404) when the bot isn't in the guild."""
+    async with httpx.AsyncClient() as client:
+        g = await client.get(f"{DISCORD_API}/guilds/{guild_id}", headers=_bot_headers(), timeout=8)
+        if g.status_code != 200:
+            raise HTTPException(status_code=404, detail="Bot is not in this server")
+        roles = g.json().get("roles", [])
+        m = await client.get(f"{DISCORD_API}/guilds/{guild_id}/members/{BOT_CLIENT_ID}",
+                             headers=_bot_headers(), timeout=8)
+        if m.status_code != 200:
+            raise HTTPException(status_code=404, detail="Bot member not found")
+        member_role_ids = set(m.json().get("roles", []))
+    perms = 0
+    top_pos = 0
+    for r in roles:
+        if r["id"] == str(guild_id) or r["id"] in member_role_ids:  # @everyone + assigned
+            try:
+                perms |= int(r.get("permissions") or 0)
+            except (TypeError, ValueError):
+                pass
+        if r["id"] in member_role_ids:
+            top_pos = max(top_pos, int(r.get("position") or 0))
+    return perms, top_pos, roles
+
+
+def _lockdown_key(gid: str) -> str:
+    return f"lockdown:{gid}"
+
+
+def _lockdown_state(gid: str) -> dict:
+    try:
+        row = _get_conn().execute("SELECT value FROM kv WHERE path=?", (_lockdown_key(gid),)).fetchone()
+        return json.loads(row["value"]) if row else {}
+    except Exception:
+        return {}
+
+
+def _lockdown_payload(gid: str) -> dict:
+    s = _lockdown_state(gid)
+    return {"active": bool(s.get("active")), "since": s.get("since") or 0,
+            "by": s.get("by"), "reason": s.get("reason"),
+            "channelsLimited": len((s.get("prev") or {}).get("slowmode") or {})}
+
+
+async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str | None) -> dict:
+    """Freeze / unfreeze a server: slowmode everywhere, invites paused, links
+    blocked for everyone. Every step is best-effort and reported back."""
+    state = _lockdown_state(gid)
+    steps: dict = {"slowmode": 0, "invites": False, "links": False}
+    async with httpx.AsyncClient() as client:
+        if active:
+            if state.get("active"):
+                return {"ok": True, "alreadyActive": True, **_lockdown_payload(gid)}
+            prev: dict = {"slowmode": {}, "invites_disabled": False, "protect_all": False}
+            # 1) Slowmode on every text channel (keep faster ones' old value for restore)
+            try:
+                r = await client.get(f"{DISCORD_API}/guilds/{gid}/channels",
+                                     headers=_bot_headers(), timeout=10)
+                channels = [c for c in (r.json() if r.status_code == 200 else [])
+                            if c.get("type") == 0][:_LOCKDOWN_CHANNEL_CAP]
+                for c in channels:
+                    old = int(c.get("rate_limit_per_user") or 0)
+                    if old >= _LOCKDOWN_SLOWMODE:
+                        continue
+                    resp = await client.patch(
+                        f"{DISCORD_API}/channels/{c['id']}", headers=_bot_headers(),
+                        json={"rate_limit_per_user": _LOCKDOWN_SLOWMODE},
+                        timeout=8)
+                    if resp.status_code == 200:
+                        prev["slowmode"][str(c["id"])] = old
+                        steps["slowmode"] += 1
+                    await asyncio.sleep(0.25)  # stay well under channel-edit rate limits
+            except Exception:
+                pass
+            # 2) Pause invites
+            try:
+                g = await client.get(f"{DISCORD_API}/guilds/{gid}", headers=_bot_headers(), timeout=8)
+                features = g.json().get("features", []) if g.status_code == 200 else []
+                if "INVITES_DISABLED" not in features:
+                    resp = await client.patch(
+                        f"{DISCORD_API}/guilds/{gid}", headers=_bot_headers(),
+                        json={"features": features + ["INVITES_DISABLED"]}, timeout=8)
+                    if resp.status_code == 200:
+                        prev["invites_disabled"] = True
+                        steps["invites"] = True
+            except Exception:
+                pass
+            # 3) Block all links (reuses the existing enforcement 1:1)
+            data = _get_server(gid) or {}
+            prev["protect_all"] = bool(_deep_get(data, "protect.all"))
+            if not prev["protect_all"]:
+                _deep_set(data, "protect.all", True)
+                _save_server(gid, data)
+                steps["links"] = True
+            _kv_set(_lockdown_key(gid), {"active": True, "since": int(time.time()),
+                                         "by": actor, "reason": (reason or "").strip()[:200] or None,
+                                         "prev": prev})
+            await _post_channel_embed(
+                gid, "🚨 Server lockdown activated",
+                f"{'By **' + actor + '**. ' if actor else ''}"
+                f"{'Reason: ' + reason.strip()[:200] if reason and reason.strip() else ''}\n"
+                f"Slowmode on {steps['slowmode']} channels · invites paused · all links blocked.\n"
+                "Lift it with /unlock or the dashboard.", 0xF23F43)
+        else:
+            if not state.get("active"):
+                return {"ok": True, "alreadyInactive": True, **_lockdown_payload(gid)}
+            prev = state.get("prev") or {}
+            # 1) Restore slowmode
+            for cid, old in (prev.get("slowmode") or {}).items():
+                try:
+                    resp = await client.patch(f"{DISCORD_API}/channels/{cid}",
+                                              headers=_bot_headers(),
+                                              json={"rate_limit_per_user": int(old)}, timeout=8)
+                    if resp.status_code == 200:
+                        steps["slowmode"] += 1
+                    await asyncio.sleep(0.25)
+                except Exception:
+                    pass
+            # 2) Re-enable invites (only if the lockdown disabled them)
+            if prev.get("invites_disabled"):
+                try:
+                    g = await client.get(f"{DISCORD_API}/guilds/{gid}", headers=_bot_headers(), timeout=8)
+                    features = [f for f in g.json().get("features", []) if f != "INVITES_DISABLED"]
+                    resp = await client.patch(f"{DISCORD_API}/guilds/{gid}", headers=_bot_headers(),
+                                              json={"features": features}, timeout=8)
+                    steps["invites"] = resp.status_code == 200
+                except Exception:
+                    pass
+            # 3) Restore link blocking to what it was
+            data = _get_server(gid) or {}
+            if not prev.get("protect_all", False):
+                _deep_set(data, "protect.all", False)
+                _save_server(gid, data)
+                steps["links"] = True
+            try:
+                c = _get_conn()
+                c.execute("DELETE FROM kv WHERE path=?", (_lockdown_key(gid),))
+                c.commit()
+            except Exception:
+                pass
+            await _post_channel_embed(
+                gid, "✅ Lockdown lifted",
+                f"{'By **' + actor + '**. ' if actor else ''}"
+                "Slowmode, invites and link rules are back to normal.", 0x23A55A)
+    _invalidate(gid)
+    return {"ok": True, "steps": steps, **_lockdown_payload(gid)}
+
+
+class LockdownBody(BaseModel):
+    active: bool
+    reason: str | None = None
+
+
+@app.get("/api/guild/{guild_id}/lockdown")
+@require_auth
+async def get_lockdown(request: Request, guild_id: str):
+    return _lockdown_payload(guild_id)
+
+
+@app.post("/api/guild/{guild_id}/lockdown")
+@require_auth
+async def set_lockdown(request: Request, guild_id: str, body: LockdownBody):
+    aid, aname = _web_actor(request)
+    result = await _apply_lockdown(guild_id, bool(body.active), body.reason, aname)
+    _audit_record(guild_id, aid, aname, "lockdown",
+                  "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
+                  None, body.active)
+    return result
+
+
+@app.get("/api/mobile/guild/{guild_id}/lockdown")
+async def mobile_get_lockdown(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return _lockdown_payload(guild_id)
+
+
+@app.post("/api/mobile/guild/{guild_id}/lockdown")
+async def mobile_set_lockdown(request: Request, guild_id: str, body: LockdownBody):
+    aid = await _require_access(request, guild_id)
+    aname = await _mobile_actor_name(request)
+    result = await _apply_lockdown(guild_id, bool(body.active), body.reason, aname)
+    _audit_record(guild_id, aid, aname, "lockdown",
+                  "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
+                  None, body.active)
+    return result
+
+
+# ── Verification gate ────────────────────────────────────────────────────────
+
+@app.get("/api/guild/{guild_id}/verify/public")
+@require_auth
+async def verify_public(request: Request, guild_id: str):
+    """Everything the public /verify/<id> page needs — no member data."""
+    data = _get_server(guild_id)
+    cfg = _verify_cfg(data)
+    info = (await _bot_guilds_info()).get(str(guild_id), {})
+    return {"enabled": cfg["enabled"] and data is not None,
+            "guildId": str(guild_id),
+            "name": info.get("name"), "icon": info.get("icon"),
+            "minAccountAgeDays": cfg["min_account_age_days"],
+            "page": cfg["page"]}
+
+
+class VerifyCompleteBody(BaseModel):
+    userId: str
+
+
+@app.post("/api/guild/{guild_id}/verify/complete")
+@require_auth
+async def verify_complete(request: Request, guild_id: str, body: VerifyCompleteBody):
+    """Called by the website AFTER the user authenticated via Discord OAuth —
+    userId is the verified session user, never client input."""
+    uid = str(body.userId)
+    if not uid.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid user")
+    data = _get_server(guild_id)
+    cfg = _verify_cfg(data)
+    if not cfg["enabled"] or data is None:
+        raise HTTPException(status_code=404, detail="Verification is not enabled here")
+
+    # Account age straight from the snowflake — no extra API call.
+    if cfg["min_account_age_days"] > 0:
+        created_ms = (int(uid) >> 22) + 1420070400000
+        age_days = (time.time() * 1000 - created_ms) / 86400000
+        if age_days < cfg["min_account_age_days"]:
+            wait = int(cfg["min_account_age_days"] - age_days) + 1
+            return {"ok": False, "error": "too_young",
+                    "detail": f"This server requires accounts older than "
+                              f"{cfg['min_account_age_days']} days. Try again in ~{wait} day(s)."}
+
+    async with httpx.AsyncClient() as client:
+        m = await client.get(f"{DISCORD_API}/guilds/{guild_id}/members/{uid}",
+                             headers=_bot_headers(), timeout=8)
+        if m.status_code != 200:
+            return {"ok": False, "error": "not_member",
+                    "detail": "Join the server on Discord first, then verify here."}
+        role_ok = True
+        if cfg["role_id"]:
+            if cfg["role_mode"] == "quarantine":
+                r = await client.delete(
+                    f"{DISCORD_API}/guilds/{guild_id}/members/{uid}/roles/{cfg['role_id']}",
+                    headers=_bot_headers(), timeout=8)
+            else:
+                r = await client.put(
+                    f"{DISCORD_API}/guilds/{guild_id}/members/{uid}/roles/{cfg['role_id']}",
+                    headers=_bot_headers(), timeout=8)
+            role_ok = r.status_code in (200, 204)
+        if not role_ok:
+            return {"ok": False, "error": "role_failed",
+                    "detail": "I couldn't update your roles — the server's mods need to "
+                              "check the bot's permissions."}
+
+    try:
+        c = _get_conn()
+        c.execute("INSERT INTO verifications(guild_id, user_id, ts) VALUES(?,?,?)",
+                  (str(guild_id), uid, int(time.time())))
+        c.commit()
+    except Exception:
+        pass
+    await _post_channel_embed(guild_id, "✅ Member verified",
+                              f"<@{uid}> passed the verification gate.", 0x23A55A)
+    return {"ok": True}
+
+
+@app.get("/api/guild/{guild_id}/verify/health")
+@require_auth
+async def verify_health(request: Request, guild_id: str):
+    return await _verify_health_payload(guild_id)
+
+
+@app.get("/api/mobile/guild/{guild_id}/verify/health")
+async def mobile_verify_health(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return await _verify_health_payload(guild_id)
+
+
+async def _verify_health_payload(guild_id: str) -> dict:
+    """Permission checklist: does the bot ACTUALLY have what the gate (and the
+    lockdown button) need — and is the role hierarchy right?"""
+    cfg = _verify_cfg(_get_server(guild_id))
+    checks = []
+    try:
+        perms, top_pos, roles = await _bot_guild_permissions(guild_id)
+    except HTTPException:
+        return {"ok": False, "checks": [{"id": "bot", "ok": False,
+                                         "label": "Bot is in this server",
+                                         "detail": "Link Protect isn't a member of this server."}]}
+    is_admin = bool(perms & _PERM_ADMIN)
+    checks.append({"id": "manage_roles", "ok": is_admin or bool(perms & _PERM_MANAGE_ROLES),
+                   "label": "Manage Roles permission",
+                   "detail": "Needed to grant/remove the verification role."})
+    checks.append({"id": "manage_channels", "ok": is_admin or bool(perms & _PERM_MANAGE_CHANNELS),
+                   "label": "Manage Channels permission",
+                   "detail": "Needed for lockdown slowmode."})
+    checks.append({"id": "manage_guild", "ok": is_admin or bool(perms & _PERM_MANAGE_GUILD),
+                   "label": "Manage Server permission",
+                   "detail": "Needed to pause invites during a lockdown."})
+    if cfg["role_id"]:
+        role = next((r for r in roles if r["id"] == cfg["role_id"]), None)
+        if role is None:
+            checks.append({"id": "role_exists", "ok": False, "label": "Verification role exists",
+                           "detail": "The configured role was deleted — pick a new one."})
+        else:
+            checks.append({"id": "role_exists", "ok": True, "label": "Verification role exists",
+                           "detail": f"@{role.get('name', 'role')}"})
+            checks.append({"id": "role_rank", "ok": top_pos > int(role.get("position") or 0),
+                           "label": "Bot role ranks above the verification role",
+                           "detail": "Drag the Link Protect role above it in Server Settings → Roles."})
+    else:
+        checks.append({"id": "role_set", "ok": not cfg["enabled"], "label": "Verification role configured",
+                       "detail": "Pick the role the gate should remove or grant."})
+    return {"ok": all(c["ok"] for c in checks), "checks": checks}
+
+
+@app.get("/api/guild/{guild_id}/verify/stats")
+@require_auth
+async def verify_stats(request: Request, guild_id: str):
+    return _verify_stats_payload(guild_id)
+
+
+@app.get("/api/mobile/guild/{guild_id}/verify/stats")
+async def mobile_verify_stats(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return _verify_stats_payload(guild_id)
+
+
+def _verify_stats_payload(guild_id: str) -> dict:
+    c = _get_conn()
+    total = c.execute("SELECT COUNT(*) AS n FROM verifications WHERE guild_id=?",
+                      (str(guild_id),)).fetchone()["n"]
+    week = c.execute("SELECT COUNT(*) AS n FROM verifications WHERE guild_id=? AND ts>=?",
+                     (str(guild_id), int(time.time()) - 7 * 86400)).fetchone()["n"]
+    return {"total": total, "last7": week}
+
+
 @app.get("/api/actions")
 @require_auth
 async def all_actions(request: Request, limit: int = Query(default=200)):
@@ -3422,6 +3836,9 @@ MOBILE_ALLOWED_PATHS = {
     "scamguard.enabled", "scamguard.channels", "scamguard.window",
     "scamguard.action", "scamguard.timeout_minutes",
     "scamguard.join_check", "scamguard.join_action", "scamguard.min_servers",
+    "verify.enabled", "verify.role_mode", "verify.role_id",
+    "verify.min_account_age_days",
+    "verify.page.headline", "verify.page.message", "verify.page.accent",
 }
 
 

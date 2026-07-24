@@ -67,9 +67,10 @@ struct ServerData: Codable, Equatable {
     var decay = Decay()
     var raid = Raid()
     var scamguard = ScamGuard()
+    var verify = Verify()
     var overrides: [String: ChannelOverride] = [:]
 
-    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, scamguard, overrides }
+    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, scamguard, verify, overrides }
 
     /// Empty defaults — used as a non-nil fallback while data loads.
     init() {}
@@ -85,6 +86,7 @@ struct ServerData: Codable, Equatable {
         decay = (try? c.decode(Decay.self, forKey: .decay)) ?? Decay()
         raid = (try? c.decode(Raid.self, forKey: .raid)) ?? Raid()
         scamguard = (try? c.decode(ScamGuard.self, forKey: .scamguard)) ?? ScamGuard()
+        verify = (try? c.decode(Verify.self, forKey: .verify)) ?? Verify()
         overrides = (try? c.decode([String: ChannelOverride].self, forKey: .overrides)) ?? [:]
     }
 
@@ -100,6 +102,46 @@ struct ServerData: Codable, Equatable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? false
             days = (try? c.decode(Int.self, forKey: .days)) ?? 30
+        }
+        func encode(to encoder: Encoder) throws {}
+    }
+
+    /// Verification gate — new members verify on the per-server web page
+    /// (link-protect.com/verify/<guild>); role handling per mode.
+    struct Verify: Codable, Equatable {
+        var enabled = false
+        var roleMode = "verified"        // verified | quarantine
+        var roleId: String? = nil
+        var minAccountAgeDays = 0
+        var page = Page()
+        struct Page: Codable, Equatable {
+            var headline = ""
+            var message = ""
+            var accent = "#5865f2"
+            init() {}
+            enum CodingKeys: String, CodingKey { case headline, message, accent }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                headline = (try? c.decode(String.self, forKey: .headline)) ?? ""
+                message = (try? c.decode(String.self, forKey: .message)) ?? ""
+                accent = (try? c.decode(String.self, forKey: .accent)) ?? "#5865f2"
+            }
+            func encode(to encoder: Encoder) throws {}
+        }
+        init() {}
+        enum CodingKeys: String, CodingKey {
+            case enabled, page
+            case roleMode = "role_mode"
+            case roleId = "role_id"
+            case minAccountAgeDays = "min_account_age_days"
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? false
+            roleMode = (try? c.decode(String.self, forKey: .roleMode)) ?? "verified"
+            roleId = try? c.decode(String.self, forKey: .roleId)
+            minAccountAgeDays = (try? c.decode(Int.self, forKey: .minAccountAgeDays)) ?? 0
+            page = (try? c.decode(Page.self, forKey: .page)) ?? Page()
         }
         func encode(to encoder: Encoder) throws {}
     }
@@ -240,6 +282,32 @@ struct ScamShieldStats: Codable, Equatable {
     var flaggedTotal = 0
     var flaggedWeek = 0
     var guildCatches = 0
+}
+
+/// Emergency lockdown state (kv-backed on the API).
+struct LockdownStatus: Codable, Equatable {
+    var active = false
+    var since = 0
+    var by: String? = nil
+    var reason: String? = nil
+    var channelsLimited = 0
+}
+
+/// Live permission checklist for the verification gate + lockdown.
+struct VerifyHealth: Codable, Equatable {
+    var ok = false
+    var checks: [Check] = []
+    struct Check: Codable, Equatable, Identifiable {
+        let id: String
+        let ok: Bool
+        let label: String
+        let detail: String
+    }
+}
+
+struct VerifyStats: Codable, Equatable {
+    var total = 0
+    var last7 = 0
 }
 
 /// `warn` mixes fixed config keys (kick/ban/timeout) with one entry per warned

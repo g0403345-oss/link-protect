@@ -49,6 +49,27 @@ final class GuildConfigViewModel: ObservableObject {
 
     func refreshStats() async { stats = try? await api.stats(guildId) }
     func scamShieldStats() async -> ScamShieldStats? { try? await api.scamShieldStats(guildId) }
+
+    // MARK: Emergency lockdown + verification gate
+
+    @Published var lockdown: LockdownStatus?
+
+    func loadLockdown() async { lockdown = try? await api.lockdown(guildId) }
+
+    @discardableResult
+    func setLockdown(active: Bool, reason: String?) async -> Bool {
+        do {
+            lockdown = try await api.setLockdown(guildId, active: active, reason: reason)
+            toasts?.success(active ? "Lockdown active — server frozen" : "Lockdown lifted")
+            return true
+        } catch {
+            toasts?.error("Lockdown failed — check my permissions")
+            return false
+        }
+    }
+
+    func verifyHealth() async -> VerifyHealth? { try? await api.verifyHealth(guildId) }
+    func verifyStats() async -> VerifyStats? { try? await api.verifyStats(guildId) }
     func refreshActions() async { actions = (try? await api.actions(guildId, limit: 50)) ?? [] }
     func loadAudit() async { audit = (try? await api.auditLog(guildId)) ?? [] }
     func loadTrends() async { if trends == nil { trends = try? await api.trends(guildId, days: 14) } }
