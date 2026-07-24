@@ -562,13 +562,13 @@ export default function LandingClient() {
 
         <div className="hero-grid" style={{ maxWidth: 1120, margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', position: 'relative' }}>
           <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
-            {/* badge */}
-            <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer"
+            {/* badge → full changelog */}
+            <Link href="/update"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
               v2.4.1 — Developer platform &amp; presets are live
               <ArrowRight size={12} />
-            </a>
+            </Link>
 
             <h1 className="hero-title" style={{ fontSize: 72, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1.0, color: '#f2f3f5', marginBottom: 20 }}>
               Stop every<br /><span style={{ color: '#5865f2' }}>bad link.</span><br />Automatically.

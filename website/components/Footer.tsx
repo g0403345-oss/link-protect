@@ -14,6 +14,7 @@ const COLUMNS: { title: string; links: FLink[] }[] = [
       { label: 'What we block', href: '/#blockers' },
       { label: 'Link checker', href: '/check' },
       { label: 'Dashboard', href: '/dashboard' },
+      { label: 'Changelog', href: '/update' },
     ],
   },
   {
