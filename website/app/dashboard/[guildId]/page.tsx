@@ -488,7 +488,7 @@ export default function GuildDashboard() {
           </span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LockdownControl guildId={guildId} onToast={addToast} />
+          <div data-tour="lockdown"><LockdownControl guildId={guildId} onToast={addToast} /></div>
           <ReportForm guildId={guildId} />
           <button onClick={() => setTourRun(true)} title="Take the dashboard tour"
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s' }}
@@ -577,7 +577,9 @@ export default function GuildDashboard() {
                       )}
                     </div>
                   </Card>
-                  <SecurityScore data={data} guildId={guildId} onNavigate={(s) => selectSection(s as Section)} />
+                  <div data-tour="securityscore">
+                    <SecurityScore data={data} guildId={guildId} onNavigate={(s) => selectSection(s as Section)} />
+                  </div>
                 </div>
               )}
 
@@ -585,7 +587,9 @@ export default function GuildDashboard() {
               {section === 'verification' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Verification Gate" description="New members verify on your personal web page — a hurdle scam bots can't take" icon={UserCheck} />
-                  <VerificationTab guildId={guildId} data={data} patch={patch} saving={saving} guildIcon={guildInfo?.icon} onToast={addToast} onRefresh={refreshDataSilently} />
+                  <div data-tour="verification">
+                    <VerificationTab guildId={guildId} data={data} patch={patch} saving={saving} guildIcon={guildInfo?.icon} onToast={addToast} onRefresh={refreshDataSilently} />
+                  </div>
                 </div>
               )}
 
@@ -601,7 +605,9 @@ export default function GuildDashboard() {
               {section === 'blockers' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Link Blockers" description="Toggle which types of links are blocked in your server" icon={AlertTriangle} />
-                  <PresetsCard guildId={guildId} onToast={addToast} onApplied={refreshDataSilently} />
+                  <div data-tour="presets">
+                    <PresetsCard guildId={guildId} onToast={addToast} onApplied={refreshDataSilently} />
+                  </div>
                   <Card title="Platform Blockers" tourId="blockers">
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {[
@@ -1090,6 +1096,7 @@ export default function GuildDashboard() {
                       activated={!!data.log?.Activated}
                       onPatch={patch}
                       saving={saving}
+                      show={data.log?.show}
                     />
                     <Card title={`Recent Actions (${actions.length})`} tourId="log">
                       {actions.length === 0 ? (

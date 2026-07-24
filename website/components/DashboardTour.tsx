@@ -46,6 +46,23 @@ const STEPS: TourStep[] = [
     body: 'See warnings issued, how many members were warned, and how many blockers are active right now. The chips below show exactly which protections are live on your server.',
   },
   {
+    section: 'overview',
+    selector: 'securityscore',
+    title: 'Your Security Score',
+    body: 'One number for how locked-down this server is. Every open recommendation is clickable and jumps straight to the right setting — reach 100 and there’s a little surprise. 🎉',
+  },
+  {
+    selector: 'lockdown',
+    title: 'Emergency Lockdown 🚨',
+    body: 'Raid in progress? This button freezes the whole server in seconds — slowmode everywhere, invites paused, every link blocked. Lifting it restores everything exactly as it was. Also available as /lockdown in Discord.',
+  },
+  {
+    section: 'blockers',
+    selector: 'presets',
+    title: 'Quick Setup presets',
+    body: 'Not sure where to start? One click sets every security toggle to a sensible level — Minimal, Balanced or Strict. Your taste blockers (YouTube, GIFs …) are never touched.',
+  },
+  {
     section: 'blockers',
     selector: 'blockers',
     title: 'Link Blockers — the core',
@@ -62,6 +79,12 @@ const STEPS: TourStep[] = [
     selector: 'raid',
     title: 'Raid Protection',
     body: 'If many members suddenly post the same link in seconds — a raid or hijacked accounts — the bot deletes the messages and times out the accounts automatically, with one alarm instead of dozens of warnings. Off by default; tune the trigger to your server.',
+  },
+  {
+    section: 'verification',
+    selector: 'verification',
+    title: 'Verification Gate',
+    body: 'New members verify on your personal web page — a hurdle scam bots can’t take. Auto-setup creates the quarantine role and locks every channel for you; the page is fully customizable, background image included.',
   },
   {
     section: 'warnings',

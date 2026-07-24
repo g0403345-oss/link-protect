@@ -61,13 +61,15 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
 
   return (
     <div className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
-      {/* Custom server background — faded like the homepage hero */}
+      {/* Custom server background — absolute (NOT fixed) like the homepage
+          hero, so it stays behind the card and never follows the scroll into
+          the footer; the mask fades it out completely towards the bottom. */}
       {cfg?.background && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/verify/bg/${cfg.guildId}?v=${cfg.backgroundVersion}`} alt="" aria-hidden
-          style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.3, pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.15) 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.15) 100%)' }} />
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.3, pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 60%, transparent 96%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 60%, transparent 96%)' }} />
       )}
-      <div aria-hidden style={{ position: 'fixed', inset: 0, background: `radial-gradient(560px circle at 50% 0%, ${accent}26, transparent 65%)`, pointerEvents: 'none' }} />
+      <div aria-hidden style={{ position: 'absolute', inset: 0, background: `radial-gradient(560px circle at 50% 0%, ${accent}26, transparent 65%)`, pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative', width: '100%', maxWidth: 420, background: '#111113', border: '1px solid #26262c', borderRadius: 20, padding: '36px 28px', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
         {phase === 'loading' && (
@@ -119,8 +121,10 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
               {phase === 'verifying'
                 ? <><RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} /> Verifying…</>
                 : <>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                    {/* Official Discord mark uses a 127.14×96.36 viewBox — the
+                        24×24 crop was clipping the ears. */}
+                    <svg width="19" height="15" viewBox="0 0 127.14 96.36" fill="currentColor" aria-hidden>
+                      <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15ZM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69Zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69Z" />
                     </svg>
                     {status === 'authenticated' ? `Verify as ${session?.user?.name ?? 'you'}` : 'Verify with Discord'}
                   </>}

@@ -1130,7 +1130,12 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
             pass  # No permission to post here — message was still removed/warned.
 
     # ── Log channel record ─────────────────────────────────────────────────
+    # Per-category log filter (log.show.*): absent keys default to on.
+    _show = settings.get("log", {}).get("show") or {}
+    _log_kind = "manual" if moderator is not None else "automod"
     log_channel_id = settings.get("log", {}).get("log-channel", 0)
+    if _show.get(_log_kind, True) is False:
+        log_channel_id = 0
     log_channel = bot.get_channel(int(log_channel_id)) if log_channel_id else None
     if log_channel:
         log_embed = discord.Embed(

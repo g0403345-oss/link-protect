@@ -2308,6 +2308,10 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "warn.kick", "warn.ban", "warn.timeout.warnings", "warn.timeout.time",
         "decay.enabled", "decay.days",
         "log.Activated", "log.log-channel", "log.link", "log.onlylink",
+    "log.show.automod", "log.show.manual", "log.show.scamshield",
+    "log.show.raid", "log.show.lockdown", "log.show.verify",
+        "log.show.automod", "log.show.manual", "log.show.scamshield",
+        "log.show.raid", "log.show.lockdown", "log.show.verify",
         "channel.channel", "channel.category", "channel.member", "channel.role",
         "link.links", "link.allow",
         "raid.enabled", "raid.threshold", "raid.window", "raid.timeout_minutes",
@@ -3337,9 +3341,19 @@ def _bot_headers() -> dict:
     return _BOT_HEADERS
 
 
+def _log_show(guild_id: str, kind: str) -> bool:
+    """Per-category warn-log filter (log.show.*). Everything defaults to on —
+    except verifications, which are opt-in."""
+    data = _get_server(guild_id) or {}
+    show = (data.get("log") or {}).get("show") or {}
+    return bool(show.get(kind, kind != "verify"))
+
+
 async def _post_channel_embed(guild_id: str, title: str, description: str,
-                              color: int = 0x5B6CFF) -> None:
+                              color: int = 0x5B6CFF, kind: str | None = None) -> None:
     """Best-effort embed into the guild's configured log channel."""
+    if kind and not _log_show(guild_id, kind):
+        return
     data = _get_server(guild_id)
     ch = (data or {}).get("log", {}).get("log-channel")
     if not ch or str(ch) == "0":
@@ -3458,7 +3472,7 @@ async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str
                 f"{'By **' + actor + '**. ' if actor else ''}"
                 f"{'Reason: ' + reason.strip()[:200] if reason and reason.strip() else ''}\n"
                 f"Slowmode on {steps['slowmode']} channels · invites paused · all links blocked.\n"
-                "Lift it with /unlock or the dashboard.", 0xF23F43)
+                "Lift it with /unlock or the dashboard.", 0xF23F43, kind="lockdown")
         else:
             if not state.get("active"):
                 return {"ok": True, "alreadyInactive": True, **_lockdown_payload(gid)}
@@ -3499,7 +3513,7 @@ async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str
             await _post_channel_embed(
                 gid, "✅ Lockdown lifted",
                 f"{'By **' + actor + '**. ' if actor else ''}"
-                "Slowmode, invites and link rules are back to normal.", 0x23A55A)
+                "Slowmode, invites and link rules are back to normal.", 0x23A55A, kind="lockdown")
     _invalidate(gid)
     return {"ok": True, "steps": steps, **_lockdown_payload(gid)}
 
@@ -3618,7 +3632,7 @@ async def verify_complete(request: Request, guild_id: str, body: VerifyCompleteB
     except Exception:
         pass
     await _post_channel_embed(guild_id, "✅ Member verified",
-                              f"<@{uid}> passed the verification gate.", 0x23A55A)
+                              f"<@{uid}> passed the verification gate.", 0x23A55A, kind="verify")
     return {"ok": True}
 
 
@@ -4031,6 +4045,8 @@ MOBILE_ALLOWED_PATHS = {
     "warn.kick", "warn.ban", "warn.timeout.warnings", "warn.timeout.time",
     "decay.enabled", "decay.days",
     "log.Activated", "log.log-channel", "log.link", "log.onlylink",
+    "log.show.automod", "log.show.manual", "log.show.scamshield",
+    "log.show.raid", "log.show.lockdown", "log.show.verify",
     "channel.channel", "channel.category", "channel.member", "channel.role",
     "link.links", "link.allow",
     "raid.enabled", "raid.threshold", "raid.window", "raid.timeout_minutes",

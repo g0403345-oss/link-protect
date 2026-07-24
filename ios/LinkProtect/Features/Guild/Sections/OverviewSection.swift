@@ -77,12 +77,18 @@ struct OverviewSection: View {
                         Image(systemName: "light.beacon.max.fill").foregroundStyle(Theme.red)
                         Text("Server frozen\(vm.lockdown?.by.map { " · by \($0)" } ?? "")")
                             .font(LPFont.label).foregroundStyle(Theme.red)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Text("Slowmode on \(vm.lockdown?.channelsLimited ?? 0) channels, invites paused, all links blocked.\(vm.lockdown?.reason.map { " Reason: \($0)" } ?? "")")
                         .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
+                    // fixedSize(h:false) forces wrapping — without it this long
+                    // Text inflated its ideal width and made the whole overview
+                    // tab scroll horizontally.
                     Text("Raid in progress? One tap freezes the server: 30s slowmode everywhere, invites paused, every link blocked. Lifting it restores everything.")
                         .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Button {
                     if active {

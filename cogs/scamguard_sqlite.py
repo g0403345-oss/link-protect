@@ -237,6 +237,8 @@ class ScamShield(commands.Cog):
 
         # One alarm embed → log channel if set, else the last spammed channel.
         log_id = settings.get("log", {}).get("log-channel", 0)
+        if (settings.get("log", {}).get("show") or {}).get("scamshield", True) is False:
+            log_id = 0  # log filter: Scam Shield entries muted
         target = self.bot.get_channel(int(log_id)) if log_id else None
         if target is None:
             target = sample.channel
@@ -337,6 +339,8 @@ class ScamShield(commands.Cog):
             pass
 
         log_id = settings.get("log", {}).get("log-channel", 0)
+        if (settings.get("log", {}).get("show") or {}).get("scamshield", True) is False:
+            log_id = 0  # log filter: Scam Shield entries muted
         target = self.bot.get_channel(int(log_id)) if log_id else None
         if target is not None:
             embed = discord.Embed(

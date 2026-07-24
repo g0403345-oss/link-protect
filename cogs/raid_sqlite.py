@@ -139,7 +139,10 @@ class RaidProtection(commands.Cog):
             pass
 
         # One alarm embed → log channel if set, else the triggering channel.
-        log_id = (await get_settings(str(guild.id))).get("log", {}).get("log-channel", 0)
+        _log_cfg = (await get_settings(str(guild.id))).get("log", {})
+        log_id = _log_cfg.get("log-channel", 0)
+        if (_log_cfg.get("show") or {}).get("raid", True) is False:
+            log_id = 0  # log filter: raid alarms muted — in-channel fallback stays
         target = self.bot.get_channel(int(log_id)) if log_id else None
         if target is None and messages:
             target = messages[-1].channel

@@ -335,19 +335,23 @@ function GuildRow({ guild, index, stats }: { guild: EnrichedGuild; index: number
           <span style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: '50%', background: guild.botPresent ? '#23a55a' : '#52535a', border: '2px solid #111113' }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Sparkline lives in the meta row below the name — as a flex sibling
+              it squeezed names down to one letter on 3-column layouts. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guild.name}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{guild.name}</span>
             {guild.owner && <span style={{ fontSize: 10, fontWeight: 600, color: '#f0b232', background: 'rgba(240,178,50,0.12)', padding: '1px 6px', borderRadius: 99, flexShrink: 0 }}>Owner</span>}
           </div>
-          {guild.approximate_member_count != null && (
-            <span style={{ fontSize: 11, color: '#52535a' }}>{guild.approximate_member_count.toLocaleString()} members</span>
-          )}
-        </div>
-        {stats && (
-          <div title={`${stats.last7.reduce((a, b) => a + b, 0)} actions in the last 7 days`} style={{ flexShrink: 0 }}>
-            <Sparkline data={stats.last7} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {guild.approximate_member_count != null && (
+              <span style={{ fontSize: 11, color: '#52535a', whiteSpace: 'nowrap' }}>{guild.approximate_member_count.toLocaleString()} members</span>
+            )}
+            {stats && (
+              <span title={`${stats.last7.reduce((a, b) => a + b, 0)} actions in the last 7 days`} style={{ display: 'inline-flex', minWidth: 0, overflow: 'hidden' }}>
+                <Sparkline data={stats.last7} width={56} height={14} />
+              </span>
+            )}
           </div>
-        )}
+        </div>
         {guild.botPresent ? (
           <Link href={`/dashboard/${guild.id}`}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, background: '#5865f2', color: '#fff', borderRadius: 7, textDecoration: 'none', flexShrink: 0 }}>

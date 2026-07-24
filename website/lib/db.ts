@@ -72,7 +72,7 @@ export interface ServerData {
   silent: boolean;
   channel: { channel: string[]; category: string[]; member: string[]; role: string[] };
   link: { links: string[]; allow?: string[] };
-  log: { Activated: boolean; "log-channel": number | string; link: number; onlylink: boolean };
+  log: { Activated: boolean; "log-channel": number | string; link: number; onlylink: boolean; show?: Record<string, boolean> };
   warn: {
     kick: number;
     ban: number;

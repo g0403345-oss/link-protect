@@ -43,6 +43,8 @@ const ENTRIES: Entry[] = [
     items: [
       'New Verification tab: mode (quarantine / verified role), role picker, minimum account age, and a fully customizable verify page with live preview.',
       'One-click auto-setup: creates (or reuses) the quarantine role, hides every category & channel from it, and adds a #verify info channel — no manual permission work.',
+      'Warn-log filter: choose exactly which events appear in your log channel — blocked links, manual warns, Scam Shield, raids, lockdowns and (opt-in) verifications.',
+      'Dashboard tour now covers the Security Score, presets, lockdown and the verification gate.',
       'Custom background image for your verify page — auto-resized and compressed on upload, rendered faded like our homepage hero.',
       'Live permission check — see instantly whether the bot has the rights and role position the gate and lockdown need.',
       'Emergency lockdown as a compact control in the dashboard header — pulses red while active, one click restores everything.',

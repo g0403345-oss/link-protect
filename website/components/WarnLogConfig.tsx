@@ -15,7 +15,19 @@ interface Props {
   onPatch: (path: string, value: unknown, label?: string) => void;
   /** The setting path currently saving, or null. */
   saving: string | null;
+  /** Per-category log filter (`log.show.*`) — absent keys use the defaults. */
+  show?: Record<string, boolean>;
 }
+
+// What can appear in the log — everything defaults to on except verifications.
+const LOG_KINDS: { key: string; label: string; defaultOn: boolean }[] = [
+  { key: 'automod', label: 'Blocked links', defaultOn: true },
+  { key: 'manual', label: 'Manual warns', defaultOn: true },
+  { key: 'scamshield', label: 'Scam Shield', defaultOn: true },
+  { key: 'raid', label: 'Raid alarms', defaultOn: true },
+  { key: 'lockdown', label: 'Lockdown', defaultOn: true },
+  { key: 'verify', label: 'Verifications', defaultOn: false },
+];
 
 /** Only channels the bot can actually post to: text + announcement. */
 function isTextChannel(type: number) {
@@ -27,7 +39,7 @@ function isTextChannel(type: number) {
  * `/disable-warn-log`. Selecting a channel writes `log.log-channel` and turns on
  * `log.Activated`; "Disable" clears the channel and the flag.
  */
-export default function WarnLogConfig({ guildId, channelId, activated, onPatch, saving }: Props) {
+export default function WarnLogConfig({ guildId, channelId, activated, onPatch, saving, show }: Props) {
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -157,6 +169,31 @@ export default function WarnLogConfig({ guildId, channelId, activated, onPatch, 
           </div>
         )}
       </div>
+
+      {/* Per-category filter — only relevant once a log channel is active */}
+      {enabled && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #1e1e22' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 4 }}>What appears in the log</div>
+          <p style={{ fontSize: 11.5, color: '#52535a', marginBottom: 10 }}>Click to toggle — verifications are off by default so the log stays about threats.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {LOG_KINDS.map((k) => {
+              const on = show?.[k.key] ?? k.defaultOn;
+              const path = `log.show.${k.key}`;
+              const busy = saving === path;
+              return (
+                <button key={k.key} onClick={() => onPatch(path, !on, `${k.label} logging`)} disabled={busy}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 99, cursor: 'pointer', transition: 'all 0.15s', opacity: busy ? 0.6 : 1,
+                    background: on ? 'rgba(35,165,90,0.12)' : '#18181b',
+                    color: on ? '#23a55a' : '#6d6f78',
+                    border: `1px solid ${on ? 'rgba(35,165,90,0.35)' : '#2e2e36'}` }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#23a55a' : '#52535a' }} />
+                  {k.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Info */}
       <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', background: enabled ? 'rgba(35,165,90,0.06)' : 'rgba(148,155,164,0.05)', border: `1px solid ${enabled ? 'rgba(35,165,90,0.15)' : 'rgba(148,155,164,0.12)'}`, borderRadius: 8 }}>

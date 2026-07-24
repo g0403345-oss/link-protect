@@ -15,7 +15,8 @@ const roleColor = (c: number) => (c ? `#${c.toString(16).padStart(6, '0')}` : '#
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
+    // overflow stays visible so the role dropdown can extend past the card edge
+    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10 }}>
       <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
       </div>

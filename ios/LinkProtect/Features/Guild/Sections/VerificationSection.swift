@@ -97,6 +97,7 @@ struct VerificationSection: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Members verify here — the link is DM'd automatically; pin it in your rules channel too. Customize headline, text and color in the web dashboard.")
                         .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 8) {
                         Text(verifyURL)
                             .font(.system(size: 12, design: .monospaced))
@@ -159,6 +160,7 @@ struct VerificationSection: View {
             }
             Text("Creates (or reuses) the quarantine role, hides every category & channel from it, adds a #verify info channel and switches the gate to quarantine mode. Safe to re-run.")
                 .font(LPFont.tiny).fontWeight(.regular).foregroundStyle(Theme.dim)
+                .fixedSize(horizontal: false, vertical: true)
             Button {
                 setupConfirm = true
             } label: {
