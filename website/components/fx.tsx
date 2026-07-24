@@ -15,6 +15,11 @@ const CONFETTI_COLORS = ['#5865f2', '#23a55a', '#f0b232', '#FFD700', '#eb459e', 
 export function Celebration({ fire, onDone }: { fire: boolean; onDone?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ran = useRef(false);
+  // Callbacks live in a ref so parent re-renders (polling, fetches) never
+  // change the effect deps — re-running the effect mid-flight cancelled the
+  // rAF loop and left the confetti frozen on screen.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     if (!fire || ran.current) return;
@@ -72,11 +77,13 @@ export function Celebration({ fire, onDone }: { fire: boolean; onDone?: () => vo
         ctx.restore();
       }
       if (alive > 0 && elapsed < 3) raf = requestAnimationFrame(tick);
-      else { ctx.clearRect(0, 0, W, H); onDone?.(); }
+      else { ctx.clearRect(0, 0, W, H); onDoneRef.current?.(); }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [fire, onDone]);
+    // Clear on teardown too — if the loop IS ever cancelled, never leave a
+    // frozen frame behind.
+    return () => { cancelAnimationFrame(raf); ctx.clearRect(0, 0, W, H); };
+  }, [fire]);
 
   if (!fire) return null;
   return (
