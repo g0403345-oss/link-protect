@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import BadgeCard from '@/components/BadgeCard';
+import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 import type { DevKey, DevWebhook, DevStatus, WebhookEvent } from '@/lib/db';
 
 const EVENT_META: Record<string, { label: string; desc: string }> = {
@@ -29,13 +30,10 @@ function relTime(ts: number) {
 
 function Card({ title, icon: Icon, children }: { title: string; icon: typeof KeyRound; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22', display: 'flex', alignItems: 'center', gap: 7 }}>
-        <Icon size={14} color="#5865f2" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
-      </div>
-      <div style={{ padding: 18 }}>{children}</div>
-    </div>
+    <CollapsibleCard storageKey={cardKey('dev', title)}
+      title={<><Icon size={14} color="#5865f2" /> {title}</>}>
+      {children}
+    </CollapsibleCard>
   );
 }
 

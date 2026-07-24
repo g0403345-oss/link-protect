@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Shield, ShieldCheck, ShieldAlert, RefreshCw, Check } from 'lucide-react';
+import CollapsibleCard from '@/components/CollapsibleCard';
 
 // Mirrors the bot's /setup-preset and the iOS app's Quick Setup: one click sets
 // all security-relevant toggles. Taste blockers (YouTube, GIFs …) are never
@@ -73,11 +74,8 @@ export default function PresetsCard({ guildId, onToast, onApplied }: {
   };
 
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>Quick Setup</span>
-      </div>
-      <div style={{ padding: 18 }}>
+    <CollapsibleCard title="Quick Setup" storageKey="guild_quick-setup">
+      <div>
         <p style={{ fontSize: 12, color: '#52535a', marginBottom: 14 }}>
           One click sets every security toggle to a sensible level — same presets as the iOS app
           and <code style={{ fontFamily: 'monospace', color: '#949ba4' }}>/setup-preset</code>.
@@ -113,6 +111,6 @@ export default function PresetsCard({ guildId, onToast, onApplied }: {
           })}
         </div>
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }

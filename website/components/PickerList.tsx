@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Search, Loader2 } from 'lucide-react';
+import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 
 interface DiscordChannel { id: string; name: string; type: number; position: number; parent_id?: string | null; }
 interface DiscordRole { id: string; name: string; color: number; position: number; }
@@ -183,12 +184,10 @@ export default function PickerList({ title, description, icon, pickerType, guild
   );
 
   return (
-    <div style={{ marginBottom: 2 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        {icon}
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#d4d4d4' }}>{title}</span>
-      </div>
-      <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>{description}</p>
+    // Same card chrome as every other settings block (collapsible, unified look)
+    <CollapsibleCard storageKey={cardKey('picker', title)}
+      title={<>{icon} {title}{value.length > 0 ? ` (${value.length})` : ''}</>}>
+      <p style={{ fontSize: 12, color: '#52535a', marginBottom: 12 }}>{description}</p>
 
       {/* Selected chips */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -313,6 +312,6 @@ export default function PickerList({ title, description, icon, pickerType, guild
           {saving ? 'Saving…' : 'Save'}
         </button>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }

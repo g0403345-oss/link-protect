@@ -6,6 +6,7 @@ import {
   ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2, Zap,
 } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
+import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 import type { ServerData, VerifyHealth } from '@/lib/db';
 
 interface Role { id: string; name: string; color: number; position: number; }
@@ -15,13 +16,9 @@ const roleColor = (c: number) => (c ? `#${c.toString(16).padStart(6, '0')}` : '#
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    // overflow stays visible so the role dropdown can extend past the card edge
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10 }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
-      </div>
-      <div style={{ padding: 18 }}>{children}</div>
-    </div>
+    <CollapsibleCard title={title} storageKey={cardKey('verify', title)}>
+      {children}
+    </CollapsibleCard>
   );
 }
 

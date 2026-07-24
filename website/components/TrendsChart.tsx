@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { TrendingUp, ShieldAlert, Zap } from 'lucide-react';
+import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 
 interface TrendDay {
   date: string; warned: number; kicked: number; banned: number; timeout: number; count: number;
@@ -62,13 +63,9 @@ export default function TrendsChart({ guildId }: { guildId: string }) {
   useEffect(() => { load(days); }, [days, load]);
 
   const card = (children: React.ReactNode, title: string, right?: React.ReactNode) => (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
-        {right}
-      </div>
-      <div style={{ padding: 18 }}>{children}</div>
-    </div>
+    <CollapsibleCard title={title} right={right} storageKey={cardKey('trends', title.replace(/ — .*$/, ''))}>
+      {children}
+    </CollapsibleCard>
   );
 
   const rangePicker = (

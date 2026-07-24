@@ -45,6 +45,8 @@ const ENTRIES: Entry[] = [
       'One-click auto-setup: creates (or reuses) the quarantine role, hides every category & channel from it, and adds a #verify info channel — no manual permission work.',
       'Warn-log filter: choose exactly which events appear in your log channel — blocked links, manual warns, Scam Shield, raids, lockdowns and (opt-in) verifications.',
       'Dashboard tour now covers the Security Score, presets, lockdown and the verification gate.',
+      'Every settings card is now collapsible — click its header to fold it away; the dashboard remembers your layout.',
+      'Access Control whitelists use the same card design as every other settings block.',
       'Custom background image for your verify page — auto-resized and compressed on upload, rendered faded like our homepage hero.',
       'Live permission check — see instantly whether the bot has the rights and role position the gate and lockdown need.',
       'Emergency lockdown as a compact control in the dashboard header — pulses red while active, one click restores everything.',

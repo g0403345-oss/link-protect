@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Award, Check, Copy } from 'lucide-react';
+import CollapsibleCard from '@/components/CollapsibleCard';
 
 // "Protected by Link Protect" embed card — shown on the guild dashboard
 // overview so admins can put the live badge on their website or README.
@@ -23,12 +24,8 @@ export default function BadgeCard({ guildId }: { guildId: string }) {
   };
 
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22', display: 'flex', alignItems: 'center', gap: 7 }}>
-        <Award size={14} color="#5865f2" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>Protected-by Badge</span>
-      </div>
-      <div style={{ padding: 18 }}>
+    <CollapsibleCard storageKey="dev_badge" title={<><Award size={14} color="#5865f2" /> Protected-by Badge</>}>
+      <div>
         <p style={{ fontSize: 12, color: '#6d6f78', marginBottom: 14, lineHeight: 1.55 }}>
           Show visitors your community is protected — embed this live badge on your website,
           GitHub README or forum signature. The counter updates automatically.
@@ -51,6 +48,6 @@ export default function BadgeCard({ guildId }: { guildId: string }) {
           ))}
         </div>
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }

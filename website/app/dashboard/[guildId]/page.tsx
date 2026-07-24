@@ -22,6 +22,7 @@ import DashboardTour from '@/components/DashboardTour';
 import SecurityScore from '@/components/SecurityScore';
 import DeveloperPanel from '@/components/DeveloperPanel';
 import PresetsCard from '@/components/PresetsCard';
+import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 import LockdownControl from '@/components/LockdownCard';
 import VerificationTab from '@/components/VerificationTab';
 import { useGuildTint } from '@/components/fx';
@@ -62,12 +63,9 @@ function useToast() {
 
 function Card({ title, children, tourId }: { title: string; children: React.ReactNode; tourId?: string }) {
   return (
-    <div data-tour={tourId} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid #1e1e22' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#949ba4' }}>{title}</span>
-      </div>
-      <div style={{ padding: 18 }}>{children}</div>
-    </div>
+    <CollapsibleCard title={title} tourId={tourId} storageKey={cardKey('guild', title)}>
+      {children}
+    </CollapsibleCard>
   );
 }
 
