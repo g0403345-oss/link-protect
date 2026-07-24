@@ -42,8 +42,9 @@ const ENTRIES: Entry[] = [
     title: 'Verification tab, lockdown button & changelog',
     items: [
       'New Verification tab: mode (quarantine / verified role), role picker, minimum account age, and a fully customizable verify page with live preview.',
+      'Custom background image for your verify page — auto-resized and compressed on upload, rendered faded like our homepage hero.',
       'Live permission check — see instantly whether the bot has the rights and role position the gate and lockdown need.',
-      'Emergency lockdown button on the server overview, with one-click restore.',
+      'Emergency lockdown as a compact control in the dashboard header — pulses red while active, one click restores everything.',
       'Public per-server verify pages at link-protect.com/verify/<server> in your colors.',
       'This changelog page — and verification-gate adoption in the admin protection graph.',
     ],

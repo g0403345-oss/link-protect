@@ -60,7 +60,13 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
   const accent = cfg?.page.accent ?? '#5865f2';
 
   return (
-    <div className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative' }}>
+    <div className="dot-grid" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden' }}>
+      {/* Custom server background — faded like the homepage hero */}
+      {cfg?.background && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/verify/bg/${cfg.guildId}?v=${cfg.backgroundVersion}`} alt="" aria-hidden
+          style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.3, pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.15) 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.15) 100%)' }} />
+      )}
       <div aria-hidden style={{ position: 'fixed', inset: 0, background: `radial-gradient(560px circle at 50% 0%, ${accent}26, transparent 65%)`, pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative', width: '100%', maxWidth: 420, background: '#111113', border: '1px solid #26262c', borderRadius: 20, padding: '36px 28px', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>

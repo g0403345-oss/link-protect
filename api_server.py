@@ -23,7 +23,7 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -2314,6 +2314,9 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "scamguard.enabled", "scamguard.channels", "scamguard.window",
         "scamguard.action", "scamguard.timeout_minutes",
         "scamguard.join_check", "scamguard.join_action", "scamguard.min_servers",
+        "verify.enabled", "verify.role_mode", "verify.role_id",
+        "verify.min_account_age_days",
+        "verify.page.headline", "verify.page.message", "verify.page.accent",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
@@ -3270,9 +3273,33 @@ def _ensure_verify_table():
         ts INTEGER NOT NULL
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_verifications_guild ON verifications (guild_id, ts DESC)")
+    c.execute("""CREATE TABLE IF NOT EXISTS verify_backgrounds (
+        guild_id TEXT PRIMARY KEY,
+        data BLOB NOT NULL,
+        mime TEXT NOT NULL,
+        updated INTEGER NOT NULL
+    )""")
     c.commit()
 
 _ensure_verify_table()
+
+_VERIFY_BG_MAX_BYTES = 1_500_000  # ~1.5 MB — the dashboard compresses client-side
+
+
+def _sniff_image(raw: bytes) -> str | None:
+    if raw[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _verify_bg_meta(guild_id: str) -> tuple[bool, int]:
+    row = _get_conn().execute(
+        "SELECT updated FROM verify_backgrounds WHERE guild_id=?", (str(guild_id),)).fetchone()
+    return (row is not None, row["updated"] if row else 0)
 
 
 _VERIFY_DEFAULT_PAGE = {
@@ -3525,11 +3552,13 @@ async def verify_public(request: Request, guild_id: str):
     data = _get_server(guild_id)
     cfg = _verify_cfg(data)
     info = (await _bot_guilds_info()).get(str(guild_id), {})
+    has_bg, bg_ver = _verify_bg_meta(guild_id)
     return {"enabled": cfg["enabled"] and data is not None,
             "guildId": str(guild_id),
             "name": info.get("name"), "icon": info.get("icon"),
             "minAccountAgeDays": cfg["min_account_age_days"],
-            "page": cfg["page"]}
+            "page": cfg["page"],
+            "background": has_bg, "backgroundVersion": bg_ver}
 
 
 class VerifyCompleteBody(BaseModel):
@@ -3662,6 +3691,49 @@ def _verify_stats_payload(guild_id: str) -> dict:
     week = c.execute("SELECT COUNT(*) AS n FROM verifications WHERE guild_id=? AND ts>=?",
                      (str(guild_id), int(time.time()) - 7 * 86400)).fetchone()["n"]
     return {"total": total, "last7": week}
+
+
+# ── Verification page background image (stored as a small blob) ──────────────
+
+@app.get("/api/guild/{guild_id}/verify/background")
+@require_auth
+async def get_verify_background(request: Request, guild_id: str):
+    row = _get_conn().execute(
+        "SELECT data, mime FROM verify_backgrounds WHERE guild_id=?", (str(guild_id),)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="No background")
+    return Response(content=row["data"], media_type=row["mime"])
+
+
+@app.put("/api/guild/{guild_id}/verify/background")
+@require_auth
+async def set_verify_background(request: Request, guild_id: str):
+    raw = await request.body()
+    if len(raw) > _VERIFY_BG_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 1.5 MB)")
+    mime = _sniff_image(raw)
+    if not mime:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG or WebP images")
+    now = int(time.time())
+    c = _get_conn()
+    c.execute("INSERT INTO verify_backgrounds(guild_id, data, mime, updated) VALUES(?,?,?,?) "
+              "ON CONFLICT(guild_id) DO UPDATE SET data=excluded.data, mime=excluded.mime, updated=excluded.updated",
+              (str(guild_id), raw, mime, now))
+    c.commit()
+    aid, aname = _web_actor(request)
+    _audit_record(guild_id, aid, aname, "verify.background", "🖼️ Verification page background updated", None, None)
+    return {"ok": True, "version": now}
+
+
+@app.delete("/api/guild/{guild_id}/verify/background")
+@require_auth
+async def delete_verify_background(request: Request, guild_id: str):
+    c = _get_conn()
+    c.execute("DELETE FROM verify_backgrounds WHERE guild_id=?", (str(guild_id),))
+    c.commit()
+    aid, aname = _web_actor(request)
+    _audit_record(guild_id, aid, aname, "verify.background", "🖼️ Verification page background removed", None, None)
+    return {"ok": True}
 
 
 @app.get("/api/actions")

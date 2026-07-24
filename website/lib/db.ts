@@ -230,6 +230,8 @@ export interface VerifyPublicConfig {
   icon: string | null;
   minAccountAgeDays: number;
   page: { headline: string; message: string; accent: string };
+  background: boolean;
+  backgroundVersion: number;
 }
 
 export async function getVerifyPublic(guildId: string): Promise<VerifyPublicConfig> {

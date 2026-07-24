@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   UserCheck, RefreshCw, CheckCircle2, XCircle, Copy, Check, Save,
-  ShieldCheck, Clock, Search, ChevronDown,
+  ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2,
 } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import type { ServerData, VerifyHealth } from '@/lib/db';
@@ -56,6 +56,12 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
   const [stats, setStats] = useState<{ total: number; last7: number } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  /* background image */
+  const [bgVersion, setBgVersion] = useState<number | null>(null); // null = none
+  const [bgBusy, setBgBusy] = useState(false);
+  const [bgError, setBgError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-roles`)
       .then((r) => (r.ok ? r.json() : null))
@@ -65,7 +71,53 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d && !d.error) setStats(d); })
       .catch(() => {});
+    fetch(`/api/verify/${guildId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.background) setBgVersion(d.backgroundVersion ?? 1); })
+      .catch(() => {});
   }, [guildId]);
+
+  /** Downscale + compress in the browser so uploads are always fast and small:
+   *  max 1920×1200, JPEG, targets ≤ ~1 MB (retries at lower quality). */
+  const processAndUpload = async (file: File) => {
+    setBgBusy(true); setBgError(null);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1920 / bitmap.width, 1200 / bitmap.height);
+      const w = Math.round(bitmap.width * scale);
+      const h = Math.round(bitmap.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error();
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      let blob: Blob | null = null;
+      for (const quality of [0.82, 0.68, 0.55]) {
+        blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
+        if (blob && blob.size <= 1_000_000) break;
+      }
+      if (!blob) throw new Error();
+      if (blob.size > 1_400_000) { setBgError('Image is too complex — try a simpler one.'); return; }
+      const res = await fetch(`/api/guild/${guildId}/verify/background`, { method: 'PUT', body: blob });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setBgError(d.error ?? 'Upload failed'); return; }
+      setBgVersion(d.version ?? Date.now());
+    } catch {
+      setBgError('Couldn’t read that image — use a JPEG, PNG or WebP.');
+    } finally {
+      setBgBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const removeBackground = async () => {
+    setBgBusy(true);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/verify/background`, { method: 'DELETE' });
+      if (res.ok) setBgVersion(null);
+    } catch { /* ignore */ }
+    finally { setBgBusy(false); }
+  };
 
   const loadHealth = useCallback(() => {
     setHealthLoading(true);
@@ -267,6 +319,29 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
                   style={{ ...input, width: 90, fontFamily: 'monospace', padding: '6px 9px' }} />
               </div>
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 6 }}>Background image</label>
+              <p style={{ fontSize: 11.5, color: '#52535a', marginBottom: 8, lineHeight: 1.5 }}>
+                Shown faded behind your page, like our homepage hero. Any image works — it&rsquo;s
+                automatically resized to max 1920px and compressed to under 1&nbsp;MB.
+              </p>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) processAndUpload(f); }} />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => fileRef.current?.click()} disabled={bgBusy}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 15px', fontSize: 12.5, fontWeight: 600, color: '#f2f3f5', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', opacity: bgBusy ? 0.6 : 1 }}>
+                  {bgBusy ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <ImagePlus size={13} />}
+                  {bgVersion ? 'Replace image' : 'Upload image'}
+                </button>
+                {bgVersion && (
+                  <button onClick={removeBackground} disabled={bgBusy}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 13px', fontSize: 12.5, fontWeight: 600, color: '#f23f43', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.3)', borderRadius: 8, cursor: 'pointer' }}>
+                    <Trash2 size={13} /> Remove
+                  </button>
+                )}
+              </div>
+              {bgError && <p style={{ fontSize: 12, color: '#f87171', marginTop: 8 }}>{bgError}</p>}
+            </div>
             {pageDirty && (
               <button onClick={savePage} disabled={pageSaving}
                 style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: pageSaving ? 0.6 : 1 }}>
@@ -278,7 +353,12 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
           {/* Live preview */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 6 }}>Live preview</label>
-            <div style={{ borderRadius: 14, border: '1px solid #2e2e36', background: '#0a0a0c', padding: '26px 18px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ borderRadius: 14, border: '1px solid #2e2e36', background: '#0a0a0c', padding: '26px 18px', textAlign: 'center', position: 'relative', overflow: 'hidden', isolation: 'isolate' }}>
+              {bgVersion && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/verify/bg/${guildId}?v=${bgVersion}`} alt="" aria-hidden
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.28, WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)' }} />
+              )}
               <div aria-hidden style={{ position: 'absolute', inset: 0, background: `radial-gradient(300px circle at 50% -20%, ${/^#[0-9a-fA-F]{6}$/.test(accentDraft) ? accentDraft : '#5865f2'}30, transparent 70%)` }} />
               <div style={{ position: 'relative' }}>
                 {guildIcon ? (

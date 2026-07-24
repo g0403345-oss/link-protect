@@ -22,7 +22,7 @@ import DashboardTour from '@/components/DashboardTour';
 import SecurityScore from '@/components/SecurityScore';
 import DeveloperPanel from '@/components/DeveloperPanel';
 import PresetsCard from '@/components/PresetsCard';
-import LockdownCard from '@/components/LockdownCard';
+import LockdownControl from '@/components/LockdownCard';
 import VerificationTab from '@/components/VerificationTab';
 import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
@@ -488,6 +488,7 @@ export default function GuildDashboard() {
           </span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <LockdownControl guildId={guildId} onToast={addToast} />
           <ReportForm guildId={guildId} />
           <button onClick={() => setTourRun(true)} title="Take the dashboard tour"
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s' }}
@@ -545,7 +546,6 @@ export default function GuildDashboard() {
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
-                  <LockdownCard guildId={guildId} onToast={addToast} />
                   <Card title="Warning Thresholds">
                     <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
                       {[
