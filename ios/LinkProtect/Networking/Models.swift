@@ -310,6 +310,18 @@ struct VerifyStats: Codable, Equatable {
     var last7 = 0
 }
 
+/// Result of the one-click quarantine setup (role + channel locks).
+struct VerifySetupResult: Codable, Equatable {
+    var ok = false
+    var roleId = ""
+    var roleName = ""
+    var roleCreated = false
+    var channelsLocked = 0
+    var channelsSkipped = 0
+    var channelsFailed = 0
+    var infoChannel: String? = nil
+}
+
 /// `warn` mixes fixed config keys (kick/ban/timeout) with one entry per warned
 /// user. We split them apart at decode time.
 struct WarnConfig: Codable, Equatable {

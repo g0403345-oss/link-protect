@@ -245,6 +245,25 @@ export async function completeVerify(guildId: string, userId: string): Promise<{
   });
 }
 
+export interface VerifySetupResult {
+  ok: boolean;
+  roleId: string;
+  roleName: string;
+  roleCreated: boolean;
+  channelsLocked: number;
+  channelsSkipped: number;
+  channelsFailed: number;
+  infoChannel: "created" | "existing" | null;
+}
+
+export async function setupVerifyRole(guildId: string): Promise<VerifySetupResult> {
+  // Locks every channel one by one — give it time on big servers.
+  return apiFetch(`/api/guild/${guildId}/verify/setup-role`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  }, 180_000);
+}
+
 export async function resetUserWarns(guildId: string, userId: string): Promise<void> {
   await apiFetch(`/api/guild/${guildId}/warns/${userId}`, { method: "DELETE" });
 }

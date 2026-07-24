@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   UserCheck, RefreshCw, CheckCircle2, XCircle, Copy, Check, Save,
-  ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2,
+  ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2, Zap,
 } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import type { ServerData, VerifyHealth } from '@/lib/db';
@@ -24,12 +24,14 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export default function VerificationTab({ guildId, data, patch, saving, guildIcon }: {
+export default function VerificationTab({ guildId, data, patch, saving, guildIcon, onToast, onRefresh }: {
   guildId: string;
   data: ServerData;
   patch: (path: string, value: unknown, label?: string) => Promise<void> | void;
   saving: string | null;
   guildIcon?: string | null;
+  onToast?: (type: 'success' | 'error', message: string) => void;
+  onRefresh?: () => void;
 }) {
   const verify = data.verify ?? {};
   const enabled = !!verify.enabled;
@@ -61,6 +63,40 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
   const [bgBusy, setBgBusy] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /* one-click role + channel setup */
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupConfirm, setSetupConfirm] = useState(false);
+
+  const runSetup = async () => {
+    if (!setupConfirm) {
+      setSetupConfirm(true);
+      setTimeout(() => setSetupConfirm(false), 4500);
+      return;
+    }
+    setSetupConfirm(false);
+    setSetupBusy(true);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/verify/setup-role`, { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) { onToast?.('error', d.error ?? 'Setup failed'); return; }
+      onToast?.('success',
+        `@${d.roleName} ${d.roleCreated ? 'created' : 'reused'} — ${d.channelsLocked} channels locked`
+        + (d.channelsSkipped ? `, ${d.channelsSkipped} already done` : '')
+        + (d.infoChannel === 'created' ? ', #verify channel created' : ''));
+      // Pull fresh settings/roles/health — the endpoint changed all three.
+      onRefresh?.();
+      fetch(`/api/guild/${guildId}/discord-roles`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rd) => { if (rd?.roles) setRoles(rd.roles as Role[]); })
+        .catch(() => {});
+      loadHealth();
+    } catch {
+      onToast?.('error', 'Could not reach the server');
+    } finally {
+      setSetupBusy(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-roles`)
@@ -248,6 +284,34 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* One-click role + channel setup */}
+            <div style={{ marginTop: 14, padding: '13px 14px', background: 'rgba(88,101,242,0.05)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <Zap size={13} color="#f0b232" />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f3f5' }}>Auto-setup — no manual channel work</span>
+                  </div>
+                  <p style={{ fontSize: 11.5, color: '#6d6f78', lineHeight: 1.55 }}>
+                    One click: {selectedRole ? <>uses <b style={{ color: '#f2f3f5' }}>@{selectedRole.name}</b></> : <>creates an <b style={{ color: '#f2f3f5' }}>@Unverified</b> role</>},
+                    hides <b style={{ color: '#f2f3f5' }}>every category &amp; channel</b> from it (existing locks are kept),
+                    creates a <b style={{ color: '#f2f3f5' }}>#verify</b> info channel only that role can see, and switches
+                    the gate to quarantine mode. Safe to re-run any time.
+                  </p>
+                </div>
+                <button onClick={runSetup} disabled={setupBusy}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 16px', fontSize: 13, fontWeight: 700, background: setupConfirm ? '#f0b232' : '#5865f2', color: setupConfirm ? '#111' : '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', opacity: setupBusy ? 0.6 : 1, transition: 'all 0.15s', flexShrink: 0 }}>
+                  {setupBusy ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={14} />}
+                  {setupBusy ? 'Locking channels…' : setupConfirm ? 'Run setup now?' : 'Auto-setup'}
+                </button>
+              </div>
+              {setupBusy && (
+                <p style={{ fontSize: 11, color: '#52535a', marginTop: 8 }}>
+                  Applying channel permissions one by one — up to a minute on large servers.
+                </p>
+              )}
             </div>
 
             {/* Min account age */}

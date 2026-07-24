@@ -3693,6 +3693,135 @@ def _verify_stats_payload(guild_id: str) -> dict:
     return {"total": total, "last7": week}
 
 
+# ── One-click quarantine setup: role + channel locks + info channel ──────────
+
+_PERM_VIEW_CHANNEL = 0x400
+_PERM_SEND_MESSAGES = 0x800
+_SETUP_CHANNEL_CAP = 150
+
+
+class VerifySetupBody(BaseModel):
+    roleName: str | None = None
+    createInfoChannel: bool = True
+
+
+async def _verify_setup_role(guild_id: str, body: VerifySetupBody, actor: str | None) -> dict:
+    """Everything the user otherwise does by hand: ensure the quarantine role
+    exists, deny VIEW_CHANNEL for it on every category & channel (preserving
+    all other overwrite bits — idempotent, safe to re-run), optionally create a
+    #verify info channel only that role can see, and switch the gate to
+    quarantine mode."""
+    data = _get_server(guild_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    cfg = _verify_cfg(data)
+    name = (body.roleName or "").strip()[:80] or "Unverified"
+
+    async with httpx.AsyncClient() as client:
+        # 1) Role: reuse the configured one when it still exists, else create.
+        g = await client.get(f"{DISCORD_API}/guilds/{guild_id}", headers=_bot_headers(), timeout=8)
+        if g.status_code != 200:
+            raise HTTPException(status_code=404, detail="Bot is not in this server")
+        roles = {r["id"]: r for r in g.json().get("roles", [])}
+        role = roles.get(cfg["role_id"]) if cfg["role_id"] else None
+        created = False
+        if role is None:
+            r = await client.post(f"{DISCORD_API}/guilds/{guild_id}/roles", headers=_bot_headers(),
+                                  json={"name": name, "permissions": "0", "mentionable": False,
+                                        "color": 0x546E7A}, timeout=8)
+            if r.status_code != 200:
+                raise HTTPException(status_code=400,
+                                    detail="Couldn't create the role — give me the Manage Roles permission.")
+            role = r.json()
+            created = True
+        role_id = role["id"]
+
+        # 2) Deny VIEW_CHANNEL on every category + channel (keep other bits).
+        ch = await client.get(f"{DISCORD_API}/guilds/{guild_id}/channels", headers=_bot_headers(), timeout=10)
+        channels = ch.json() if ch.status_code == 200 else []
+        locked = skipped = failed = 0
+        existing_verify_channel = next(
+            (c for c in channels if c.get("type") == 0 and c.get("name") == "verify"), None)
+        for c in channels[:_SETUP_CHANNEL_CAP]:
+            if existing_verify_channel and c["id"] == existing_verify_channel["id"]:
+                continue  # the info channel must stay visible to the role
+            ow = next((o for o in c.get("permission_overwrites", [])
+                       if o.get("id") == role_id), None)
+            allow = int(ow["allow"]) if ow else 0
+            deny = int(ow["deny"]) if ow else 0
+            if deny & _PERM_VIEW_CHANNEL:
+                skipped += 1
+                continue
+            resp = await client.put(
+                f"{DISCORD_API}/channels/{c['id']}/permissions/{role_id}", headers=_bot_headers(),
+                json={"type": 0, "allow": str(allow & ~_PERM_VIEW_CHANNEL),
+                      "deny": str(deny | _PERM_VIEW_CHANNEL)}, timeout=8)
+            if resp.status_code in (200, 204):
+                locked += 1
+            else:
+                failed += 1
+            await asyncio.sleep(0.2)  # stay well under per-channel rate limits
+
+        # 3) Info channel: the ONLY thing unverified members can see, with the
+        #    verify link — DMs may be closed, so this is their signpost.
+        info_status = None
+        if body.createInfoChannel:
+            if existing_verify_channel:
+                info_status = "existing"
+            else:
+                cr = await client.post(
+                    f"{DISCORD_API}/guilds/{guild_id}/channels", headers=_bot_headers(),
+                    json={"name": "verify", "type": 0, "topic": "Verify to unlock this server",
+                          "permission_overwrites": [
+                              {"id": str(guild_id), "type": 0, "deny": str(_PERM_VIEW_CHANNEL)},
+                              {"id": role_id, "type": 0, "allow": str(_PERM_VIEW_CHANNEL),
+                               "deny": str(_PERM_SEND_MESSAGES)},
+                              {"id": BOT_CLIENT_ID, "type": 1,
+                               "allow": str(_PERM_VIEW_CHANNEL | _PERM_SEND_MESSAGES)},
+                          ]}, timeout=8)
+                if cr.status_code in (200, 201):
+                    info_status = "created"
+                    try:
+                        await client.post(
+                            f"{DISCORD_API}/channels/{cr.json()['id']}/messages", headers=_bot_headers(),
+                            json={"embeds": [{
+                                "title": "👋 One step to unlock this server",
+                                "description": f"**[Click here to verify]"
+                                               f"(https://link-protect.com/verify/{guild_id})** — "
+                                               "one click with your Discord account and you're in.",
+                                "color": 0x5B6CFF,
+                                "footer": {"text": "Link Protect • link-protect.com"}}]},
+                            timeout=8)
+                    except Exception:
+                        pass
+
+    # 4) Flip the gate to quarantine mode with this role.
+    _deep_set(data, "verify.role_id", str(role_id))
+    _deep_set(data, "verify.role_mode", "quarantine")
+    _deep_set(data, "verify.enabled", True)
+    _save_server(guild_id, data)
+    _invalidate(guild_id)
+    _audit_record(guild_id, None, actor, "verify.setup",
+                  f"⚡ Verification auto-setup: @{role['name']} locked out of {locked} channels", None, None)
+    return {"ok": True, "roleId": str(role_id), "roleName": role["name"], "roleCreated": created,
+            "channelsLocked": locked, "channelsSkipped": skipped, "channelsFailed": failed,
+            "infoChannel": info_status}
+
+
+@app.post("/api/guild/{guild_id}/verify/setup-role")
+@require_auth
+async def verify_setup_role(request: Request, guild_id: str, body: VerifySetupBody):
+    _, aname = _web_actor(request)
+    return await _verify_setup_role(guild_id, body, aname)
+
+
+@app.post("/api/mobile/guild/{guild_id}/verify/setup-role")
+async def mobile_verify_setup_role(request: Request, guild_id: str, body: VerifySetupBody):
+    await _require_access(request, guild_id)
+    aname = await _mobile_actor_name(request)
+    return await _verify_setup_role(guild_id, body, aname)
+
+
 # ── Verification page background image (stored as a small blob) ──────────────
 
 @app.get("/api/guild/{guild_id}/verify/background")

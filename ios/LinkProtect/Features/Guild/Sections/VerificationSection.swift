@@ -4,10 +4,13 @@ import SwiftUI
 /// minimum account age, the live permission check and the per-server page link.
 struct VerificationSection: View {
     @ObservedObject var vm: GuildConfigViewModel
+    @EnvironmentObject private var toasts: ToastCenter
     @State private var health: VerifyHealth?
     @State private var stats: VerifyStats?
     @State private var healthLoading = false
     @State private var copied = false
+    @State private var setupConfirm = false
+    @State private var setupBusy = false
 
     private var data: ServerData { vm.data ?? ServerData() }
     private var verify: ServerData.Verify { data.verify }
@@ -41,6 +44,8 @@ struct VerificationSection: View {
                     modePicker
 
                     rolePicker
+
+                    autoSetup
 
                     NumberStepper(label: "Minimum account age (days)",
                                   description: "Accounts younger than this can't verify. 0 = off.",
@@ -142,6 +147,59 @@ struct VerificationSection: View {
         healthLoading = true
         health = await vm.verifyHealth()
         healthLoading = false
+    }
+
+    // MARK: One-click setup
+
+    private var autoSetup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill").foregroundStyle(Theme.yellow).font(.system(size: 12))
+                Text("Auto-setup — no manual channel work").font(LPFont.label).foregroundStyle(Theme.text)
+            }
+            Text("Creates (or reuses) the quarantine role, hides every category & channel from it, adds a #verify info channel and switches the gate to quarantine mode. Safe to re-run.")
+                .font(LPFont.tiny).fontWeight(.regular).foregroundStyle(Theme.dim)
+            Button {
+                setupConfirm = true
+            } label: {
+                HStack(spacing: 7) {
+                    if setupBusy { Spinner(size: 13) } else { Image(systemName: "bolt.fill") }
+                    Text(setupBusy ? "Locking channels…" : "Run auto-setup")
+                }
+                .font(LPFont.label)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .foregroundStyle(.white)
+                .background(Theme.blurple)
+                .clipShape(RoundedRectangle(cornerRadius: 9))
+            }
+            .buttonStyle(PressScaleStyle())
+            .disabled(setupBusy)
+        }
+        .padding(12)
+        .background(Theme.blurple.opacity(0.06))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.blurple.opacity(0.25), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .confirmationDialog("Lock all channels for unverified members?", isPresented: $setupConfirm, titleVisibility: .visible) {
+            Button("Run auto-setup") { Task { await runSetup() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Existing channel locks are kept — this only fills the gaps. Can take up to a minute.")
+        }
+    }
+
+    private func runSetup() async {
+        setupBusy = true
+        do {
+            let r = try await vm.setupVerifyRole()
+            toasts.success("@\(r.roleName) — \(r.channelsLocked) channels locked"
+                           + (r.infoChannel == "created" ? " · #verify created" : ""))
+            await vm.load()
+            await reloadHealth()
+        } catch {
+            toasts.error("Setup failed — check my permissions")
+        }
+        setupBusy = false
     }
 
     // MARK: Mode

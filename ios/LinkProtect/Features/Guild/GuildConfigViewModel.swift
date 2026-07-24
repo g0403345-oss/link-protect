@@ -70,6 +70,7 @@ final class GuildConfigViewModel: ObservableObject {
 
     func verifyHealth() async -> VerifyHealth? { try? await api.verifyHealth(guildId) }
     func verifyStats() async -> VerifyStats? { try? await api.verifyStats(guildId) }
+    func setupVerifyRole() async throws -> VerifySetupResult { try await api.setupVerifyRole(guildId) }
     func refreshActions() async { actions = (try? await api.actions(guildId, limit: 50)) ?? [] }
     func loadAudit() async { audit = (try? await api.auditLog(guildId)) ?? [] }
     func loadTrends() async { if trends == nil { trends = try? await api.trends(guildId, days: 14) } }

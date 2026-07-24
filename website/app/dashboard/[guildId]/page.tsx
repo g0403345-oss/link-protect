@@ -585,7 +585,7 @@ export default function GuildDashboard() {
               {section === 'verification' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <SectionHeader title="Verification Gate" description="New members verify on your personal web page — a hurdle scam bots can't take" icon={UserCheck} />
-                  <VerificationTab guildId={guildId} data={data} patch={patch} saving={saving} guildIcon={guildInfo?.icon} />
+                  <VerificationTab guildId={guildId} data={data} patch={patch} saving={saving} guildIcon={guildInfo?.icon} onToast={addToast} onRefresh={refreshDataSilently} />
                 </div>
               )}
 

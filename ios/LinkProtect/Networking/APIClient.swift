@@ -131,6 +131,22 @@ struct APIClient {
         return try await request("/api/mobile/guild/\(guildId)/verify/stats")
     }
 
+    /// One-click quarantine setup: role + channel locks + #verify info channel.
+    func setupVerifyRole(_ guildId: String) async throws -> VerifySetupResult {
+        struct Body: Encodable { let createInfoChannel = true }
+        if demo {
+            return VerifySetupResult(ok: true, roleId: "1", roleName: "Unverified", roleCreated: true,
+                                     channelsLocked: 8, channelsSkipped: 0, channelsFailed: 0,
+                                     infoChannel: "created")
+        }
+        let data = try await perform("/api/mobile/guild/\(guildId)/verify/setup-role", method: "POST",
+                                     body: Body(), timeout: 180)
+        guard let result = try? JSONDecoder().decode(VerifySetupResult.self, from: data) else {
+            throw APIError.decoding
+        }
+        return result
+    }
+
     /// Set or replace a single channel's rule override.
     func setOverride(_ guildId: String, channelId: String, _ override: ChannelOverride) async throws {
         if demo { return }
