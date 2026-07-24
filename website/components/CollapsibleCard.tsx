@@ -27,13 +27,12 @@ export default function CollapsibleCard({ title, children, tourId, right, storag
   }, [storageKey]);
 
   const toggle = () => {
-    setCollapsed((c) => {
-      const next = !c;
-      if (storageKey) {
-        try { localStorage.setItem(`lpcc_${storageKey}`, next ? '1' : '0'); } catch { /* ignore */ }
-      }
-      return next;
-    });
+    // Side effect outside the updater — updaters must stay pure.
+    const next = !collapsed;
+    setCollapsed(next);
+    if (storageKey) {
+      try { localStorage.setItem(`lpcc_${storageKey}`, next ? '1' : '0'); } catch { /* ignore */ }
+    }
   };
 
   return (

@@ -532,8 +532,10 @@ export default function GuildDashboard() {
         {/* Content */}
         <main ref={mainRef} className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
           <div style={{ marginBottom: 20 }}><VoteBanner /></div>
-          <AnimatePresence mode="wait">
-            <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          {/* Enter-only animation: with AnimatePresence mode="wait" the next
+              section only mounted after the old one's exit finished — a stuck
+              exit (seen after collapsing a card) left the tab empty. */}
+          <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
 
               {/* OVERVIEW */}
               {section === 'overview' && (
@@ -1169,7 +1171,6 @@ export default function GuildDashboard() {
               )}
 
             </motion.div>
-          </AnimatePresence>
         </main>
       </div>
 
