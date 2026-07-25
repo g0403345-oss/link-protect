@@ -389,7 +389,10 @@ class ScamShield(commands.Cog):
                 color=discord.Color.red(),
             )
             embed.set_footer(text="Link Protect · link-protect.com")
-            await member.send(embed=embed)
+            view = discord.ui.View(timeout=None)
+            view.add_item(discord.ui.Button(label="Appeal this decision",
+                                            url="https://link-protect.com/appeal"))
+            await member.send(embed=embed, view=view)
         except Exception:
             pass  # DMs closed — nothing else we can do.
 

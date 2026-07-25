@@ -9,7 +9,7 @@ removal, account-age check, page config) lives in api_server.py.
 import discord
 from discord.ext import commands
 
-from .shared import get_settings
+from .shared import get_settings, render_message, message_accent
 
 
 class VerifyGate(commands.Cog):
@@ -36,18 +36,20 @@ class VerifyGate(commands.Cog):
                 pass  # missing perms/role — the dashboard health check surfaces this
 
         # Both modes: send the personal verify link (best-effort, DMs may be off).
+        # Text is admin-customizable (Message Studio: messages.verify_dm).
         try:
+            link = f"https://link-protect.com/verify/{member.guild.id}"
             embed = discord.Embed(
                 title=f"Verify to unlock {member.guild.name}",
-                description=(
-                    "This server uses a verification gate to keep scam bots out.\n\n"
-                    f"**[Click here to verify](https://link-protect.com/verify/{member.guild.id})** — "
-                    "one click with your Discord account and you're in."
-                ),
-                color=0x5B6CFF,
+                description=render_message(settings, "verify_dm", user=member.mention,
+                                           username=member.name, server=member.guild.name,
+                                           link=link),
+                color=message_accent(settings),
             )
             embed.set_footer(text="Link Protect • link-protect.com")
-            await member.send(embed=embed)
+            view = discord.ui.View(timeout=None)
+            view.add_item(discord.ui.Button(label="Verify now", url=link))
+            await member.send(embed=embed, view=view)
         except Exception:
             pass
 

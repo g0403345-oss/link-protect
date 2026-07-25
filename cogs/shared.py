@@ -727,6 +727,53 @@ async def notify_action_failure(bot, guild, settings, *, feature: str, action: s
         pass
 
 
+# ── Message Studio: admin-customizable bot messages ─────────────────────────
+# Templates live in settings["messages"][key]; empty/missing → default. The
+# web dashboard edits them (PATCH messages.*), the bot only ever renders.
+
+DEFAULT_MESSAGES = {
+    "warn_channel": "{user} — your message was removed.\n**Reason:** {reason}",
+    "warn_manual": "{user} was warned by a moderator.\n**Reason:** {reason}",
+    "warn_dm": "Your link in **{server}** was removed.\n**Reason:** {reason}",
+    "action_dm": "You were **{action}** on **{server}** after reaching {warnings} warnings.",
+    "verify_dm": "Welcome to **{server}**! Verify your account to unlock the server: {link}",
+    "lockdown_announce": "🚨 **Emergency lockdown active.** Links are blocked and invites are "
+                         "paused while the moderators handle the situation.",
+}
+
+_TEMPLATE_VARS = {"user", "username", "server", "reason", "warnings", "remaining",
+                  "channel", "action", "link"}
+
+
+def render_message(settings: dict, key: str, **vars) -> str:
+    """Fill a message template. Unknown {tokens} stay literal, custom templates
+    are capped at 700 chars so nobody can turn the bot into a spam cannon."""
+    tpl = ((settings.get("messages") or {}).get(key) or "").strip() or DEFAULT_MESSAGES.get(key, "")
+    tpl = tpl[:700]
+    out = tpl
+    for name in _TEMPLATE_VARS:
+        if name in vars and vars[name] is not None:
+            out = out.replace("{" + name + "}", str(vars[name]))
+    return out
+
+
+def message_accent(settings: dict) -> int:
+    """The server's embed accent color (falls back to the brand blurple)."""
+    raw = str((settings.get("messages") or {}).get("accent") or "").lstrip("#")
+    try:
+        if len(raw) == 6:
+            return int(raw, 16)
+    except ValueError:
+        pass
+    return 0x5B6CFF
+
+
+# Embeds 2.0: one action color ramp, identical to the web dashboard.
+ACTION_COLORS = {"warned": 0xF0B232, "kicked": 0xE0683C, "banned": 0xF23F43, "timeout": 0x5865F2}
+DASHBOARD_URL = "https://link-protect.com/dashboard"
+APPEAL_URL = "https://link-protect.com/appeal"
+
+
 # ── blocked-link capture (threat-intel data collection) ──────────────────────
 # Whenever the bot blocks a message we record the link(s) it contained so we can
 # build a real-world feed of bad URLs. We store ONLY the link + category + counts
@@ -1161,6 +1208,22 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
     action_succeeded = None       # "ban" | "kick" | "timeout"
     action_failed = None          # (action, [reason lines])
     if attempted:
+        # DM BEFORE acting — after a kick/ban there is no mutual server left
+        # and Discord refuses the DM. Template: messages.action_dm.
+        try:
+            _past = {"ban": "banned", "kick": "kicked", "timeout": "timed out"}[attempted]
+            _dm = discord.Embed(
+                description=render_message(settings, "action_dm", user=member.mention,
+                                           username=getattr(member, "name", ""),
+                                           server=guild.name, action=_past, warnings=warn_count),
+                color=ACTION_COLORS.get("banned" if attempted == "ban" else
+                                        "kicked" if attempted == "kick" else "timeout", 0xF23F43),
+            )
+            _view = discord.ui.View(timeout=None)
+            _view.add_item(discord.ui.Button(label="Appeal this decision", url=APPEAL_URL))
+            await member.send(embed=_dm, view=_view)
+        except Exception:
+            pass
         try:
             if attempted == "ban":
                 await member.ban(reason=f"Auto-ban: reached {ban_limit} warnings")
@@ -1186,6 +1249,9 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
                     user_id, username, _plain_failure_reasons(attempted, member, guild))
             except Exception:
                 pass
+
+    _upcoming_limits = [l for l in (kick_limit, ban_limit) if l and warn_count < l]
+    remaining_txt = str(min(_upcoming_limits) - warn_count) if _upcoming_limits else "0"
 
     def _progress_footer():
         """'X more warning(s) → kicked/banned' for the nearest upcoming limit."""
@@ -1228,8 +1294,12 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
         # silent mode only mutes automatic link-block messages.
         warn_embed = discord.Embed(
             title="⚠️ Warning issued",
-            description=f"{moderator.mention} warned {member.mention}\n**Reason:** {reason}",
-            color=discord.Color.dark_red(),
+            description=render_message(settings, "warn_manual", user=member.mention,
+                                       username=getattr(member, "name", ""), server=guild.name,
+                                       reason=reason, warnings=warn_count, remaining=remaining_txt,
+                                       channel=getattr(channel, "mention", "")) +
+                        f"\n-# Moderator: {moderator.mention}",
+            color=ACTION_COLORS["warned"],
         )
         try:
             await channel.send(embed=_decorate(warn_embed))
@@ -1240,8 +1310,11 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
         try:
             dm_embed = discord.Embed(
                 title="🔗 Your link was removed",
-                description=f"**Server:** {guild.name}\n**Channel:** {channel.mention}\n**Reason:** {reason}",
-                color=discord.Color.dark_red(),
+                description=render_message(settings, "warn_dm", user=member.mention,
+                                           username=getattr(member, "name", ""), server=guild.name,
+                                           reason=reason, warnings=warn_count, remaining=remaining_txt,
+                                           channel=getattr(channel, "mention", "")),
+                color=ACTION_COLORS["warned"],
             )
             await member.send(embed=_decorate(dm_embed))
         except Exception:
@@ -1249,8 +1322,11 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
     else:
         warn_embed = discord.Embed(
             title="🔗 Link Blocked",
-            description=f"{member.mention} — your message was removed.\n**Reason:** {reason}",
-            color=discord.Color.dark_red(),
+            description=render_message(settings, "warn_channel", user=member.mention,
+                                       username=getattr(member, "name", ""), server=guild.name,
+                                       reason=reason, warnings=warn_count, remaining=remaining_txt,
+                                       channel=getattr(channel, "mention", "")),
+            color=ACTION_COLORS["warned"],
         )
         try:
             await channel.send(embed=_decorate(warn_embed))
@@ -1264,6 +1340,8 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
     log_channel_id = settings.get("log", {}).get("log-channel", 0)
     if _show.get(_log_kind, True) is False:
         log_channel_id = 0
+    if settings.get("log", {}).get("digest"):
+        log_channel_id = 0  # daily digest replaces the per-action log posts
     log_channel = bot.get_channel(int(log_channel_id)) if log_channel_id else None
     if log_channel:
         log_embed = discord.Embed(
@@ -1273,8 +1351,15 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
                         + (f"**Moderator:** {moderator.mention}" if moderator is not None
                            else f"**Channel:** {channel.mention}"
                                 + (" *(silent mode)*" if silent else "")),
-            color=discord.Color.blurple(),
+            color=ACTION_COLORS.get(action_succeeded and
+                                    {"kick": "kicked", "ban": "banned", "timeout": "timeout"}[action_succeeded]
+                                    or "warned", 0xF0B232),
         )
+        try:
+            log_embed.set_thumbnail(url=member.display_avatar.url)
+        except Exception:
+            pass
+        log_embed.timestamp = discord.utils.utcnow()
         if content:
             log_embed.add_field(name="Content", value=f"```{content[:900]}```", inline=False)
         log_embed.add_field(name="Total Warnings", value=str(warn_count))
@@ -1290,7 +1375,15 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
                 value="\n".join(action_failed[1]),
                 inline=False,
             )
+        # Embeds 2.0: quick actions on every log entry. The "Remove warning"
+        # button is handled by the raw component listener in main.py (custom_id
+        # "lpw:rm:<guild>:<user>"), so it survives bot restarts.
+        _lview = discord.ui.View(timeout=None)
+        _lview.add_item(discord.ui.Button(label="Open dashboard", style=discord.ButtonStyle.link,
+                                          url=f"{DASHBOARD_URL}/{guild_id}"))
+        _lview.add_item(discord.ui.Button(label="Remove warning", style=discord.ButtonStyle.secondary,
+                                          emoji="↩️", custom_id=f"lpw:rm:{guild_id}:{user_id}"))
         try:
-            await log_channel.send(embed=log_embed)
+            await log_channel.send(embed=log_embed, view=_lview)
         except discord.Forbidden:
             pass  # No permission in the configured log channel — skip logging.

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Loader2, ChevronDown, Hash, Check, XCircle, Megaphone } from 'lucide-react';
+import ToggleSwitch from '@/components/ToggleSwitch';
 
 interface DiscordChannel { id: string; name: string; type: number; position: number; parent_id?: string | null; }
 
@@ -17,6 +18,8 @@ interface Props {
   saving: string | null;
   /** Per-category log filter (`log.show.*`) — absent keys use the defaults. */
   show?: Record<string, boolean>;
+  /** Mirrors `log.digest` — one daily summary embed instead of per-action messages. */
+  digest?: boolean;
 }
 
 // What can appear in the log — everything defaults to on except verifications.
@@ -39,7 +42,7 @@ function isTextChannel(type: number) {
  * `/disable-warn-log`. Selecting a channel writes `log.log-channel` and turns on
  * `log.Activated`; "Disable" clears the channel and the flag.
  */
-export default function WarnLogConfig({ guildId, channelId, activated, onPatch, saving, show }: Props) {
+export default function WarnLogConfig({ guildId, channelId, activated, onPatch, saving, show, digest }: Props) {
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -192,6 +195,19 @@ export default function WarnLogConfig({ guildId, channelId, activated, onPatch, 
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Daily digest — only relevant once a log channel is active */}
+      {enabled && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #1e1e22' }}>
+          <ToggleSwitch
+            checked={!!digest}
+            onChange={(v) => onPatch('log.digest', v, 'Daily digest')}
+            label="Daily digest"
+            description="One summary embed per day instead of a message per action (Scam Shield, raid and lockdown alerts stay live)"
+            disabled={saving === 'log.digest'}
+          />
         </div>
       )}
 

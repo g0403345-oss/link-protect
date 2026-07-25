@@ -30,6 +30,28 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 5, version: '2.6.0',
+    title: 'Message Studio, smarter embeds & a tidy command list',
+    items: [
+      'Every message the bot sends — warnings, DMs, the verification invite, the lockdown announcement — now uses your templates from the dashboard’s Messages tab, with your accent color on every embed.',
+      'Log embeds grew up: member avatars, timestamps, one action color ramp (warn / kick / ban / timeout) matching the web dashboard — and buttons to remove a warning or open the dashboard right from Discord. Banned members get an appeal link in their DM.',
+      'Optional daily digest: one summary embed per day instead of a message per action.',
+      '61 commands became 18: all enable-/disable- pairs are now /blocker, warnings live under /warn (add · list · remove · reset · kick-at · ban-at · timeout · decay · log), whitelists under /whitelist, the blacklist under /blacklist — plus a rewritten /help with topic picker.',
+      'Escalations now DM the member before a kick or ban (customizable), so people always know what happened.',
+    ],
+  },
+  {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 4,
+    title: 'Message Studio — the bot in your words',
+    items: [
+      'New Messages tab in the server dashboard: customize every text the bot sends — blocked-link warnings, manual warns, silent-mode DMs, escalation DMs, the verification DM and the lockdown announcement.',
+      'Tone presets (Friendly / Neutral / Strict) fill all templates in one click; variables like {user}, {reason} or {warnings} insert as chips right at your cursor.',
+      'Live Discord-style preview with sample values that follows the field you’re editing, plus a custom accent color for the bot’s embeds.',
+      '“Send me a test DM” delivers any template to your own Discord so you can check the result before members see it.',
+      'Warn-log: new Daily digest option — one summary embed per day instead of a message per action (Scam Shield, raid and lockdown alerts stay live).',
+    ],
+  },
+  {
     product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 2, version: '2.5.1',
     title: 'Missing-permission alerts',
     items: [

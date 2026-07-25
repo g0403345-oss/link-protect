@@ -2319,6 +2319,10 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "verify.enabled", "verify.role_mode", "verify.role_id",
         "verify.min_account_age_days",
         "verify.page.headline", "verify.page.message", "verify.page.accent",
+        "log.digest",
+        "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
+        "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
+        "messages.accent",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
@@ -3405,6 +3409,74 @@ def _lockdown_state(gid: str) -> dict:
         return {}
 
 
+# ── Message Studio (must stay in sync with cogs/shared.py DEFAULT_MESSAGES) ──
+_MESSAGE_DEFAULTS = {
+    "warn_channel": "{user} — your message was removed.\n**Reason:** {reason}",
+    "warn_manual": "{user} was warned by a moderator.\n**Reason:** {reason}",
+    "warn_dm": "Your link in **{server}** was removed.\n**Reason:** {reason}",
+    "action_dm": "You were **{action}** on **{server}** after reaching {warnings} warnings.",
+    "verify_dm": "Welcome to **{server}**! Verify your account to unlock the server: {link}",
+    "lockdown_announce": "🚨 **Emergency lockdown active.** Links are blocked and invites are "
+                         "paused while the moderators handle the situation.",
+}
+
+
+def _render_guild_message(data: dict, key: str, **vars) -> str:
+    tpl = ((data.get("messages") or {}).get(key) or "").strip() or _MESSAGE_DEFAULTS.get(key, "")
+    out = tpl[:700]
+    for name, val in vars.items():
+        if val is not None:
+            out = out.replace("{" + name + "}", str(val))
+    return out
+
+
+def _guild_accent(data: dict) -> int:
+    raw = str((data.get("messages") or {}).get("accent") or "").lstrip("#")
+    try:
+        if len(raw) == 6:
+            return int(raw, 16)
+    except ValueError:
+        pass
+    return 0x5B6CFF
+
+
+class MessageTestBody(BaseModel):
+    kind: str
+
+
+@app.post("/api/guild/{guild_id}/messages/test")
+@require_auth
+async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
+    """Send the acting dashboard user a DM previewing one of their templates."""
+    if body.kind not in _MESSAGE_DEFAULTS:
+        raise HTTPException(status_code=400, detail="Unknown template")
+    aid, _ = _web_actor(request)
+    if not aid:
+        raise HTTPException(status_code=401, detail="No Discord account in session")
+    data = _get_server(guild_id) or {}
+    info = await _bot_guilds_info()
+    gname = info.get(guild_id, {}).get("name") or "Your server"
+    text = _render_guild_message(
+        data, body.kind,
+        user=f"<@{aid}>", username="you", server=gname,
+        reason="Posted a phishing link (test)", warnings=3, remaining=2,
+        channel="#general", action="kicked",
+        link=f"https://link-protect.com/verify/{guild_id}")
+    async with httpx.AsyncClient() as client:
+        dm = await client.post(f"{DISCORD_API}/users/@me/channels", headers=_bot_headers(),
+                               json={"recipient_id": str(aid)}, timeout=8)
+        if dm.status_code != 200:
+            raise HTTPException(status_code=502, detail="Couldn't open a DM with you")
+        r = await client.post(
+            f"{DISCORD_API}/channels/{dm.json()['id']}/messages", headers=_bot_headers(),
+            json={"embeds": [{"description": text, "color": _guild_accent(data),
+                              "footer": {"text": f"Test · {body.kind} · sent from the dashboard"}}]},
+            timeout=8)
+        if r.status_code not in (200, 201):
+            raise HTTPException(status_code=502, detail="DM failed — are your DMs open?")
+    return {"ok": True}
+
+
 def _lockdown_payload(gid: str) -> dict:
     s = _lockdown_state(gid)
     return {"active": bool(s.get("active")), "since": s.get("since") or 0,
@@ -3465,8 +3537,12 @@ async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str
             _kv_set(_lockdown_key(gid), {"active": True, "since": int(time.time()),
                                          "by": actor, "reason": (reason or "").strip()[:200] or None,
                                          "prev": prev})
+            _ginfo = await _bot_guilds_info()
             await _post_channel_embed(
                 gid, "🚨 Server lockdown activated",
+                _render_guild_message(data, "lockdown_announce",
+                                      server=_ginfo.get(gid, {}).get("name") or "this server")
+                + "\n\n"
                 f"{'By **' + actor + '**. ' if actor else ''}"
                 f"{'Reason: ' + reason.strip()[:200] if reason and reason.strip() else ''}\n"
                 f"Slowmode on {steps['slowmode']} channels · invites paused · all links blocked.\n"
@@ -4109,7 +4185,10 @@ MOBILE_ALLOWED_PATHS = {
     "scamguard.join_check", "scamguard.join_action", "scamguard.min_servers",
     "verify.enabled", "verify.role_mode", "verify.role_id",
     "verify.min_account_age_days",
-    "verify.page.headline", "verify.page.message", "verify.page.accent",
+    "verify.page.headline", "verify.page.message", "verify.page.accent",    "log.digest",
+    "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
+    "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
+    "messages.accent",
 }
 
 

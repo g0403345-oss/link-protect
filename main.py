@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.5.1"
+BOT_VERSION = "2.6.0"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -356,25 +356,22 @@ TOPGG_TOKEN = os.environ.get("TOPGG_TOKEN", "")
 # every settings command stops applying and instead points users to the dashboard/app.
 # Moderation and info commands keep working.
 SETTINGS_COMMANDS = {
-    # blockers
-    "enable-google", "disable-google", "enable-youtube", "disable-youtube",
-    "enable-nsfw", "disable-nsfw", "enable-gif", "disable-gif",
-    "enable-invite", "disable-invite", "enable-bitly", "disable-bitly",
-    "enable-nitro", "disable-nitro", "enable-twitch", "disable-twitch",
-    "enable-steam", "disable-steam", "enable-all", "disable-all",
-    "enable-malware-secure", "disable-malware-secure",
-    "enable-silent-mode", "disable-silent-mode",
-    # access control
-    "enable-channel", "disable-channel", "enable-member", "disable-member",
-    "enable-role", "disable-role", "enable-only-link", "disable-only-link",
-    # warning configuration
-    "warn-kick", "warn-ban", "warn-timeout", "warn-decay",
+    # blockers + silent mode
+    "blocker",
+    # access control (whitelist group)
+    "whitelist channel-add", "whitelist channel-remove",
+    "whitelist member-add", "whitelist member-remove",
+    "whitelist role-add", "whitelist role-remove",
+    "whitelist only-link", "whitelist only-link-off",
+    # warning configuration ("warn add/list/…" stay — that's moderation)
+    "warn kick-at", "warn ban-at", "warn timeout", "warn decay",
+    "warn log", "warn log-off",
     # presets
     "setup-preset",
     # per-channel rules (channel-rules stays — it's read-only)
     "channel-mode", "channel-block", "channel-reset",
-    # logging + blacklist
-    "enable-warn-log", "disable-warn-log", "link-enable", "link-disable",
+    # blacklist writes ("blacklist list" stays readable)
+    "blacklist add", "blacklist remove",
 }
 
 _redirect_cache = {"value": False, "ts": 0.0}
@@ -418,7 +415,8 @@ def _redirect_embed(ctx) -> discord.Embed:
 @bot.check
 async def _settings_redirect_check(ctx) -> bool:
     """Global slash-command gate: blocks settings commands when redirect mode is on."""
-    name = getattr(getattr(ctx, "command", None), "name", "") or ""
+    cmd = getattr(ctx, "command", None)
+    name = getattr(cmd, "qualified_name", None) or getattr(cmd, "name", "") or ""
     if name in SETTINGS_COMMANDS and _redirect_enabled():
         try:
             await ctx.respond(embed=_redirect_embed(ctx), ephemeral=True)
@@ -688,7 +686,7 @@ async def on_guild_remove(guild):
         pass
 
 
-@bot.slash_command(name="z-database-controle",
+@bot.slash_command(name="z-database-controle", guild_ids=[864823666952372245],
     description="Admin only: check if every server ID is in the database and clean up old ones")
 @commands.is_owner()
 async def database(ctx):
@@ -759,7 +757,7 @@ async def database_error(ctx, error):
         await ctx.respond(embed=embed, ephemeral=True)
 
 
-@bot.slash_command(name="z-user-notification", description="Notify all server owners about update")
+@bot.slash_command(name="z-user-notification", guild_ids=[864823666952372245], description="Notify all server owners about update")
 @commands.is_owner()
 async def nootification(ctx):
     await ctx.defer()
@@ -778,7 +776,7 @@ async def nootification(ctx):
                 description=(
                     "**We're excited to announce that Link Protect has been successfully updated to version `2.0.00`.**\n\n"
                     "🔒 All link types are now **reliably detected and filtered** again – including Discord invites, suspicious URLs, and custom patterns.\n"
-                    "⚙️ Core features like `/enable-google`, `/dashboard`, and advanced filtering have been updated, optimized, and fully restored.\n"
+                    "⚙️ Core features like `/blocker`, `/dashboard`, and advanced filtering have been updated, optimized, and fully restored.\n"
                     "🧪 Despite rigorous testing, bugs may still occur – if you notice anything unusual, please use `/support` to reach out on our support server.\nIts also important to tell me if the Bot does not detect a link!\n\n"
                     "💙 Thank you for trusting Link Protect for over **4 years**.\n"
                     "Your feedback and support have helped us grow into one of the most reliable anti-link bots on Discord.\n\n"
@@ -813,102 +811,27 @@ async def nootification_error(ctx, error):
         embed = brand_embed("⛔ Error", "These z- commands are only for the bot owner.", kind="error")
         await ctx.respond(embed=embed, ephemeral=True)
 
-@bot.slash_command(name="help", description="Get all commands and information")
-async def _help(ctx):
-    await ctx.defer()
-    embed = discord.Embed(
-        title="📖 Link Protect — All Commands",
-        description="Everything you can configure. Most settings are also available on the "
-                    "**[web dashboard](https://link-protect.com/dashboard)** and in the **iOS app**.",
-        color=BRAND_COLOR,
-    )
-    embed.add_field(
-        name="🔒 Link Blockers",
-        value="```"
-              "/enable-all  · /disable-all            Block every link\n"
-              "/enable-google · /disable-google\n"
-              "/enable-youtube · /disable-youtube\n"
-              "/enable-nsfw · /disable-nsfw\n"
-              "/enable-gif · /disable-gif\n"
-              "/enable-invite · /disable-invite       discord.gg invites\n"
-              "/enable-bitly · /disable-bitly         URL shorteners\n"
-              "/enable-nitro · /disable-nitro         Nitro scams\n"
-              "/enable-twitch · /disable-twitch\n"
-              "/enable-steam · /disable-steam\n"
-              "/enable-malware-secure · /disable-...  Malware/phishing scan\n"
-              "/enable-silent-mode · /disable-...     Warn via DM, not chat```",
-        inline=False,
-    )
-    embed.add_field(
-        name="🎯 Per-Channel Rules",
-        value="```"
-              "/channel-mode  #ch <default|off|custom>  How a channel behaves\n"
-              "/channel-block #ch <type> <on|off>       One blocker per channel\n"
-              "/channel-rules #ch                       Show what's blocked & why\n"
-              "/channel-reset #ch                       Back to server settings```",
-        inline=False,
-    )
-    embed.add_field(
-        name="🚪 Access Control (whitelist)",
-        value="```"
-              "/enable-channel  · /disable-channel  #ch    Exempt a channel\n"
-              "/enable-member   · /disable-member   @user  Exempt a user\n"
-              "/enable-role     · /disable-role     @role  Exempt a role\n"
-              "/enable-only-link · /disable-only-link #ch  Only-links channel```",
-        inline=False,
-    )
-    embed.add_field(
-        name="⚠️ Warning System",
-        value="```"
-              "/warn @user [reason]        Manually warn a user\n"
-              "/warnings @user             Show a user's warnings\n"
-              "/warn-delete @user <#>      Delete one warning\n"
-              "/warn-reset @user           Reset all of a user's warnings\n"
-              "/warn-delete-server         Reset every warning on the server\n"
-              "/warn-kick <number>         Kick after X warnings (0 = off)\n"
-              "/warn-ban  <number>         Ban after X warnings (0 = off)\n"
-              "/warn-timeout <warns> <min> Timeout after X warnings\n"
-              "/warn-decay <days>          Auto-expire old warnings (0 = off)```",
-        inline=False,
-    )
-    embed.add_field(
-        name="📋 Blacklist & Logging",
-        value="```"
-              "/link-disable <url>     Block a specific link\n"
-              "/link-enable  <url>     Unblock it again\n"
-              "/list-blacklist         Show all blacklisted links\n"
-              "/enable-warn-log  #ch   Log warns/kicks/bans to a channel\n"
-              "/disable-warn-log       Stop logging```",
-        inline=False,
-    )
-    embed.add_field(
-        name="🛠️ Info & Utility",
-        value="```"
-              "/dashboard    Current settings + web/app links\n"
-              "/modstats     Moderation statistics for this server\n"
-              "/stats        Global bot statistics\n"
-              "/ping         Show bot latency\n"
-              "/check-link <url>   Manually scan a URL for malware\n"
-              "/invite       Invite Link Protect to a server\n"
-              "/support      Join the support server\n"
-              "/update       Latest updates\n"
-              "/help         This message```",
-        inline=False,
-    )
-    embed.add_field(
-        name="⚠️ IMPORTANT",
-        value="Give **Link Protect** the **highest role** so it can delete messages and kick/ban members.",
-        inline=False,
-    )
-    embed.add_field(name="Support Server", value="[Click to join](https://discord.gg/BjDC9t329E)", inline=True)
-    embed.add_field(name="Web Dashboard", value="[Open dashboard](https://link-protect.com/dashboard)", inline=True)
-    embed.add_field(name="Privacy Policy", value="[link-protect.com/privacy](https://link-protect.com/privacy)", inline=True)
-    await ctx.respond(embed=embed)
-
-
-# The two most recent changelog entries (newest first). Keep this list at
-# length 2 — /update intentionally only shows the latest two releases.
 _CHANGELOG = [
+    {
+        "version": "2.6.0",
+        "date": "25.07.2026",
+        "fields": [
+            ("💬 Message Studio",
+             " • Customize every bot message — warnings, DMs, verify &\n"
+             "   lockdown texts — in the dashboard's new Messages tab,\n"
+             "   with variables, tone presets and your own embed color."),
+            ("✨ Smarter embeds",
+             " • Log entries show avatars, timestamps and action colors.\n"
+             " • Buttons: remove a warning or open the dashboard right\n"
+             "   from the log — banned users get an appeal link.\n"
+             " • Optional daily digest: one summary embed per day."),
+            ("🧹 61 commands → 18",
+             " • All enable-/disable- pairs became /blocker.\n"
+             " • /warn add · list · remove · kick-at · ban-at · timeout\n"
+             "   · decay · log — one clean command group.\n"
+             " • /whitelist and /blacklist groups, rewritten /help."),
+        ],
+    },
     {
         "version": "2.5.1",
         "date": "25.07.2026",
@@ -992,6 +915,8 @@ _CHANGELOG = [
         ],
     },
 ]
+
+
 
 
 @bot.slash_command(name="update", description="Show latest updates from Link Protect Bot")
@@ -1114,7 +1039,106 @@ async def _check_link(ctx, url: discord.Option(str, "URL to scan (must start wit
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="warn-reset", description="Reset ALL warnings for a specific user")
+
+# ═══════════════════ Consolidated commands (v2.6.0) ═══════════════════
+# 47 legacy commands (enable-X/disable-X pairs, warn-*, link-*) became four
+# clean entry points: /blocker, /warn …, /whitelist …, /blacklist ….
+_MOD_PERMS = discord.Permissions(manage_guild=True)
+warn_grp = bot.create_group("warn", "Warnings — issue, inspect and configure",
+                            default_member_permissions=discord.Permissions(kick_members=True))
+wl_grp = bot.create_group("whitelist", "Let channels, members or roles bypass the blockers",
+                          default_member_permissions=_MOD_PERMS)
+bl_grp = bot.create_group("blacklist", "Your server's custom blocked links",
+                          default_member_permissions=_MOD_PERMS)
+
+_BLOCKER_MAP = {"all": "all", "google": "google", "youtube": "youtube", "nsfw": "nsfw",
+                "gif": "gif", "invites": "invite", "shorteners": "bit", "nitro": "nitro",
+                "twitch": "twitch", "steam": "steam", "malware": "malware"}
+
+
+@bot.slash_command(name="blocker", description="Turn a link blocker (or silent mode) on or off",
+                   default_member_permissions=_MOD_PERMS)
+async def _blocker_cmd(ctx,
+                       blocker: discord.Option(str, "Which blocker",
+                                               choices=sorted(_BLOCKER_MAP.keys()) + ["silent-mode"]),
+                       state: discord.Option(str, "New state", choices=["on", "off"])):
+    await ctx.defer()
+    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
+        return await ctx.followup.send(embed=brand_embed(
+            "⛔ Error", "You need `Manage Messages` or `Administrator` permissions.", kind="error"))
+    guild_id = str(ctx.guild.id)
+    on = state == "on"
+    if blocker == "silent-mode":
+        path, label = f"/servers/{guild_id}/silent", "Silent mode"
+    else:
+        path, label = f"/servers/{guild_id}/protect/{_BLOCKER_MAP[blocker]}", f"{blocker.capitalize()} blocker"
+    try:
+        await asyncio.to_thread(lambda: db.reference(path).set(on))
+        note = ""
+        if blocker not in ("all", "silent-mode"):
+            protect = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
+            if protect.get("all"):
+                note = "\n-# Heads up: **Block All Links** is on — it overrides individual blockers."
+        await ctx.followup.send(embed=brand_embed(
+            f"{'✅' if on else '🛑'} {label} {'enabled' if on else 'disabled'}",
+            f"{label} is now **{'on' if on else 'off'}**.{note}", kind="success" if on else "info"))
+    except Exception as e:
+        await ctx.followup.send(embed=brand_embed(
+            "⛔ Error", f"Something went wrong.\nUse /support for help.\n```{e}```", kind="error"))
+
+
+_HELP_PAGES = {
+    "start": ("🚀 Getting started",
+              "**/setup-preset** — full protection in one command (Minimal · Balanced · Strict)\n"
+              "**/dashboard** — your server's status + a link to the web dashboard\n"
+              "**/blocker** — turn any link blocker on or off\n"
+              "**/check-link** — scan a URL against the threat database"),
+    "warn": ("⚠️ Warnings",
+             "**/warn add** — warn a member  ·  **/warn list** — their warnings\n"
+             "**/warn remove · reset · clear-server** — manage records\n"
+             "**/warn kick-at · ban-at · timeout · decay** — escalation thresholds\n"
+             "**/warn log** — send every action into a mod channel (**/warn log-off** stops it)"),
+    "lists": ("📋 Whitelist & blacklist",
+              "**/whitelist channel-add / member-add / role-add** — let them bypass blockers\n"
+              "**/whitelist only-link** — links allowed only in one channel\n"
+              "**/blacklist add / remove / list** — your custom blocked links\n"
+              "**/channel-mode · channel-block · channel-rules** — per-channel rules"),
+    "security": ("🛡️ Security",
+                 "**/lockdown** — freeze the whole server in an emergency (**/unlock** restores)\n"
+                 "Scam Shield, Raid Shield & the verification gate are configured in the "
+                 "[web dashboard](https://link-protect.com/dashboard)"),
+    "info": ("ℹ️ Info",
+             "**/stats · /ping · /modstats · /update** — numbers & news\n"
+             "**/invite** — add Link Protect to another server\n"
+             "**/support** — join the support server"),
+}
+
+
+class _HelpView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.select(placeholder="Pick a topic…", options=[
+        discord.SelectOption(label="Getting started", value="start", emoji="🚀"),
+        discord.SelectOption(label="Warnings", value="warn", emoji="⚠️"),
+        discord.SelectOption(label="Whitelist & blacklist", value="lists", emoji="📋"),
+        discord.SelectOption(label="Security", value="security", emoji="🛡️"),
+        discord.SelectOption(label="Info", value="info", emoji="ℹ️"),
+    ])
+    async def _pick(self, select, interaction):
+        title, body = _HELP_PAGES[select.values[0]]
+        await interaction.response.edit_message(embed=brand_embed(title, body))
+
+
+@bot.slash_command(name="help", description="All commands and how to set up Link Protect")
+async def _help(ctx):
+    title, body = _HELP_PAGES["start"]
+    e = brand_embed(title, body)
+    e.set_footer(text="Link Protect • Most settings live in the dashboard: link-protect.com")
+    await ctx.respond(embed=e, view=_HelpView())
+
+
+@warn_grp.command(name="reset", description="Reset ALL warnings for a specific user")
 async def _warn_reset(ctx, member: discord.Member):
     await ctx.defer()
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
@@ -1423,7 +1447,7 @@ async def _dashboard(ctx):
     embed.add_field(name="``Malware Secure``", value=" ", inline = False)
     embed.add_field(name=f"Malware Link Scanner is currently {status(protect_data['malware'])} `- {'ON' if protect_data['malware'] else 'OFF'}`", value=f"", inline=True)
     if link_data == 0:
-        embed.set_footer(text="For blocking your own links, use /link-enable")
+        embed.set_footer(text="For blocking your own links, use /blacklist add")
     else:
         embed.set_footer(text="Need help? Join the support server /support")
     embed.add_field(
@@ -1446,643 +1470,7 @@ async def _dashboard(ctx):
         print(f"[dashboard:respond] {e}")
 
 
-@bot.slash_command(name="enable-google", description="Enable the Link Blocker for Google")
-async def _enable_google(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    google_enabled = protect_data.get("google", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Google blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if google_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Google blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/google").set(True))
-        embed = brand_embed("✅ Google blocker enabled", "The Google blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-google", description="Disable the Link Blocker for google")
-async def _disgoogle(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        google_enabled = protect_data.get("google", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Google blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/google").set(False))
-            embed = brand_embed("✅ Google blocker disabled", "The Google blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Google blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-youtube", description="Enable the Link Blocker for YouTube")
-async def _enable_youtube(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    youtube_enabled = protect_data.get("youtube", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The YouTube blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if youtube_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The YouTube blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/youtube").set(True))
-        embed = brand_embed("✅ YouTube blocker enabled", "The YouTube blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-youtube", description="Disable the Link Blocker for YouTube")
-async def _disyoutube(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        youtube_enabled = protect_data.get("youtube", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The YouTube blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/youtube").set(False))
-            embed = brand_embed("✅ YouTube blocker disabled", "The YouTube blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The YouTube blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-nsfw", description="Enable the Link Blocker for NSFW")
-async def _enable_nsfw(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    nsfw_enabled = protect_data.get("nsfw", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The NSFW blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if nsfw_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The NFSW blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nsfw").set(True))
-        embed = brand_embed("✅ NFSW blocker enabled", "The NFSW blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-nsfw", description="Disable the Link Blocker for NSFW")
-async def _disnsfw(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        nsfw_enabled = protect_data.get("nsfw", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The NSFW blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nsfw").set(False))
-            embed = brand_embed("✅ NSFW blocker disabled", "The NSFW blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The NSFW blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-gif", description="Enable the Link Blocker for Gif")
-async def _enablegif(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    gif_enabled = protect_data.get("gif", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The GIF blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if gif_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The GIF blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/gif").set(True))
-        embed = brand_embed("✅ GIF blocker enabled", "The GIF blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-gif", description="Disable the Link Blocker for GIF")
-async def _disgif(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        gif_enabled = protect_data.get("gif", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The GIF blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/gif").set(False))
-            embed = brand_embed("✅ GIF blocker disabled", "The GIF blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The GIF blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-invite", description="Enable the Link Blocker for Invite")
-async def _enableinvite(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    invite_enabled = protect_data.get("invite", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Invite blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if invite_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Invite blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/invite").set(True))
-        embed = brand_embed("✅ Invite blocker enabled", "The Invite blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-invite", description="Disable the Link Blocker for Invite")
-async def _disinvite(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        invite_enabled = protect_data.get("invite", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Invite blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/invite").set(False))
-            embed = brand_embed("✅ Invite blocker disabled", "The Invite blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Invite blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-bitly", description="Enable the Link Blocker for Bitly")
-async def _enablebitly(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    bitly_enabled = protect_data.get("bit", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Bitly blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if bitly_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Bitly blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/bit").set(True))
-        embed = brand_embed("✅ Bitly blocker enabled", "The Bitly blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-bitly", description="Disable the Link Blocker for Bitly")
-async def _disbitly(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        bitly_enabled = protect_data.get("bit", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Bitly blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/bit").set(False))
-            embed = brand_embed("✅ Bitly blocker disabled", "The Bitly blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Bitly blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-nitro", description="Enable the Link Blocker for Discord Nitro")
-async def _enablenitro(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    nitro_enabled = protect_data.get("nitro", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Nitro blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if nitro_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Nitro blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nitro").set(True))
-        embed = brand_embed("✅ Nitro blocker enabled", "The Nitro blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-nitro", description="Disable the Link Blocker for Discord Nitro")
-async def _disnitroy(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        nitro_enabled = protect_data.get("nitro", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Nitro blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/nitro").set(False))
-            embed = brand_embed("✅ Nitro blocker disabled", "The Nitro blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Nitro blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-
-@bot.slash_command(name="enable-twitch", description="Enable the Link Blocker for Twitch")
-async def _enabletwitch(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    twitch_enabled = protect_data.get("twitch", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Twitch blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if twitch_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Twitch blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/twitch").set(True))
-        embed = brand_embed("✅ Twitch blocker enabled", "The Twitch blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-twitch", description="Disable the Link Blocker for Twitch")
-async def _distwitch(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        twitch_enabled = protect_data.get("twitch", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Twitch blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/twitch").set(False))
-            embed = brand_embed("✅ Twitch blocker disabled", "The Twitch blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Twitch blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-@bot.slash_command(name="enable-steam", description="Enable the Link Blocker for Steam")
-async def _enablesteam(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    all_enabled = protect_data.get("all", False)
-    steam_enabled = protect_data.get("steam", False)
-    if all_enabled == True:
-        embed = brand_embed("⛔ Error", "The Steam blocker is included in `all`", kind="error")
-        embed.set_footer(text="Use /disable-all to manage specific links")
-        await ctx.followup.send(embed=embed)
-        return
-    if steam_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Steam blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/steam").set(True))
-        embed = brand_embed("✅ Steam blocker enabled", "The Steam blocker has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-steam", description="Disable the Link Blocker for Steam")
-async def _dissteam(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        all_enabled = protect_data.get("all", False)
-        steam_enabled = protect_data.get("steam", False)
-        if all_enabled == True:
-            embed = brand_embed("⛔ Error", "The Steam blocker is included in `all`", kind="error")
-            embed.set_footer(text="Use /disable-all to manage specific links")
-            await ctx.followup.send(embed=embed)
-            return
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/steam").set(False))
-            embed = brand_embed("✅ Steam blocker disabled", "The Steam blocker has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Steam blocker is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-@bot.slash_command(name="enable-silent-mode",
-                   description="Delete links silently (DM user instead of public channel warning)")
-async def _enable_silent(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions.", kind="error"))
-        return
-    current = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").get())
-    if current:
-        await ctx.followup.send(embed=brand_embed("ℹ️ Info", "Silent mode is already enabled.", kind="info"))
-        return
-    await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").set(True))
-    embed = discord.Embed(
-        title="🔇 Silent Mode Enabled",
-        description="Links are deleted **without** a public warning message.\n"
-                    "The user receives a **DM** instead (if DMs are open).\n"
-                    "Kicks/bans/logs still work normally.",
-        color=discord.Color.green())
-    await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-silent-mode",
-                   description="Re-enable public warning messages when a link is deleted")
-async def _disable_silent(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions.", kind="error"))
-        return
-    await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/silent").set(False))
-    await ctx.followup.send(embed=brand_embed("🔔 Silent Mode Disabled", "Warning messages are now sent publicly in the channel again.", kind="success"))
-
-
-@bot.slash_command(name="enable-malware-secure", description="Enable the malware check for your server")
-async def _enablemalware(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-    malware_enabled = protect_data.get("malware", False)
-    if malware_enabled == True:
-        embed = brand_embed("ℹ️ Info", "The Malware Secuire is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    try:
-        await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/malware").set(True))
-        embed = brand_embed("MALWARE SECURE", "The Malware Secure has been enabled.", kind="success")
-        await ctx.followup.send(embed=embed)
-    except Exception as e:
-        embed = brand_embed("⛔ Error", f"Something went wrong.\nUse /support for help.\n```{str(e)}```", kind="error")
-        await ctx.followup.send(embed=embed)
-
-@bot.slash_command(name="disable-malware-secure", description="Disable the malware check for your server")
-async def _dismalware(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    else:
-        protect_data = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect").get()) or {}
-        steam_enabled = protect_data.get("malware", False)
-        try:
-            await asyncio.to_thread(lambda: db.reference(f"/servers/{guild_id}/protect/malware").set(False))
-            embed = brand_embed("MALWARE SECURE", "The Malware Secure has been disabled.", kind="success")
-            await ctx.followup.send(embed=embed)
-            return
-        except:
-            embed = brand_embed("ℹ️ Info", "The Malware Secure is already disabled.", kind="info")
-            await ctx.followup.send(embed=embed)
-            return
-
-@bot.slash_command(name="enable-all", description="Enable the Link Blocker for all links")
-async def _enable_all(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_ref = db.reference(f"/servers/{guild_id}/protect")
-    protect_data = protect_ref.get() or {}
-    if protect_data.get("all", False):
-        embed = brand_embed("ℹ️ Info", "The All Link blocker is already enabled.", kind="info")
-        await ctx.followup.send(embed=embed)
-        return
-    safe_ref = db.reference(f"/servers/{guild_id}/safe")
-    to_safe = {key: value for key, value in protect_data.items() if key != "all" and value is True}
-    safe_ref.set(to_safe)
-    new_protect = {key: False for key in protect_data if key != "all"}
-    new_protect["all"] = True
-    protect_ref.set(new_protect)
-    embed = brand_embed("✅ All Links blocker enabled", "The All Links blocker has been enabled.", kind="success")
-    await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-all", description="Disable the Link Blocker for All links")
-async def _disable_all(ctx):
-    await ctx.defer()
-    guild_id = str(ctx.guild.id)
-    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
-        embed = brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    protect_ref = db.reference(f"/servers/{guild_id}/protect")
-    safe_ref = db.reference(f"/servers/{guild_id}/safe")
-    protect_data = protect_ref.get() or {}
-    if not protect_data.get("all", False):
-        embed = brand_embed("⛔ Error", "The All Link blocker is already disabled.", kind="error")
-        await ctx.followup.send(embed=embed)
-        return
-    safe_data = safe_ref.get() or {}
-    safe_ref.set({key: False for key in safe_data})
-    restored_protect = {key: (safe_data.get(key, False)) for key in protect_data if key != "all"}
-    restored_protect["all"] = False
-    protect_ref.set(restored_protect)
-    embed = brand_embed("✅ All Links blocker disabled", "The All Links blocker has been disabled.", kind="success")
-    await ctx.followup.send(embed=embed)
-
-
-@bot.slash_command(name="disable-channel", description="Remove disabled channels the bot deletes links from")
+@wl_grp.command(name="channel-remove", description="Remove disabled channels the bot deletes links from")
 async def _dischannel(ctx, name: discord.Option(str, "Mention the channel to disable (e.g. #general)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2111,7 +1499,7 @@ async def _dischannel(ctx, name: discord.Option(str, "Mention the channel to dis
         await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="enable-channel", description="Set channels the bot should NOT delete links from")
+@wl_grp.command(name="channel-add", description="Set channels the bot should NOT delete links from")
 async def _enchannel(ctx, name: discord.Option(str, "Mention the channel to enable (e.g. #general)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2139,7 +1527,7 @@ async def _enchannel(ctx, name: discord.Option(str, "Mention the channel to enab
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="enable-only-link",
+@wl_grp.command(name="only-link",
                    description="Set a channel where the bot deletes every message that is not a link.")
 async def _enlink(ctx, channelname: discord.Option(str, "Mention the channel (e.g. #general)")):
     await ctx.defer()
@@ -2168,7 +1556,7 @@ async def _enlink(ctx, channelname: discord.Option(str, "Mention the channel (e.
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="disable-only-link",
+@wl_grp.command(name="only-link-off",
                    description="Disable the channel where the bot deletes messages that are not links.")
 async def _dislink(ctx):
     await ctx.defer()
@@ -2190,7 +1578,7 @@ async def _dislink(ctx):
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="disable-member", description="Don't allow a member to send links")
+@wl_grp.command(name="member-remove", description="Don't allow a member to send links")
 async def _dismember(ctx, member: discord.Option(str, "Mention the member to disable (e.g. @User)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2219,7 +1607,7 @@ async def _dismember(ctx, member: discord.Option(str, "Mention the member to dis
         await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="enable-member", description="Allow a member to send links")
+@wl_grp.command(name="member-add", description="Allow a member to send links")
 async def _enmember(ctx, member: discord.Option(str, "Mention the member to enable (e.g. @user)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2247,7 +1635,7 @@ async def _enmember(ctx, member: discord.Option(str, "Mention the member to enab
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="disable-role", description="Don't allow a role to send links")
+@wl_grp.command(name="role-remove", description="Don't allow a role to send links")
 async def _disrole(ctx, role: discord.Option(str, "Mention the role to disable (e.g. @role)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2276,7 +1664,7 @@ async def _disrole(ctx, role: discord.Option(str, "Mention the role to disable (
         await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="enable-role", description="Allow a role to send links")
+@wl_grp.command(name="role-add", description="Allow a role to send links")
 async def _enrole(ctx, role: discord.Option(str, "Mention the role to enable (e.g. @role)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2303,8 +1691,8 @@ async def _enrole(ctx, role: discord.Option(str, "Mention the role to enable (e.
     embed = brand_embed("Role", f"{role} has been enabled.", kind="success")
     await ctx.followup.send(embed=embed)
 
-@bot.slash_command(
-    name="warn-timeout",
+@warn_grp.command(
+    name="timeout",
     description="Set warnings until a member gets timed out and the timeout duration")
 async def _warntimeout(
     ctx,
@@ -2354,7 +1742,7 @@ async def _warntimeout(
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="warn-kick", description="Set number of warnings until a member gets kicked")
+@warn_grp.command(name="kick-at", description="Set number of warnings until a member gets kicked")
 async def _warnkick(ctx, number: discord.Option(int, "Number of warnings before kick")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2384,7 +1772,7 @@ async def _warnkick(ctx, number: discord.Option(int, "Number of warnings before 
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="warn-ban", description="Set number of warnings until a member gets banned")
+@warn_grp.command(name="ban-at", description="Set number of warnings until a member gets banned")
 async def _warnban(ctx, number: discord.Option(int, "Number of warnings before ban")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2435,7 +1823,7 @@ async def _deny(ctx):
     await ctx.followup.send(embed=brand_embed("⛔ Error", "You need `Manage Messages` or `Administrator` permissions to run this command.", kind="error"))
 
 
-@bot.slash_command(name="warn-decay",
+@warn_grp.command(name="decay",
                    description="Auto-expire old warnings after a number of days (0 = turn off)")
 async def _warndecay(ctx, days: discord.Option(int, "Warnings older than this many days are removed automatically. 0 disables it.")):
     await ctx.defer()
@@ -2588,7 +1976,7 @@ async def _channelreset(ctx, channel: discord.Option(discord.TextChannel, "Chann
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="warn", description="Warn a user")
+@warn_grp.command(name="add", description="Warn a user")
 async def warn_user(ctx, member: discord.Member,
                     reason: discord.Option(str, "Reason", required=False) = "No reason provided."):
     """Manual warn — runs through the SAME engine as automatic link-block warns
@@ -2612,7 +2000,7 @@ async def warn_user(ctx, member: discord.Member,
         kind="success"), ephemeral=True)
 
 
-@bot.slash_command(name="warnings", description="Show all warnings from a user")
+@warn_grp.command(name="list", description="Show all warnings from a user")
 async def _warnings(ctx, member: discord.Member):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2636,7 +2024,7 @@ async def _warnings(ctx, member: discord.Member):
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="warn-delete", description="Delete a specific warning from a user")
+@warn_grp.command(name="remove", description="Delete a specific warning from a user")
 async def _warndel(ctx, member: discord.Member,
                    index: discord.Option(int, "Which warning to delete (e.g. 1 for first warning)")):
     await ctx.defer()
@@ -2687,7 +2075,7 @@ async def _warndel(ctx, member: discord.Member,
                 pass  # No access to the configured log channel.
 
 
-@bot.slash_command(name="warn-delete-server", description="Delete all warnings of all users on this server")
+@warn_grp.command(name="clear-server", description="Delete all warnings of all users on this server")
 async def _warn_delete_server(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2802,7 +2190,7 @@ async def _modstats(ctx):
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="enable-warn-log", description="Send warnings, kicks, bans into a channel")
+@warn_grp.command(name="log", description="Send warnings, kicks, bans into a channel")
 async def _enwarnlog(ctx, channelname):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2841,7 +2229,7 @@ async def _enwarnlog(ctx, channelname):
         await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="disable-warn-log", description="Stop sending warnings, kicks, bans into a channel")
+@warn_grp.command(name="log-off", description="Stop sending warnings, kicks, bans into a channel")
 async def _diswarnlog(ctx):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -2865,7 +2253,7 @@ async def _diswarnlog(ctx):
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="link-enable", description="Whitelist a link from your blacklist")
+@bl_grp.command(name="remove", description="Whitelist a link from your blacklist")
 async def enable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
@@ -2894,7 +2282,7 @@ async def enable_link(ctx, link: str):
 
 
 
-@bot.slash_command(name="link-disable", description="Blacklist a link (the bot will block this link)")
+@bl_grp.command(name="add", description="Blacklist a link (the bot will block this link)")
 async def disable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
@@ -2926,7 +2314,7 @@ async def disable_link(ctx, link: str):
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="list-blacklist", description="Show all blacklisted links for this server")
+@bl_grp.command(name="list", description="Show all blacklisted links for this server")
 async def _list_blacklist(ctx):
     await ctx.defer()
     if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
@@ -2960,5 +2348,90 @@ async def _list_blacklist(ctx):
             inline=False)
     embed.set_footer(text=f"Total: {len(links)} blacklisted link(s)")
     await ctx.followup.send(embed=embed)
+
+
+# ═══ Embeds 2.0: "Remove warning" button on log embeds (survives restarts —
+# we match on the custom_id prefix, no persistent view registration needed) ═══
+@bot.listen("on_interaction")
+async def _lp_component_listener(interaction: discord.Interaction):
+    try:
+        cid = (interaction.data or {}).get("custom_id", "")
+    except Exception:
+        return
+    if not isinstance(cid, str) or not cid.startswith("lpw:rm:"):
+        return
+    try:
+        _, _, gid, uid = cid.split(":", 3)
+        perms = getattr(interaction.user, "guild_permissions", None)
+        if not perms or not (perms.kick_members or perms.manage_guild or perms.administrator):
+            return await interaction.response.send_message(
+                "You need `Kick Members` or `Manage Server` to remove warnings.", ephemeral=True)
+        ref = db.reference(f"/servers/{gid}/warn/{uid}")
+        data = await asyncio.to_thread(ref.get) or {}
+        count = int(data.get("Warn", 0) or 0)
+        if count <= 0:
+            return await interaction.response.send_message("This user has no warnings left.", ephemeral=True)
+        data["Warn"] = count - 1
+        for k in ("reason", "ts"):
+            if isinstance(data.get(k), list) and data[k]:
+                data[k] = data[k][:-1]
+        await asyncio.to_thread(ref.set, data)
+        await interaction.response.send_message(
+            f"↩️ Removed one warning from <@{uid}> — they now have **{count - 1}**.", ephemeral=True)
+    except Exception:
+        try:
+            await interaction.response.send_message("Couldn't remove the warning.", ephemeral=True)
+        except Exception:
+            pass
+
+
+# ═══ Daily digest: one summary embed instead of a message per action.
+# Runs 23:30 Berlin time (21:30 UTC), before the nightly restart. ═══
+from discord.ext import tasks as _tasks
+import datetime as _dt
+
+@_tasks.loop(time=_dt.time(hour=21, minute=30, tzinfo=_dt.timezone.utc))
+async def _daily_digest():
+    from cogs.shared import _get_conn as _sc, get_settings as _gs, ACTION_COLORS as _AC
+    try:
+        since = int(time.time()) - 86400
+        rows = await asyncio.to_thread(lambda: _sc().execute(
+            "SELECT guild_id, action, username, COUNT(*) AS n FROM actions WHERE timestamp > ? "
+            "GROUP BY guild_id, action, username", (since,)).fetchall())
+    except Exception:
+        return
+    per_guild: dict = {}
+    for gid, action, username, n in rows:
+        per_guild.setdefault(int(gid), []).append((action, username, int(n)))
+    for gid, items in per_guild.items():
+        try:
+            settings = await _gs(str(gid))
+            log_cfg = settings.get("log", {}) or {}
+            if not log_cfg.get("digest") or not log_cfg.get("log-channel"):
+                continue
+            ch = bot.get_channel(int(log_cfg["log-channel"]))
+            if ch is None:
+                continue
+            totals: dict = {}
+            per_user: dict = {}
+            for action, username, n in items:
+                totals[action] = totals.get(action, 0) + n
+                per_user[username] = per_user.get(username, 0) + n
+            summary = " · ".join(f"**{n}** {a}" for a, n in sorted(totals.items(), key=lambda x: -x[1]))
+            top = "\n".join(f"• **{u}** — {n} action(s)"
+                             for u, n in sorted(per_user.items(), key=lambda x: -x[1])[:5])
+            e = brand_embed("📋 Daily moderation digest",
+                            f"Last 24 hours: {summary}\n\n**Most active offenders:**\n{top}")
+            e.timestamp = discord.utils.utcnow()
+            await ch.send(embed=e)
+        except Exception:
+            continue
+
+
+@bot.listen("on_ready")
+async def _start_digest_loop():
+    if not _daily_digest.is_running():
+        _daily_digest.start()
+
 
 bot.run(os.environ["BOT_TOKEN"])

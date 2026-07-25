@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck, MessageSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -25,6 +25,7 @@ import PresetsCard from '@/components/PresetsCard';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 import LockdownControl from '@/components/LockdownCard';
 import VerificationTab from '@/components/VerificationTab';
+import MessagesTab from '@/components/MessagesTab';
 import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
@@ -39,7 +40,7 @@ import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 
-type Section = 'overview' | 'blockers' | 'scamshield' | 'verification' | 'warnings' | 'channelrules' | 'access' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
+type Section = 'overview' | 'blockers' | 'scamshield' | 'verification' | 'warnings' | 'channelrules' | 'access' | 'messages' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
 
 interface ScamShieldStats { flaggedTotal: number; flaggedWeek: number; guildCatches: number; }
 
@@ -508,6 +509,7 @@ export default function GuildDashboard() {
     { id: 'warnings',     label: 'Warnings',       icon: Ban,           desc: 'Kick, ban & decay' },
     { id: 'channelrules', label: 'Channel Rules',  icon: Target,        desc: 'Per-channel behaviour' },
     { id: 'access',       label: 'Access Control', icon: Lock,          desc: 'Whitelist channels & roles' },
+    { id: 'messages',     label: 'Messages',       icon: MessageSquare, desc: 'How the bot talks' },
     { id: 'blacklist',    label: 'Blacklist',       icon: List,          desc: 'Custom blocked domains' },
     { id: 'stats',        label: 'Statistics',     icon: BarChart3,     desc: 'Warning history' },
     { id: 'log',          label: 'Activity Log',   icon: Activity,      desc: 'Live moderation feed' },
@@ -579,7 +581,7 @@ export default function GuildDashboard() {
           {[
             { title: '', ids: ['overview'] },
             { title: 'Protection', ids: ['blockers', 'scamshield', 'verification', 'blacklist'] },
-            { title: 'Members', ids: ['warnings', 'channelrules', 'access'] },
+            { title: 'Members', ids: ['warnings', 'channelrules', 'access', 'messages'] },
             { title: 'Insights', ids: ['stats', 'log', 'audit'] },
             { title: 'System', ids: ['developer'] },
           ].map(({ title, ids }) => {
@@ -1001,6 +1003,14 @@ export default function GuildDashboard() {
                 </div>
               )}
 
+              {/* MESSAGES */}
+              {section === 'messages' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <SectionHeader title="Messages" description="Customize how Link Protect talks to your members" icon={MessageSquare} />
+                  <MessagesTab guildId={guildId} data={data} patch={patch} saving={saving} onToast={addToast} />
+                </div>
+              )}
+
               {/* BLACKLIST */}
               {section === 'blacklist' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1119,6 +1129,7 @@ export default function GuildDashboard() {
                     onPatch={patch}
                     saving={saving}
                     show={data.log?.show}
+                    digest={!!data.log?.digest}
                   />
                   <Card title={`Recent Actions (${actions.length})`} tourId="log">
                     <ActivityTimeline guildId={guildId} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />

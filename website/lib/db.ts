@@ -72,7 +72,7 @@ export interface ServerData {
   silent: boolean;
   channel: { channel: string[]; category: string[]; member: string[]; role: string[] };
   link: { links: string[]; allow?: string[] };
-  log: { Activated: boolean; "log-channel": number | string; link: number; onlylink: boolean; show?: Record<string, boolean> };
+  log: { Activated: boolean; "log-channel": number | string; link: number; onlylink: boolean; show?: Record<string, boolean>; digest?: boolean };
   warn: {
     kick: number;
     ban: number;
@@ -95,6 +95,16 @@ export interface ServerData {
     page?: { headline?: string; message?: string; accent?: string };
   };
   overrides?: Record<string, ChannelOverride>;
+  /** Message Studio — custom bot message templates. Empty/missing = default text. */
+  messages?: {
+    warn_channel?: string;
+    warn_manual?: string;
+    warn_dm?: string;
+    action_dm?: string;
+    verify_dm?: string;
+    lockdown_announce?: string;
+    accent?: string;
+  };
 }
 
 export interface ChannelOverride {
@@ -219,6 +229,14 @@ export interface PermFailure {
   username: string;
   reasons: string[];
   ts: number;
+}
+
+/** Message Studio: have the bot DM the acting user a test render of a template. */
+export async function sendTestMessage(guildId: string, kind: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/guild/${guildId}/messages/test`, {
+    method: "POST",
+    body: JSON.stringify({ kind }),
+  });
 }
 
 export async function getPermFails(guildId: string): Promise<{ items: PermFailure[]; dismissedAt: number }> {
