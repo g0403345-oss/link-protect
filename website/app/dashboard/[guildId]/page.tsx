@@ -33,16 +33,8 @@ import GuildHero from '@/components/GuildHero';
 import PulseStrip from '@/components/PulseStrip';
 import BlockerWall from '@/components/BlockerWall';
 import ActivityTimeline from '@/components/ActivityTimeline';
-import SetupChecklist from '@/components/SetupChecklist';
 import EmptyState from '@/components/EmptyState';
 
-// Friendly names for protect.* keys — the Overview chips share them with the
-// Blockers tab instead of printing raw keys like "bit" or "nsfw".
-const PROTECT_LABELS: Record<string, string> = {
-  all: 'All Links', nsfw: 'NSFW', nitro: 'Nitro Scams', malware: 'Malware / Phishing',
-  invite: 'Invites', youtube: 'YouTube', google: 'Google', gif: 'GIFs',
-  twitch: 'Twitch', steam: 'Steam', bit: 'Shorteners',
-};
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
@@ -636,43 +628,11 @@ export default function GuildDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <GuildHero guildId={guildId} name={guildInfo?.name ?? 'Your server'} icon={guildInfo?.icon}
                     data={data} stats={stats} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
-                  <SetupChecklist guildId={guildId} data={data} onNavigate={(sec) => selectSection(sec as Section)} />
                   <div data-tour="overview-stats" className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" spark={trend14 ?? undefined} delta={weekDelta} />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
-                  <Card title="Warning Thresholds">
-                    <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
-                      {[
-                        { label: 'Kick at', value: warn.kick ?? 0, color: '#e0683c' },
-                        { label: 'Ban at', value: warn.ban ?? 0, color: '#f23f43' },
-                        { label: 'Timeout at', value: warn.timeout?.warnings ?? 0, color: '#5865f2' },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div style={{ fontSize: 32, fontWeight: 900, color, letterSpacing: '-0.03em' }}>{value}</div>
-                          <div style={{ fontSize: 12, color: '#52535a', marginTop: 4 }}>{label} warnings</div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                  <Card title="Active Protections">
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {Object.entries(protect).map(([k, v]) => v ? (
-                        <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 500, color: '#23a55a', background: 'rgba(35,165,90,0.1)', border: '1px solid rgba(35,165,90,0.2)', borderRadius: 99 }}>
-                          <CheckCircle2 size={11} /> {PROTECT_LABELS[k] ?? k}
-                        </span>
-                      ) : null)}
-                      {data.silent && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 500, color: '#949ba4', background: 'rgba(148,155,164,0.08)', border: '1px solid rgba(148,155,164,0.15)', borderRadius: 99 }}>
-                          <EyeOff size={11} /> Silent Mode
-                        </span>
-                      )}
-                      {Object.values(protect).every((v) => !v) && !data.silent && (
-                        <p style={{ fontSize: 13, color: '#52535a' }}>No blockers active</p>
-                      )}
-                    </div>
-                  </Card>
                   <div data-tour="securityscore">
                     <SecurityScore data={data} guildId={guildId} onNavigate={(s) => selectSection(s as Section)} />
                   </div>

@@ -90,7 +90,6 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
   const moodLabel = lockdown ? 'Lockdown active' : recentThreat ? 'Threat handled in the last 24h' : 'All calm';
   const MoodIcon = lockdown ? Siren : recentThreat ? ShieldAlert : Shield;
 
-  const blockersOn = Object.values(data.protect ?? {}).filter(Boolean).length;
   const iconUrl = icon ? `https://cdn.discordapp.com/icons/${guildId}/${icon}.webp?size=256` : null;
 
   const chip = (label: React.ReactNode, color: string) => (
@@ -128,21 +127,22 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
           <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', color: '#f2f3f5', lineHeight: 1.15, marginBottom: 8 }}>{name}</h1>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
             {chip(<><MoodIcon size={12} /> {moodLabel}</>, mood)}
-            {chip(<>{blockersOn} blockers on</>, '#5865f2')}
             {actions[0] && chip(<>Last action {relTime(actions[0].timestamp)}</>, '#949ba4')}
-            {stats && chip(<>{(stats.totalWarnings ?? 0).toLocaleString()} warnings all-time</>, '#f0b232')}
           </div>
-          {/* Quick actions */}
+          {/* One clear next step — everything else lives in its own tab */}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <button onClick={() => onNavigate('blockers')} className="btn-primary btn-sm" style={{ fontSize: 12.5 }}>
-              <Shield size={13} /> Blockers
-            </button>
-            <button onClick={() => onNavigate('scamshield')} className="btn-secondary btn-sm" style={{ fontSize: 12.5 }}>
-              <Radar size={13} /> Scan members
-            </button>
+            {firstTodo ? (
+              <button onClick={() => onNavigate(firstTodo.section)} className="btn-primary btn-sm" style={{ fontSize: 12.5 }}>
+                {firstTodo.label} <span style={{ opacity: 0.75 }}>+{firstTodo.points}</span> <ArrowRight size={12} />
+              </button>
+            ) : (
+              <button onClick={() => onNavigate('scamshield')} className="btn-primary btn-sm" style={{ fontSize: 12.5 }}>
+                <Radar size={13} /> Scan members
+              </button>
+            )}
             {firstTodo && (
-              <button onClick={() => onNavigate(firstTodo.section)} className="btn-secondary btn-sm" style={{ fontSize: 12.5, color: '#96a4ff', borderColor: 'rgba(88,101,242,0.4)' }}>
-                +{firstTodo.points} score: {firstTodo.label} <ArrowRight size={12} />
+              <button onClick={() => onNavigate('scamshield')} className="btn-secondary btn-sm" style={{ fontSize: 12.5 }}>
+                <Radar size={13} /> Scan members
               </button>
             )}
           </div>
