@@ -2378,6 +2378,12 @@ async def _lp_component_listener(interaction: discord.Interaction):
             if isinstance(data.get(k), list) and data[k]:
                 data[k] = data[k][:-1]
         await asyncio.to_thread(ref.set, data)
+        # Acknowledge silently — the green removal embed below is the feedback,
+        # an extra ephemeral "removed" message would just duplicate it.
+        try:
+            await interaction.response.defer(invisible=True)
+        except Exception:
+            pass
         # Replace the original log embed with a removal notice — the old entry
         # disappears, the audit trail stays visible in channel AND web log.
         guild = interaction.guild
@@ -2405,13 +2411,14 @@ async def _lp_component_listener(interaction: discord.Interaction):
                 "unwarned", f"Warning removed by {interaction.user.name}", count - 1)
         except Exception:
             pass
-        await interaction.response.send_message(
-            f"↩️ Removed one warning from <@{uid}> — they now have **{count - 1}**.", ephemeral=True)
     except Exception:
         try:
             await interaction.response.send_message("Couldn't remove the warning.", ephemeral=True)
         except Exception:
-            pass
+            try:
+                await interaction.followup.send("Couldn't remove the warning.", ephemeral=True)
+            except Exception:
+                pass
 
 
 # ═══ Daily digest: one summary embed instead of a message per action.
