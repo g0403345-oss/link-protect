@@ -42,6 +42,19 @@ struct WatchComplication: Widget {
     }
 }
 
+// watchOS 10 refuses widgets without the containerBackground API — same as
+// iOS 17 ("Please adopt containerBackground").
+extension View {
+    @ViewBuilder
+    func accessoryContainerCompat() -> some View {
+        if #available(watchOS 10.0, *) {
+            containerBackground(for: .widget) { Color.clear }
+        } else {
+            self
+        }
+    }
+}
+
 struct ComplicationView: View {
     let snapshot: LPWidgetSnapshot
     @Environment(\.widgetFamily) private var family
@@ -51,6 +64,14 @@ struct ComplicationView: View {
     }
 
     var body: some View {
+        Group {
+            content
+        }
+        .accessoryContainerCompat()
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch family {
         case .accessoryInline:
             Label(

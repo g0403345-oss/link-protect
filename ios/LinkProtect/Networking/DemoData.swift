@@ -10,6 +10,18 @@ enum DemoData {
         id: "000000000000000001", username: "appreview", globalName: "App Reviewer", avatar: nil
     )
 
+    static let recentActions: [RecentAction] = [
+        RecentAction(guildId: "1", guildName: "Bot Management", userId: "1", username: "scambot42",
+                     action: "banned", reason: "Scam Shield: same message in 3 channels",
+                     warnCount: 0, timestamp: Int(Date().timeIntervalSince1970) - 540),
+        RecentAction(guildId: "2", guildName: "Support", userId: "2", username: "jake",
+                     action: "warned", reason: "Posted a Nitro scam link",
+                     warnCount: 2, timestamp: Int(Date().timeIntervalSince1970) - 4200),
+        RecentAction(guildId: "1", guildName: "Bot Management", userId: "3", username: "mia",
+                     action: "timeout", reason: "Reached 3 warnings",
+                     warnCount: 3, timestamp: Int(Date().timeIntervalSince1970) - 9000),
+    ]
+
     static let guilds: [ManagedGuild] = [
         ManagedGuild(id: "100000000000000001", name: "Link Protect Demo", icon: nil,
                      owner: true, botPresent: true, activeProtections: 6, warnedUsers: 3),

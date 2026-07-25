@@ -58,11 +58,12 @@ const ENTRIES: Entry[] = [
   /* ── iOS App ─────────────────────────────────────────────────── */
   {
     product: 'app', date: 'In development', ts: d('2026-07-25'), upcoming: true,
-    title: 'Lockdown, verification, Share Extension & Watch complications',
+    title: 'Lockdown, verification, Share Extension & a real Watch app',
     items: [
       'Emergency lockdown button and the full verification-gate settings, right in the app.',
       'Check any link straight from the share sheet in Safari, Discord or anywhere else — full verdict with redirect chain, no sign-in needed.',
-      'Watch-face complications: bot status, server count and warnings right on your Apple Watch face.',
+      'The Apple Watch app grew four tabs: live status, servers with emergency lockdown from your wrist (relayed via iPhone), a moderation activity feed and your vote streak.',
+      'Watch-face complications, and Lock Screen widgets fixed for iOS 17 (containerBackground).',
     ],
   },
   {

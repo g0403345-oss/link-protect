@@ -16,25 +16,41 @@ struct LockStatusWidget: Widget {
     }
 }
 
+// iOS 17 refuses to offer widgets that don't adopt the containerBackground
+// API ("Please adopt containerBackground") — accessory widgets included.
+extension View {
+    @ViewBuilder
+    func accessoryContainerCompat() -> some View {
+        if #available(iOSApplicationExtension 17.0, *) {
+            containerBackground(for: .widget) { Color.clear }
+        } else {
+            self
+        }
+    }
+}
+
 @available(iOS 16.0, *)
 struct LockStatusView: View {
     let snapshot: LPWidgetSnapshot
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        switch family {
-        case .accessoryInline:
-            Label(
-                snapshot.signedIn
-                    ? "\(snapshot.serverCount) servers · \(snapshot.totalWarned) warned"
-                    : "Sign in to Link Protect",
-                systemImage: statusIcon
-            )
-        case .accessoryRectangular:
-            rectangular
-        default:
-            circular
+        Group {
+            switch family {
+            case .accessoryInline:
+                Label(
+                    snapshot.signedIn
+                        ? "\(snapshot.serverCount) servers · \(snapshot.totalWarned) warned"
+                        : "Sign in to Link Protect",
+                    systemImage: statusIcon
+                )
+            case .accessoryRectangular:
+                rectangular
+            default:
+                circular
+            }
         }
+        .accessoryContainerCompat()
     }
 
     private var statusIcon: String {

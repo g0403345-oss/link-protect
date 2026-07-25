@@ -131,6 +131,19 @@ struct APIClient {
         return try await request("/api/mobile/guild/\(guildId)/verify/stats")
     }
 
+    /// Latest moderation actions across every managed guild (watch Activity tab).
+    func recentActions(limit: Int = 20) async throws -> [RecentAction] {
+        if demo { return DemoData.recentActions }
+        struct Resp: Decodable { let actions: [RecentAction] }
+        return try await request("/api/mobile/actions/recent?limit=\(limit)", as: Resp.self).actions
+    }
+
+    /// Vote status for the signed-in user (streak/monthly/rank — watch Vote tab).
+    func myVote() async throws -> MyVoteStatus {
+        if demo { return MyVoteStatus(streak: 3, monthly: 12, total: 44, rank: 1) }
+        return try await request("/api/mobile/me/vote")
+    }
+
     /// One-click quarantine setup: role + channel locks + #verify info channel.
     func setupVerifyRole(_ guildId: String) async throws -> VerifySetupResult {
         struct Body: Encodable { let createInfoChannel = true }

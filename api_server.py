@@ -4322,6 +4322,40 @@ async def mobile_me(request: Request):
     }
 
 
+@app.get("/api/mobile/actions/recent")
+async def mobile_recent_actions(request: Request, limit: int = 20):
+    """Latest moderation actions across every guild the user manages — feeds
+    the Apple Watch Activity tab with ONE call instead of per-guild polling."""
+    token = _bearer(request)
+    user = await _discord_user(token)
+    managed = await _user_managed_guilds(token)
+    ids = {g["id"] for g in managed} | set(_guilds_where_editor(user["id"]))
+    ids = [i for i in ids if str(i).isdigit()][:100]
+    if not ids:
+        return {"actions": []}
+    ph = ",".join("?" * len(ids))
+    rows = _get_conn().execute(
+        f"SELECT guild_id, user_id, username, action, reason, warn_count, timestamp "
+        f"FROM actions WHERE guild_id IN ({ph}) ORDER BY id DESC LIMIT ?",
+        (*[int(i) for i in ids], max(1, min(int(limit or 20), 50))),
+    ).fetchall()
+    info = await _bot_guilds_info()
+    return {"actions": [{
+        "guildId": str(r["guild_id"]),
+        "guildName": info.get(str(r["guild_id"]), {}).get("name"),
+        "userId": r["user_id"], "username": r["username"],
+        "action": r["action"], "reason": r["reason"],
+        "warnCount": r["warn_count"], "timestamp": r["timestamp"],
+    } for r in rows]}
+
+
+@app.get("/api/mobile/me/vote")
+async def mobile_me_vote(request: Request):
+    """Vote status for the signed-in user (watch Vote tab / app surfaces)."""
+    user = await _discord_user(_bearer(request))
+    return _vote_status(str(user["id"]))
+
+
 @app.get("/api/mobile/guilds")
 async def mobile_guilds(request: Request):
     """Every guild the user manages — including ones the bot isn't in yet, so the

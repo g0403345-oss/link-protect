@@ -12,6 +12,10 @@ struct LPWidgetSnapshot: Codable, Equatable {
     var servers: [Server]
     /// Scam Shield catches across all servers (optional: decodes old snapshots).
     var scamCatches: Int? = nil
+    /// Recent moderation actions across the user's servers (watch Activity tab).
+    var recentActions: [ActionItem]? = nil
+    /// Vote status for the watch's Vote tab.
+    var vote: VoteInfo? = nil
 
     struct Server: Codable, Equatable, Identifiable {
         var id: String
@@ -19,6 +23,22 @@ struct LPWidgetSnapshot: Codable, Equatable {
         var warned: Int
         var blockers: Int
         var catches: Int? = nil
+    }
+
+    struct ActionItem: Codable, Equatable, Identifiable {
+        var guildName: String?
+        var username: String
+        var action: String      // warned | kicked | banned | timeout
+        var reason: String?
+        var ts: Int
+        var id: String { "\(ts)-\(username)-\(action)" }
+    }
+
+    struct VoteInfo: Codable, Equatable {
+        var streak: Int
+        var monthly: Int
+        var total: Int
+        var rank: Int?
     }
 
     static let placeholder = LPWidgetSnapshot(

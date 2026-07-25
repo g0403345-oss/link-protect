@@ -310,6 +310,27 @@ struct VerifyStats: Codable, Equatable {
     var last7 = 0
 }
 
+/// One row of the cross-guild recent-actions feed (watch Activity tab).
+struct RecentAction: Codable, Equatable, Identifiable {
+    var guildId = ""
+    var guildName: String? = nil
+    var userId = ""
+    var username = ""
+    var action = "warned"
+    var reason: String? = nil
+    var warnCount = 0
+    var timestamp = 0
+    var id: String { "\(timestamp)-\(userId)-\(action)" }
+}
+
+/// Subset of the vote-status payload the watch needs.
+struct MyVoteStatus: Codable, Equatable {
+    var streak = 0
+    var monthly = 0
+    var total = 0
+    var rank: Int? = nil
+}
+
 /// Result of the one-click quarantine setup (role + channel locks).
 struct VerifySetupResult: Codable, Equatable {
     var ok = false
