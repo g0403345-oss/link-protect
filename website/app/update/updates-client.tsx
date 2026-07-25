@@ -33,7 +33,7 @@ const ENTRIES: Entry[] = [
     product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 6,
     title: 'Meet Link Protect — the animated intro',
     items: [
-      'A 30-second Apple-style animated introduction at /intro: seven scenes from “Scams. Raids. Spam.” to a live blocked-scam demo, the feature montage and the Security-Score ring — with story progress, tap-to-advance, skip and replay.',
+      'A 30-second Apple-style animated introduction at /intro: eight scenes from “Scams. Raids. Spam.” over the logo shockwave reveal, a live blocked-scam demo, full-frame feature cuts, the Security-Score ring and real-time network numbers — with story progress, tap-to-advance, skip and replay.',
       'Linked from the landing hero (“Watch the intro”); honors reduced-motion with a static end card.',
     ],
   },
