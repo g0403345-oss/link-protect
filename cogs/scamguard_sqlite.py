@@ -29,7 +29,8 @@ from discord.ext import commands, tasks
 
 from .shared import (get_settings, is_whitelisted, resolve_channel, extract_urls,
                      record_blocked, flag_scammer_sync, get_flag_sync,
-                     load_flagged_ids_sync, _log_action_sync, DBRef)
+                     load_flagged_ids_sync, _log_action_sync, DBRef,
+                     notify_action_failure)
 
 _API_SECRET = os.environ.get("BOT_API_SECRET")
 _INTERNAL_API = os.environ.get("INTERNAL_API_URL", "http://127.0.0.1:3002")
@@ -199,6 +200,9 @@ class ScamShield(commands.Cog):
             acted = None
             print(f"[scamguard] {action} failed in guild {guild.id}:", flush=True)
             traceback.print_exc()
+            if action in ("ban", "kick", "timeout"):
+                await notify_action_failure(self.bot, guild, settings,
+                                            feature="Scam Shield", action=action, member=member)
 
         # Warn entry + dashboard log — the "why" must always be visible.
         uid, uname = str(member.id), getattr(member, "name", str(member.id))
@@ -328,6 +332,8 @@ class ScamShield(commands.Cog):
         except Exception:
             print(f"[scamguard] join-{action} failed in guild {guild.id}:", flush=True)
             traceback.print_exc()
+            await notify_action_failure(self.bot, guild, settings,
+                                        feature="Scam Shield", action=action, member=member)
             return False
 
         uid, uname = str(member.id), getattr(member, "name", str(member.id))

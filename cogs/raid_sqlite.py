@@ -20,7 +20,8 @@ import discord
 from discord.ext import commands, tasks
 
 from .shared import (get_settings, resolve_channel, is_whitelisted,
-                     link_allowlisted, extract_urls, record_blocked)
+                     link_allowlisted, extract_urls, record_blocked,
+                     notify_action_failure)
 
 _API_SECRET = os.environ.get("BOT_API_SECRET")
 _INTERNAL_API = os.environ.get("INTERNAL_API_URL", "http://127.0.0.1:3002")
@@ -125,12 +126,14 @@ class RaidProtection(commands.Cog):
 
         # Time out every involved account (best-effort).
         timed_out = 0
+        perm_failed = None  # first member the timeout bounced off — for the admin alert
         for member in members.values():
             try:
                 await member.timeout(until, reason=f"Raid defense: mass-posted {domain}")
                 timed_out += 1
             except Exception:
-                pass
+                if perm_failed is None:
+                    perm_failed = member
 
         # Record the campaign domain for threat-intel (link only, no authors).
         try:
@@ -138,8 +141,16 @@ class RaidProtection(commands.Cog):
         except Exception:
             pass
 
+        settings = await get_settings(str(guild.id))
+
+        # Timeouts bounced off missing permissions → the admins must know.
+        if perm_failed is not None:
+            await notify_action_failure(self.bot, guild, settings,
+                                        feature="Raid Shield", action="timeout",
+                                        member=perm_failed)
+
         # One alarm embed → log channel if set, else the triggering channel.
-        _log_cfg = (await get_settings(str(guild.id))).get("log", {})
+        _log_cfg = settings.get("log", {})
         log_id = _log_cfg.get("log-channel", 0)
         if (_log_cfg.get("show") or {}).get("raid", True) is False:
             log_id = 0  # log filter: raid alarms muted — in-channel fallback stays

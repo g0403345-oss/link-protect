@@ -2308,8 +2308,6 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "warn.kick", "warn.ban", "warn.timeout.warnings", "warn.timeout.time",
         "decay.enabled", "decay.days",
         "log.Activated", "log.log-channel", "log.link", "log.onlylink",
-    "log.show.automod", "log.show.manual", "log.show.scamshield",
-    "log.show.raid", "log.show.lockdown", "log.show.verify",
         "log.show.automod", "log.show.manual", "log.show.scamshield",
         "log.show.raid", "log.show.lockdown", "log.show.verify",
         "channel.channel", "channel.category", "channel.member", "channel.role",
@@ -3555,6 +3553,62 @@ async def mobile_set_lockdown(request: Request, guild_id: str, body: LockdownBod
                   "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
                   None, body.active)
     return result
+
+
+# ── Permission-failure alerts ────────────────────────────────────────────────
+# The bot records refused kick/ban/timeout attempts in kv permfail:<gid>
+# (see cogs/shared.py notify_action_failure). The dashboard shows a banner for
+# every item newer than dismissedAt.
+
+def _permfails_payload(guild_id: str) -> dict:
+    row = _get_conn().execute(
+        "SELECT value FROM kv WHERE path=?", (f"permfail:{guild_id}",)
+    ).fetchone()
+    try:
+        data = json.loads(row["value"]) if row else {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    items = [i for i in (data.get("items") or []) if isinstance(i, dict)]
+    return {"items": items, "dismissedAt": int(data.get("dismissedAt", 0) or 0)}
+
+
+def _permfails_dismiss(guild_id: str) -> dict:
+    data = _permfails_payload(guild_id)
+    data["dismissedAt"] = int(time.time())
+    c = _get_conn()
+    c.execute(
+        "INSERT INTO kv(path, value) VALUES(?, ?) "
+        "ON CONFLICT(path) DO UPDATE SET value=excluded.value",
+        (f"permfail:{guild_id}", json.dumps(data)),
+    )
+    c.commit()
+    return {"ok": True, "dismissedAt": data["dismissedAt"]}
+
+
+@app.get("/api/guild/{guild_id}/permfails")
+@require_auth
+async def get_permfails(request: Request, guild_id: str):
+    return _permfails_payload(guild_id)
+
+
+@app.post("/api/guild/{guild_id}/permfails/dismiss")
+@require_auth
+async def dismiss_permfails(request: Request, guild_id: str):
+    return _permfails_dismiss(guild_id)
+
+
+@app.get("/api/mobile/guild/{guild_id}/permfails")
+async def mobile_get_permfails(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return _permfails_payload(guild_id)
+
+
+@app.post("/api/mobile/guild/{guild_id}/permfails/dismiss")
+async def mobile_dismiss_permfails(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    return _permfails_dismiss(guild_id)
 
 
 # ── Verification gate ────────────────────────────────────────────────────────

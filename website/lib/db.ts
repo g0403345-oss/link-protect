@@ -212,6 +212,23 @@ export async function setLockdown(guildId: string, active: boolean, reason?: str
   }, 180_000);
 }
 
+export interface PermFailure {
+  feature: string;    // "Scam Shield" | "Raid Shield" | "Warn escalation"
+  action: string;     // "ban" | "kick" | "timeout"
+  userId: string;
+  username: string;
+  reasons: string[];
+  ts: number;
+}
+
+export async function getPermFails(guildId: string): Promise<{ items: PermFailure[]; dismissedAt: number }> {
+  return apiFetch(`/api/guild/${guildId}/permfails`);
+}
+
+export async function dismissPermFails(guildId: string): Promise<{ ok: boolean; dismissedAt: number }> {
+  return apiFetch(`/api/guild/${guildId}/permfails/dismiss`, { method: "POST" });
+}
+
 export interface VerifyHealthCheck { id: string; ok: boolean; label: string; detail: string; }
 export interface VerifyHealth { ok: boolean; checks: VerifyHealthCheck[]; }
 

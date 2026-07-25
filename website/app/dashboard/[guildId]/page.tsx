@@ -28,6 +28,7 @@ import VerificationTab from '@/components/VerificationTab';
 import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
+import PermFailBanner from '@/components/PermFailBanner';
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
@@ -532,6 +533,7 @@ export default function GuildDashboard() {
         {/* Content */}
         <main ref={mainRef} className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
           <div style={{ marginBottom: 20 }}><VoteBanner /></div>
+          <PermFailBanner guildId={guildId} />
           {/* Enter-only animation: with AnimatePresence mode="wait" the next
               section only mounted after the old one's exit finished — a stuck
               exit (seen after collapsing a card) left the tab empty. */}

@@ -561,9 +561,9 @@ class DB:
 db = DB()
 
 
-def _action_failure_reasons(action: str, member, guild) -> list:
-    """Bullet list explaining exactly why the bot couldn't kick/ban/timeout
-    `member` (missing permission / role position / owner)."""
+def _action_failure_flags(action: str, member, guild):
+    """(perm_name, has_perm, hierarchy_ok, is_owner) — the three ways Discord
+    refuses a kick/ban/timeout."""
     perm_map = {
         "kick": ("Kick Members", lambda p: p.kick_members),
         "ban": ("Ban Members", lambda p: p.ban_members),
@@ -577,6 +577,13 @@ def _action_failure_reasons(action: str, member, guild) -> list:
     except Exception:
         hierarchy_ok = True
     is_owner = (member.id == guild.owner_id)
+    return perm_name, has_perm, hierarchy_ok, is_owner
+
+
+def _action_failure_reasons(action: str, member, guild) -> list:
+    """Bullet list explaining exactly why the bot couldn't kick/ban/timeout
+    `member` (missing permission / role position / owner)."""
+    perm_name, has_perm, hierarchy_ok, is_owner = _action_failure_flags(action, member, guild)
 
     reasons = []
     if is_owner:
@@ -590,20 +597,134 @@ def _action_failure_reasons(action: str, member, guild) -> list:
     return reasons
 
 
-def _action_failure_embed(action: str, member, guild, exc=None):
+def _plain_failure_reasons(action: str, member, guild) -> list:
+    """Markdown-free variant of _action_failure_reasons for the web dashboard."""
+    perm_name, has_perm, hierarchy_ok, is_owner = _action_failure_flags(action, member, guild)
+    reasons = []
+    if is_owner:
+        reasons.append("The target is the server owner — Discord never lets a bot act on the owner.")
+    if not has_perm:
+        reasons.append(f"Link Protect is missing the '{perm_name}' permission.")
+    if not hierarchy_ok and not is_owner:
+        reasons.append("Link Protect's role is not above the user's highest role.")
+    if not reasons:
+        reasons.append(f"Discord refused the {action} — check Link Protect's permission and role position.")
+    return reasons
+
+
+def _action_failure_embed(action: str, member, guild, exc=None, feature: str | None = None):
     """Standalone embed wrapper around _action_failure_reasons."""
     import discord
     past = {"kick": "kicked", "ban": "banned", "timeout": "timed out"}.get(action, action)
     verb = {"kick": "kick", "ban": "ban", "timeout": "time out"}.get(action, action)
     reasons = _action_failure_reasons(action, member, guild)
+    lead = (f"**{feature}** tried to {verb} {member.mention}, but Discord refused:"
+            if feature else
+            f"{member.mention} reached the threshold and should have been **{past}**, but I couldn't:")
     e = discord.Embed(
         title=f"⚠️ Couldn't {verb} {getattr(member, 'display_name', 'user')}",
-        description=(f"{member.mention} reached the threshold and should have been **{past}**, "
-                     f"but I couldn't:\n\n" + "\n".join(reasons)),
+        description=lead + "\n\n" + "\n".join(reasons),
         color=discord.Color.orange(),
     )
     e.set_footer(text="Fix the above and it works automatically next time — no re-setup needed.")
     return e
+
+
+# ── permission-failure alerts ─────────────────────────────────────────────────
+# When a protection cog's kick/ban/timeout is refused, the admin must find out —
+# otherwise the bot just looks like it silently did nothing. Three channels:
+# orange embed in the log channel, a kv record (permfail:<gid>) that feeds the
+# dashboard banner, and a push to every device managing the guild. The kv write
+# doubles as the dedupe gate: the same user+feature+action alerts once per hour.
+
+_PERMFAIL_COOLDOWN = 3600
+_PERMFAIL_KEEP = 10
+
+
+def _record_perm_failure_sync(guild_id: int, feature: str, action: str,
+                              user_id: str, username: str, reasons: list) -> bool:
+    """Append to kv permfail:<gid> (last 10 kept). Returns False when the same
+    failure was already recorded within the cooldown — callers skip the alert."""
+    conn = _get_conn()
+    path = f"permfail:{guild_id}"
+    now = int(time.time())
+    row = conn.execute("SELECT value FROM kv WHERE path=?", (path,)).fetchone()
+    try:
+        data = json.loads(row[0]) if row else {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    items = [i for i in (data.get("items") or []) if isinstance(i, dict)]
+    for it in items:
+        if (it.get("feature") == feature and it.get("action") == action
+                and it.get("userId") == user_id
+                and now - int(it.get("ts", 0) or 0) < _PERMFAIL_COOLDOWN):
+            return False
+    items.append({"feature": feature, "action": action, "userId": user_id,
+                  "username": username, "reasons": reasons, "ts": now})
+    data["items"] = items[-_PERMFAIL_KEEP:]
+    conn.execute(
+        "INSERT INTO kv(path, value) VALUES(?, ?) "
+        "ON CONFLICT(path) DO UPDATE SET value=excluded.value",
+        (path, json.dumps(data)),
+    )
+    conn.commit()
+    return True
+
+
+async def _push_guild_alert(guild_id, title: str, body: str, *, user_id=None, username=None) -> None:
+    """Best-effort APNs push to every device managing the guild (kind
+    rule_triggered — respects the per-device alert toggle in the app)."""
+    secret = os.environ.get("BOT_API_SECRET")
+    if not secret:
+        return
+    api = os.environ.get("INTERNAL_API_URL", "http://127.0.0.1:3002")
+    payload = {"guild_id": str(guild_id), "kind": "rule_triggered", "title": title, "body": body}
+    if user_id:
+        payload["user_id"] = str(user_id)
+    if username:
+        payload["username"] = str(username)
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as s:
+            await s.post(f"{api}/api/internal/notify", json=payload,
+                         headers={"Authorization": f"Bearer {secret}"},
+                         timeout=aiohttp.ClientTimeout(total=5))
+    except Exception:
+        pass
+
+
+async def notify_action_failure(bot, guild, settings, *, feature: str, action: str, member) -> None:
+    """A protection cog's kick/ban/timeout was refused by Discord. Make it
+    visible: log-channel embed + dashboard record + push. Never raises."""
+    try:
+        reasons = _plain_failure_reasons(action, member, guild)
+        fresh = await asyncio.to_thread(
+            _record_perm_failure_sync, int(guild.id), feature, action,
+            str(member.id), getattr(member, "name", str(member.id)), reasons)
+        if not fresh:
+            return  # same failure alerted < 1 h ago
+        # Log channel — an operational alert, deliberately NOT gated by the
+        # log.show.* category filters.
+        try:
+            log_id = int((settings.get("log", {}) or {}).get("log-channel", 0) or 0)
+        except Exception:
+            log_id = 0
+        ch = bot.get_channel(log_id) if log_id else None
+        if ch is not None:
+            try:
+                await ch.send(embed=_action_failure_embed(action, member, guild, feature=feature))
+            except Exception:
+                pass
+        verb = {"kick": "kick", "ban": "ban", "timeout": "time out"}.get(action, action)
+        await _push_guild_alert(
+            guild.id,
+            f"⚠️ {feature} couldn't {verb} {getattr(member, 'display_name', 'user')}",
+            reasons[0] if reasons else "Check Link Protect's role and permissions.",
+            user_id=str(member.id), username=getattr(member, "name", None))
+    except Exception:
+        pass
 
 
 # ── blocked-link capture (threat-intel data collection) ──────────────────────
@@ -1058,6 +1179,13 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
             )
         except Exception:
             action_failed = (attempted, _action_failure_reasons(attempted, member, guild))
+            # Feed the dashboard banner too — the embeds below only reach Discord.
+            try:
+                await asyncio.to_thread(
+                    _record_perm_failure_sync, int(guild_id), "Warn escalation", attempted,
+                    user_id, username, _plain_failure_reasons(attempted, member, guild))
+            except Exception:
+                pass
 
     def _progress_footer():
         """'X more warning(s) → kicked/banned' for the nearest upcoming limit."""

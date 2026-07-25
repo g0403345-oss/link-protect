@@ -30,6 +30,22 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 2, version: '2.5.1',
+    title: 'Missing-permission alerts',
+    items: [
+      'When Scam Shield, Raid Shield or a warn escalation can’t kick, ban or time out someone — missing permission or role rank — the failure is no longer silent.',
+      'You get an orange alert in your log channel with the exact cause and fix, and the app receives a push notification.',
+      'Repeated failures for the same user are deduplicated to one alert per hour.',
+    ],
+  },
+  {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 1,
+    title: 'Permission-problem banner in the dashboard',
+    items: [
+      'The server dashboard now shows a warning banner when the bot recently couldn’t enforce an action, with the reason and how to fix it — dismissible until it happens again.',
+    ],
+  },
+  {
     product: 'bot', date: 'July 24, 2026', ts: d('2026-07-24') + 2, version: '2.5.0',
     title: 'Emergency lockdown & verification gate',
     items: [

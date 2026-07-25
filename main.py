@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.5.0"
+BOT_VERSION = "2.5.1"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -909,6 +909,18 @@ async def _help(ctx):
 # The two most recent changelog entries (newest first). Keep this list at
 # length 2 — /update intentionally only shows the latest two releases.
 _CHANGELOG = [
+    {
+        "version": "2.5.1",
+        "date": "25.07.2026",
+        "fields": [
+            ("⚠️ Missing-permission alerts",
+             " • When Scam Shield, Raid Shield or a warn escalation can't\n"
+             "   kick/ban/timeout someone (missing permission or role rank),\n"
+             "   you now get an orange alert in your log channel, a banner\n"
+             "   in the web dashboard and a push to the app — with the exact\n"
+             "   fix. No more silently failed actions."),
+        ],
+    },
     {
         "version": "2.5.0",
         "date": "24.07.2026",
