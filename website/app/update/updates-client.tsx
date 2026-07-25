@@ -57,7 +57,7 @@ const ENTRIES: Entry[] = [
 
   /* ── iOS App ─────────────────────────────────────────────────── */
   {
-    product: 'app', date: 'In development', ts: d('2026-07-25'), upcoming: true,
+    product: 'app', date: 'July 25, 2026', ts: d('2026-07-25'), upcoming: true, version: '1.1.0',
     title: 'Lockdown, verification, Share Extension & a real Watch app',
     items: [
       'Emergency lockdown button and the full verification-gate settings, right in the app.',
