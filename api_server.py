@@ -3456,12 +3456,55 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
     data = _get_server(guild_id) or {}
     info = await _bot_guilds_info()
     gname = info.get(guild_id, {}).get("name") or "Your server"
+    verify_link = f"https://link-protect.com/verify/{guild_id}"
     text = _render_guild_message(
         data, body.kind,
         user=f"<@{aid}>", username="you", server=gname,
         reason="Posted a phishing link (test)", warnings=3, remaining=2,
         channel="#general", action="kicked",
-        link=f"https://link-protect.com/verify/{guild_id}")
+        link=verify_link)
+
+    # Mirror the REAL embed the bot sends — title, fields, footer and buttons —
+    # so the test never looks like the bot would drop parts of the message.
+    embed: dict = {"description": text, "color": _guild_accent(data)}
+    components: list = []
+
+    def _link_btn(label: str, url: str):
+        components.append({"type": 1, "components": [
+            {"type": 2, "style": 5, "label": label, "url": url}]})
+
+    warn_footer = "⚠️ 2 more warnings → you will be timed out for 20 min"
+    if body.kind == "warn_channel":
+        embed.update({"title": "🔗 Link Blocked", "color": 0xF0B232,
+                      "fields": [{"name": "Total Warnings", "value": "**3** warning(s)"}],
+                      "footer": {"text": warn_footer}})
+    elif body.kind == "warn_manual":
+        embed.update({"title": "⚠️ Warning issued", "color": 0xF0B232,
+                      "fields": [{"name": "Total Warnings", "value": "**3** warning(s)"}],
+                      "footer": {"text": warn_footer}})
+    elif body.kind == "warn_dm":
+        embed.update({"title": "🔗 Your link was removed", "color": 0xF0B232,
+                      "fields": [{"name": "Total Warnings", "value": "**3** warning(s)"}],
+                      "footer": {"text": warn_footer}})
+    elif body.kind == "action_dm":
+        embed.update({"color": 0xE0683C})
+        _link_btn("Appeal this decision", "https://link-protect.com/appeal")
+    elif body.kind == "verify_dm":
+        embed.update({"title": f"Verify to unlock {gname}",
+                      "footer": {"text": "Link Protect • link-protect.com"}})
+        _link_btn("Verify now", verify_link)
+    elif body.kind == "lockdown_announce":
+        embed.update({"title": "🚨 Server lockdown activated", "color": 0xF23F43,
+                      "description": text + "\n\nSlowmode on 12 channels · invites paused · "
+                                            "all links blocked.\nLift it with /unlock or the dashboard."})
+
+    payload: dict = {
+        "content": f"-# Test preview of **{body.kind}** — sent from the dashboard, exactly as members would see it.",
+        "embeds": [embed],
+    }
+    if components:
+        payload["components"] = components
+
     async with httpx.AsyncClient() as client:
         dm = await client.post(f"{DISCORD_API}/users/@me/channels", headers=_bot_headers(),
                                json={"recipient_id": str(aid)}, timeout=8)
@@ -3469,9 +3512,7 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
             raise HTTPException(status_code=502, detail="Couldn't open a DM with you")
         r = await client.post(
             f"{DISCORD_API}/channels/{dm.json()['id']}/messages", headers=_bot_headers(),
-            json={"embeds": [{"description": text, "color": _guild_accent(data),
-                              "footer": {"text": f"Test · {body.kind} · sent from the dashboard"}}]},
-            timeout=8)
+            json=payload, timeout=8)
         if r.status_code not in (200, 201):
             raise HTTPException(status_code=502, detail="DM failed — are your DMs open?")
     return {"ok": True}

@@ -617,7 +617,7 @@ export default function GuildDashboard() {
         </aside>
 
         {/* Content */}
-        <main ref={mainRef} className="guild-main" style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+        <main ref={mainRef} className="guild-main" style={{ flex: 1, padding: '28px 32px' }}>
           <div style={{ marginBottom: 20 }}><VoteBanner /></div>
           <PermFailBanner guildId={guildId} />
           {/* Enter-only animation: with AnimatePresence mode="wait" the next

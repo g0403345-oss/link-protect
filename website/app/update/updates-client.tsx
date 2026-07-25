@@ -48,7 +48,7 @@ const ENTRIES: Entry[] = [
       'New Messages tab in the server dashboard: customize every text the bot sends — blocked-link warnings, manual warns, silent-mode DMs, escalation DMs, the verification DM and the lockdown announcement.',
       'Tone presets (Friendly / Neutral / Strict) fill all templates in one click; variables like {user}, {reason} or {warnings} insert as chips right at your cursor.',
       'Live Discord-style preview with sample values that follows the field you’re editing, plus a custom accent color for the bot’s embeds.',
-      '“Send me a test DM” delivers any template to your own Discord so you can check the result before members see it.',
+      '“Send me a test DM” delivers any template to your own Discord — as the complete embed with title, warning count, footer and buttons, exactly as members see it; the live preview follows you while scrolling.',
       'Warn-log: new Daily digest option — one summary embed per day instead of a message per action (Scam Shield, raid and lockdown alerts stay live).',
     ],
   },
