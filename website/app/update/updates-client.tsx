@@ -47,6 +47,7 @@ const ENTRIES: Entry[] = [
       'Dashboard tour now covers the Security Score, presets, lockdown and the verification gate.',
       'Every settings card is now collapsible — click its header to fold it away; the dashboard remembers your layout.',
       'Access Control whitelists use the same card design as every other settings block.',
+      'Landing: the iOS section became a compact tap-through phone showcase with all six current app screens.',
       'Custom background image for your verify page — auto-resized and compressed on upload, rendered faded like our homepage hero.',
       'Live permission check — see instantly whether the bot has the rights and role position the gate and lockdown need.',
       'Emergency lockdown as a compact control in the dashboard header — pulses red while active, one click restores everything.',

@@ -13,12 +13,53 @@ import LinkChecker from '@/components/LinkChecker';
 import Leaderboard from '@/components/Leaderboard';
 import SupporterWall from '@/components/SupporterWall';
 
-/* ── "Now on iOS" app showcase ───────────────────────────────── */
-function PhoneShot({ src, alt, raised }: { src: string; alt: string; raised?: boolean }) {
+/* ── "Now on iOS" app showcase — one quiet phone, tap to browse ── */
+const APP_SHOTS = [
+  { src: '/app/app-overview.png', label: 'Overview', caption: 'Stats, emergency lockdown & active protections at a glance.' },
+  { src: '/app/app-scamshield.png', label: 'Scam Shield', caption: 'Cross-channel spam defense with live network intel.' },
+  { src: '/app/app-warnings.png', label: 'Warnings', caption: 'Kick, ban & timeout thresholds — tuned in seconds.' },
+  { src: '/app/app-access.png', label: 'Access', caption: 'Whitelist channels, categories, members and roles.' },
+  { src: '/app/app-blacklist.png', label: 'Blacklist', caption: 'Your own always-block domains.' },
+  { src: '/app/app-stats.png', label: 'Statistics', caption: 'Trends, top reasons and most-warned members.' },
+];
+
+function AppShowcase() {
+  const [i, setI] = useState(0);
+  const touchX = useRef<number | null>(null);
+  const next = () => setI((v) => (v + 1) % APP_SHOTS.length);
+  const prev = () => setI((v) => (v - 1 + APP_SHOTS.length) % APP_SHOTS.length);
+
   return (
-    <div style={{ flex: '0 0 auto', width: 'min(236px, 72vw)', transform: raised ? 'translateY(-22px)' : 'none' }}>
-      <div style={{ borderRadius: 36, overflow: 'hidden', border: '1px solid #2e2e36', background: '#000', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', lineHeight: 0 }}>
-        <Image src={src} alt={alt} width={1206} height={2622} style={{ width: '100%', height: 'auto', display: 'block' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <div
+        onClick={next}
+        onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+        onTouchEnd={(e) => {
+          if (touchX.current === null) return;
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          touchX.current = null;
+          if (dx > 40) prev();
+          else if (dx < -40) next();
+        }}
+        title="Tap for the next screen"
+        style={{ position: 'relative', width: 'min(216px, 62vw)', aspectRatio: '1320 / 2868', borderRadius: 30, overflow: 'hidden', border: '1px solid #2e2e36', background: '#000', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', cursor: 'pointer', userSelect: 'none' }}>
+        {APP_SHOTS.map((s, idx) => (
+          <Image key={s.src} src={s.src} alt={`${s.label} — Link Protect iOS app`} fill sizes="216px"
+            style={{ objectFit: 'cover', opacity: idx === i ? 1 : 0, transition: 'opacity 0.35s ease' }} />
+        ))}
+      </div>
+
+      {/* Dots */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {APP_SHOTS.map((s, idx) => (
+          <button key={s.src} onClick={() => setI(idx)} aria-label={s.label}
+            style={{ width: idx === i ? 18 : 7, height: 7, borderRadius: 99, border: 'none', cursor: 'pointer', padding: 0, background: idx === i ? '#5865f2' : '#2e2e36', transition: 'all 0.25s' }} />
+        ))}
+      </div>
+
+      <div style={{ textAlign: 'center', minHeight: 44 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f2f3f5', marginBottom: 3 }}>{APP_SHOTS[i].label}</div>
+        <p style={{ fontSize: 12, color: '#6d6f78', lineHeight: 1.5, maxWidth: 240 }}>{APP_SHOTS[i].caption}</p>
       </div>
     </div>
   );
@@ -28,7 +69,7 @@ function AppSection() {
   const features = [
     { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 16 shields, apply presets, set warning thresholds and blacklists — right from your phone.' },
     { icon: Bell, title: 'Instant push alerts', desc: 'Know the moment the bot goes offline or a protection rule fires in one of your servers.' },
-    { icon: Lock, title: 'Face ID locked', desc: 'Your moderation panel stays private behind Face ID — plus a Home Screen widget for live status.' },
+    { icon: Lock, title: 'Face ID locked, Watch included', desc: 'Private behind Face ID — with Home & Lock Screen widgets and a full Apple Watch app, emergency lockdown included.' },
   ];
   return (
     <section style={{ padding: '100px 24px', borderTop: '1px solid #18181b', background: '#0b0b0d' }}>
@@ -46,22 +87,22 @@ function AppSection() {
           <div style={{ display: 'flex', justifyContent: 'center' }}><AppStoreBadge /></div>
         </div>
 
-        <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <PhoneShot src="/app/servers.png" alt="Server list in the Link Protect iOS app" />
-          <PhoneShot src="/app/overview.png" alt="Server protection overview in the Link Protect iOS app" raised />
-          <PhoneShot src="/app/blockers.png" alt="Link blockers configuration in the Link Protect iOS app" />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginTop: 64 }}>
-          {features.map(({ icon: Icon, title, desc }) => (
-            <div key={title} style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: 22 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                <Icon size={17} color="#7289da" />
+        {/* One quiet phone (tap/swipe to browse all six screens) + feature cards */}
+        <div className="app-showcase-grid" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 40, alignItems: 'center', maxWidth: 860, margin: '0 auto' }}>
+          <AppShowcase />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {features.map(({ icon: Icon, title, desc }) => (
+              <div key={title} style={{ display: 'flex', gap: 14, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: '18px 20px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon size={17} color="#7289da" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>{title}</div>
+                  <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55 }}>{desc}</p>
+                </div>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>{title}</div>
-              <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55 }}>{desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -735,6 +776,7 @@ export default function LandingClient() {
         @media (max-width: 920px) {
           .bento-grid { grid-template-columns: 1fr; }
           .bento-card { grid-column: span 1 !important; flex-direction: column !important; }
+          .app-showcase-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
         }
         .lp-shield-glow {
           position: absolute; inset: 0; opacity: 0; transition: opacity 0.25s; pointer-events: none;
