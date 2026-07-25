@@ -824,7 +824,9 @@ _CHANGELOG = [
              " • Log entries show avatars, timestamps and action colors.\n"
              " • Buttons: remove a warning or open the dashboard right\n"
              "   from the log — banned users get an appeal link.\n"
-             " • Optional daily digest: one summary embed per day."),
+             " • Optional daily digest: one summary embed per day.\n"
+             " • Warned members always see their count and how many\n"
+             "   warnings remain until timeout, kick or ban."),
             ("🧹 61 commands → 18",
              " • All enable-/disable- pairs became /blocker.\n"
              " • /warn add · list · remove · kick-at · ban-at · timeout\n"

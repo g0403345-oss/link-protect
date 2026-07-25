@@ -38,6 +38,7 @@ const ENTRIES: Entry[] = [
       'Optional daily digest: one summary embed per day instead of a message per action.',
       '61 commands became 18: all enable-/disable- pairs are now /blocker, warnings live under /warn (add · list · remove · reset · kick-at · ban-at · timeout · decay · log), whitelists under /whitelist, the blacklist under /blacklist — plus a rewritten /help with topic picker.',
       'Escalations now DM the member before a kick or ban (customizable), so people always know what happened.',
+      'Warned members always see their current count and how many warnings remain until the next step — now including timeout, not just kick/ban.',
     ],
   },
   {

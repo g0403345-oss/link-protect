@@ -1250,12 +1250,16 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
             except Exception:
                 pass
 
-    _upcoming_limits = [l for l in (kick_limit, ban_limit) if l and warn_count < l]
+    _upcoming_limits = [l for l in (timeout_warns, kick_limit, ban_limit) if l and warn_count < l]
     remaining_txt = str(min(_upcoming_limits) - warn_count) if _upcoming_limits else "0"
 
     def _progress_footer():
-        """'X more warning(s) → kicked/banned' for the nearest upcoming limit."""
+        """'X more warning(s) → timed out/kicked/banned' — whichever stage is
+        next. The member always knows where they stand."""
         upcoming = []
+        if timeout_warns and warn_count < timeout_warns:
+            mins = timeout_minutes or 10
+            upcoming.append((timeout_warns, f"timed out for {mins} min"))
         if kick_limit and warn_count < kick_limit:
             upcoming.append((kick_limit, "kicked"))
         if ban_limit and warn_count < ban_limit:
