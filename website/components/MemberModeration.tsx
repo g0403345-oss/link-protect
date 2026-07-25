@@ -16,7 +16,7 @@ interface Props {
 const ACTIONS: { kind: ActionKind; label: string; color: string; icon: typeof Ban; destructive: boolean }[] = [
   { kind: 'warn', label: 'Warn', color: '#5865f2', icon: AlertTriangle, destructive: false },
   { kind: 'timeout', label: 'Timeout', color: '#5865f2', icon: Clock, destructive: false },
-  { kind: 'kick', label: 'Kick', color: '#f0b232', icon: UserX, destructive: true },
+  { kind: 'kick', label: 'Kick', color: '#e0683c', icon: UserX, destructive: true },
   { kind: 'ban', label: 'Ban', color: '#f23f43', icon: Ban, destructive: true },
 ];
 

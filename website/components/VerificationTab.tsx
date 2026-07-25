@@ -195,7 +195,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Stats */}
       {stats && (stats.total > 0 || enabled) && (
-        <div className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
           {[{ label: 'Members verified (total)', value: stats.total, color: '#23a55a' },
             { label: 'Verified — last 7 days', value: stats.last7, color: '#5865f2' }].map((s) => (
             <div key={s.label} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: '14px 16px' }}>
@@ -230,7 +230,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
                     <button key={m.id} onClick={() => patch('verify.role_mode', m.id, 'Verification mode')}
                       disabled={saving === 'verify.role_mode'}
                       style={{ textAlign: 'left', padding: '12px 14px', background: active ? 'rgba(88,101,242,0.1)' : '#18181b', border: `1px solid ${active ? '#5865f2' : '#2e2e36'}`, borderRadius: 9, cursor: 'pointer' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#7289da' : '#f2f3f5', marginBottom: 3 }}>{m.title}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#96a4ff' : '#f2f3f5', marginBottom: 3 }}>{m.title}</div>
                       <div style={{ fontSize: 11.5, color: '#6d6f78', lineHeight: 1.5 }}>{m.desc}</div>
                     </button>
                   );
@@ -402,7 +402,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
                   </button>
                 )}
               </div>
-              {bgError && <p style={{ fontSize: 12, color: '#f87171', marginTop: 8 }}>{bgError}</p>}
+              {bgError && <p style={{ fontSize: 12, color: '#f23f43', marginTop: 8 }}>{bgError}</p>}
             </div>
             {pageDirty && (
               <button onClick={savePage} disabled={pageSaving}
@@ -477,7 +477,7 @@ function AgeInput({ value, onSave, saving }: { value: number; onSave: (v: number
         style={{ width: 80, padding: '8px 10px', background: '#18181b', border: `1px solid ${dirty ? '#f0b232' : '#2e2e36'}`, borderRadius: 7, color: '#f2f3f5', fontSize: 14, fontWeight: 700, textAlign: 'center', outline: 'none', fontFamily: 'inherit' }} />
       {dirty && (
         <button onClick={() => onSave(local)} disabled={saving}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, background: '#f0b232', color: '#111', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
           {saving ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
         </button>
       )}

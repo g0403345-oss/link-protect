@@ -71,12 +71,13 @@ export default async function CheckPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const sharedUrl = typeof params.url === 'string' ? params.url.slice(0, 500) : '';
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 60 }}>
+    <div style={{ minHeight: '100vh', paddingTop: 60, position: 'relative' }}>
+      <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
       {/* Hero + checker */}
       <Section style={{ paddingTop: 64, textAlign: 'center', maxWidth: 720 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div className="eyebrow" style={{ marginBottom: 22 }}>
           <Shield size={12} /> Free URL Checker
         </div>
         <h1 style={{ fontSize: 'clamp(32px, 6vw, 48px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
@@ -100,10 +101,10 @@ export default async function CheckPage({ searchParams }: { searchParams: Promis
         <p style={{ fontSize: 14, color: '#6d6f78', textAlign: 'center', marginBottom: 32 }}>Two independent sources, one clear verdict.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
           {STEPS.map((s, i) => (
-            <div key={s.title} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 20 }}>
+            <div key={s.title} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <s.icon size={17} color="#7289da" />
+                  <s.icon size={17} color="#96a4ff" />
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#52535a' }}>STEP {i + 1}</span>
               </div>
@@ -120,7 +121,7 @@ export default async function CheckPage({ searchParams }: { searchParams: Promis
         <p style={{ fontSize: 14, color: '#6d6f78', textAlign: 'center', marginBottom: 32 }}>The threats most likely to hit a Discord community.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
           {DETECTS.map((d) => (
-            <div key={d.title} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 18, display: 'flex', gap: 12 }}>
+            <div key={d.title} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 18, display: 'flex', gap: 12 }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: `${d.color}1a`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <d.icon size={17} style={{ color: d.color }} />
               </div>
@@ -138,7 +139,7 @@ export default async function CheckPage({ searchParams }: { searchParams: Promis
         <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 32, letterSpacing: '-0.02em' }}>Frequently asked</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {FAQ.map((f) => (
-            <div key={f.q} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '16px 20px' }}>
+            <div key={f.q} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>{f.q}</div>
               <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55 }}>{f.a}</p>
             </div>
@@ -155,10 +156,10 @@ export default async function CheckPage({ searchParams }: { searchParams: Promis
             Discord server — automatically, and for free.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={BOT_INVITE} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 14, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none' }}>
+            <a href={BOT_INVITE} target="_blank" rel="noreferrer" className="btn-primary" style={{ fontSize: 14 }}>
               Add to your server
             </a>
-            <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 14, fontWeight: 600, color: '#949ba4', border: '1px solid #2e2e36', borderRadius: 10, textDecoration: 'none' }}>
+            <Link href="/dashboard" className="btn-secondary" style={{ fontSize: 14 }}>
               Open dashboard
             </Link>
           </div>

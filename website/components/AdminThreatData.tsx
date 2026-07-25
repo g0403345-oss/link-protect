@@ -132,7 +132,7 @@ export default function AdminThreatData() {
           const active = mode === m.id;
           return (
             <button key={m.id} onClick={() => setMode(m.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${active ? '#5865f2' : '#2e2e36'}`, background: active ? 'rgba(88,101,242,0.12)' : '#18181b', color: active ? '#7289da' : '#949ba4' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${active ? '#5865f2' : '#2e2e36'}`, background: active ? 'rgba(88,101,242,0.12)' : '#18181b', color: active ? '#96a4ff' : '#949ba4' }}>
               <m.icon size={13} /> {m.label}
             </button>
           );
@@ -168,7 +168,7 @@ export default function AdminThreatData() {
       {/* Category filter chips (only the ones relevant to this view) */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
         <button onClick={() => setCategory('')}
-          style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${category === '' ? '#5865f2' : '#2e2e36'}`, background: category === '' ? 'rgba(88,101,242,0.15)' : 'transparent', color: category === '' ? '#7289da' : '#949ba4' }}>
+          style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${category === '' ? '#5865f2' : '#2e2e36'}`, background: category === '' ? 'rgba(88,101,242,0.15)' : 'transparent', color: category === '' ? '#96a4ff' : '#949ba4' }}>
           All
         </button>
         {(data?.summary.byCategory ?? []).filter(c => mode === 'threats' ? isThreat(c.category) : !isThreat(c.category)).map(c => {
@@ -197,7 +197,7 @@ export default function AdminThreatData() {
         <div style={{ display: 'flex', gap: 4 }}>
           {SORTS.map(s => (
             <button key={s.id} onClick={() => setSort(s.id)}
-              style={{ fontSize: 12, fontWeight: 600, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${sort === s.id ? '#5865f2' : '#2e2e36'}`, background: sort === s.id ? 'rgba(88,101,242,0.12)' : '#18181b', color: sort === s.id ? '#7289da' : '#949ba4', whiteSpace: 'nowrap' }}>
+              style={{ fontSize: 12, fontWeight: 600, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${sort === s.id ? '#5865f2' : '#2e2e36'}`, background: sort === s.id ? 'rgba(88,101,242,0.12)' : '#18181b', color: sort === s.id ? '#96a4ff' : '#949ba4', whiteSpace: 'nowrap' }}>
               {s.label}
             </button>
           ))}
@@ -210,10 +210,10 @@ export default function AdminThreatData() {
 
       {/* Error */}
       {error && (
-        <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: '#f87171', margin: 0 }}>Bot-API nicht erreichbar</p>
-          <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
-            <code style={{ background: '#1e1e22', padding: '1px 5px', borderRadius: 4 }}>sudo systemctl restart linkprotect-api.service</code>
+        <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: '#f23f43', margin: 0 }}>Bot API unreachable</p>
+          <p style={{ fontSize: 12, color: '#949ba4', margin: '4px 0 0' }}>
+            The bot server isn&apos;t responding. Check that it&apos;s online — data reappears automatically once it&apos;s back.
           </p>
         </div>
       )}

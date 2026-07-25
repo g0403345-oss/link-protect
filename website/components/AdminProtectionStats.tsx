@@ -84,7 +84,7 @@ export default function AdminProtectionStats() {
   return (
     <div>
       {error && (
-        <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
+        <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f23f43' }}>
           Bot API unreachable.
         </div>
       )}

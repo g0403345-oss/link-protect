@@ -290,7 +290,7 @@ export default function DeveloperPanel({ guildId, onToast }: {
               return (
                 <button key={ev} title={EVENT_META[ev].desc}
                   onClick={() => setWhEvents((p) => (on ? p.filter((x) => x !== ev) : [...p, ev]))}
-                  style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, borderRadius: 99, cursor: 'pointer', background: on ? 'rgba(88,101,242,0.15)' : '#18181b', color: on ? '#7289da' : '#6d6f78', border: `1px solid ${on ? 'rgba(88,101,242,0.4)' : '#2e2e36'}` }}>
+                  style={{ padding: '5px 11px', fontSize: 11.5, fontWeight: 600, borderRadius: 99, cursor: 'pointer', background: on ? 'rgba(88,101,242,0.15)' : '#18181b', color: on ? '#96a4ff' : '#6d6f78', border: `1px solid ${on ? 'rgba(88,101,242,0.4)' : '#2e2e36'}` }}>
                   {EVENT_META[ev].label}
                 </button>
               );
@@ -324,7 +324,7 @@ export default function DeveloperPanel({ guildId, onToast }: {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
               {h.events.map((ev) => (
-                <span key={ev} style={{ padding: '2px 8px', fontSize: 10.5, fontWeight: 600, color: '#7289da', background: 'rgba(88,101,242,0.1)', borderRadius: 99 }}>
+                <span key={ev} style={{ padding: '2px 8px', fontSize: 10.5, fontWeight: 600, color: '#96a4ff', background: 'rgba(88,101,242,0.1)', borderRadius: 99 }}>
                   {EVENT_META[ev]?.label ?? ev}
                 </span>
               ))}
@@ -414,8 +414,8 @@ export default function DeveloperPanel({ guildId, onToast }: {
             </p>
           </div>
           <button onClick={() => toggleBeta(!dev?.beta)} disabled={betaSaving || !dev}
-            style={{ width: 44, height: 24, borderRadius: 99, border: 'none', cursor: 'pointer', flexShrink: 0, position: 'relative', background: dev?.beta ? '#23a55a' : '#2e2e36', transition: 'background 0.15s', opacity: betaSaving ? 0.6 : 1 }}>
-            <span style={{ position: 'absolute', top: 3, left: dev?.beta ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+            style={{ width: 40, height: 20, borderRadius: 99, border: 'none', cursor: 'pointer', flexShrink: 0, position: 'relative', background: dev?.beta ? '#23a55a' : '#2e2e36', transition: 'background 0.15s', opacity: betaSaving ? 0.6 : 1 }}>
+            <span style={{ position: 'absolute', top: 2, left: dev?.beta ? 22 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
           </button>
         </div>
       </Card>

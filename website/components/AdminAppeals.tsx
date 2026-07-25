@@ -98,7 +98,7 @@ export default function AdminAppeals() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, alignItems: 'center' }}>
         {STATUSES.map((s) => (
           <button key={s || 'all'} onClick={() => setStatus(s)}
-            style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${status === s ? '#5865f2' : '#2e2e36'}`, background: status === s ? 'rgba(88,101,242,0.15)' : 'transparent', color: status === s ? '#7289da' : '#949ba4', textTransform: 'capitalize' }}>
+            style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${status === s ? '#5865f2' : '#2e2e36'}`, background: status === s ? 'rgba(88,101,242,0.15)' : 'transparent', color: status === s ? '#96a4ff' : '#949ba4', textTransform: 'capitalize' }}>
             {s || 'all'}
           </button>
         ))}
@@ -109,7 +109,7 @@ export default function AdminAppeals() {
       </div>
 
       {error && (
-        <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
+        <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f23f43' }}>
           Bot API unreachable.
         </div>
       )}
@@ -159,7 +159,7 @@ export default function AdminAppeals() {
                           </a>
                         ) : (
                           <a key={j} href={at.url} target="_blank" rel="noreferrer"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#7289da', textDecoration: 'none', background: '#111113', border: '1px solid #2e2e36', borderRadius: 6, padding: '4px 9px' }}>
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#96a4ff', textDecoration: 'none', background: '#111113', border: '1px solid #2e2e36', borderRadius: 6, padding: '4px 9px' }}>
                             <Paperclip size={11} /> {at.name} <span style={{ color: '#52535a' }}>({Math.round(at.size / 1024)} KB)</span>
                           </a>
                         ))}
@@ -172,7 +172,7 @@ export default function AdminAppeals() {
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button onClick={() => setOpenId(a.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#7289da' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#96a4ff' }}>
                 <MessageSquare size={13} /> Conversation
               </button>
               {(a.status === 'open' || a.status === 'reviewed') && (
@@ -182,7 +182,7 @@ export default function AdminAppeals() {
                     <Check size={13} /> {confirm === `accept:${a.id}` ? 'Confirm — remove flag?' : 'Accept'}
                   </button>
                   <button onClick={() => decide(a.id, false)} disabled={busy === a.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.5)', background: confirm === `deny:${a.id}` ? '#f23f43' : 'rgba(242,63,67,0.1)', color: confirm === `deny:${a.id}` ? '#fff' : '#f87171' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.5)', background: confirm === `deny:${a.id}` ? '#f23f43' : 'rgba(242,63,67,0.1)', color: confirm === `deny:${a.id}` ? '#fff' : '#f23f43' }}>
                     <X size={13} /> {confirm === `deny:${a.id}` ? 'Confirm — deny?' : 'Deny'}
                   </button>
                 </>

@@ -111,13 +111,13 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
             )}
 
             {phase === 'failed' && errorDetail && (
-              <div style={{ margin: '10px 0 4px', padding: '11px 13px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.25)', borderRadius: 9, fontSize: 12.5, color: '#f87171', lineHeight: 1.5, textAlign: 'left' }}>
+              <div style={{ margin: '10px 0 4px', padding: '11px 13px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.25)', borderRadius: 9, fontSize: 12.5, color: '#f23f43', lineHeight: 1.5, textAlign: 'left' }}>
                 {errorDetail}
               </div>
             )}
 
             <button onClick={verify} disabled={phase === 'verifying'}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginTop: 14, padding: '13px 28px', fontSize: 15, fontWeight: 700, background: accent, color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer', opacity: phase === 'verifying' ? 0.7 : 1, boxShadow: `0 8px 24px ${accent}55` }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginTop: 14, padding: '13px 28px', fontSize: 15, fontWeight: 700, background: accent, color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer', opacity: phase === 'verifying' ? 0.5 : 1, boxShadow: `0 8px 24px ${accent}55` }}>
               {phase === 'verifying'
                 ? <><RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} /> Verifying…</>
                 : <>

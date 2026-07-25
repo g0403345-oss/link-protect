@@ -57,7 +57,7 @@ export default function AppealPage() {
       <Navbar />
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '120px 24px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#f87171', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 18, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#f23f43', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 18, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             <ShieldAlert size={12} /> Scam Shield
           </div>
           <h1 style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-0.03em', color: '#f2f3f5', marginBottom: 10 }}>Appeal a flag</h1>
@@ -146,7 +146,7 @@ export default function AppealPage() {
                   )}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button onClick={() => setThreadOpen(true)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: 'rgba(88,101,242,0.12)', color: '#7289da', border: '1px solid rgba(88,101,242,0.4)', borderRadius: 8, cursor: 'pointer' }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: 'rgba(88,101,242,0.12)', color: '#96a4ff', border: '1px solid rgba(88,101,242,0.4)', borderRadius: 8, cursor: 'pointer' }}>
                       <MessageSquare size={13} /> Open conversation
                     </button>
                   </div>

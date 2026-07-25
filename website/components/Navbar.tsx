@@ -235,7 +235,7 @@ export default function Navbar() {
           })}
           {!session && (
             <Link href="/login" onClick={() => setNavOpen(false)}
-              style={{ display: 'block', padding: '11px 12px', fontSize: 15, fontWeight: 600, color: '#7289da', textDecoration: 'none', borderRadius: 8 }}>
+              style={{ display: 'block', padding: '11px 12px', fontSize: 15, fontWeight: 600, color: '#96a4ff', textDecoration: 'none', borderRadius: 8 }}>
               Log in
             </Link>
           )}

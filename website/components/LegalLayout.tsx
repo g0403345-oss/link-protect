@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Scale } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 
 export function LegalLayout({
@@ -14,18 +14,23 @@ export function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', position: 'relative' }}>
+      <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 380, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
-      <main style={{ maxWidth: 760, margin: '0 auto', padding: '120px 24px 96px' }}>
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: '120px 24px 96px', position: 'relative' }}>
         <Link
           href="/"
+          className="no-print"
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#52535a', textDecoration: 'none', marginBottom: 28 }}
         >
           <ChevronLeft size={14} /> Back to home
         </Link>
 
-        <h1 style={{ fontSize: 34, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.025em', marginBottom: 8 }}>
+        <div className="eyebrow" style={{ marginBottom: 18 }}>
+          <Scale size={12} /> Legal
+        </div>
+        <h1 style={{ fontSize: 'clamp(30px, 5vw, 40px)', fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.03em', marginBottom: 8, lineHeight: 1.1 }}>
           {title}
         </h1>
         <p style={{ fontSize: 13, color: '#52535a', marginBottom: 28 }}>Last updated: {updated}</p>
@@ -36,10 +41,14 @@ export function LegalLayout({
           {children}
         </div>
 
-        <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #1e1e22', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <Link href="/privacy" style={{ fontSize: 13, color: '#5865f2', textDecoration: 'none' }}>Privacy Policy</Link>
-          <Link href="/terms" style={{ fontSize: 13, color: '#5865f2', textDecoration: 'none' }}>Terms of Service</Link>
-          <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#5865f2', textDecoration: 'none' }}>Support</a>
+        <div className="no-print" style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #1e1e22', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          {[
+            { href: '/privacy', label: 'Privacy Policy' },
+            { href: '/terms', label: 'Terms of Service' },
+          ].map(({ href, label }) => (
+            <Link key={href} href={href} className="legal-link" style={{ fontSize: 13, color: '#96a4ff', textDecoration: 'none' }}>{label}</Link>
+          ))}
+          <a href="https://discord.gg/BjDC9t329E" target="_blank" rel="noreferrer" className="legal-link" style={{ fontSize: 13, color: '#96a4ff', textDecoration: 'none' }}>Support</a>
         </div>
       </main>
     </div>

@@ -75,7 +75,7 @@ function AppSection() {
     <section style={{ padding: '100px 24px', borderTop: '1px solid #18181b', background: '#0b0b0d' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div className="eyebrow" style={{ marginBottom: 22 }}>
             <Smartphone size={12} /> Now on iOS
           </div>
           <h2 className="cta-title" style={{ fontSize: 48, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 16, lineHeight: 1.05 }}>
@@ -94,7 +94,7 @@ function AppSection() {
             {features.map(({ icon: Icon, title, desc }) => (
               <div key={title} style={{ display: 'flex', gap: 14, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 12, padding: '18px 20px' }}>
                 <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={17} color="#7289da" />
+                  <Icon size={17} color="#96a4ff" />
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>{title}</div>
@@ -167,9 +167,9 @@ function DiscordMockup() {
   const sc = MOCK_SCENES[scene];
 
   return (
-    <div style={{ width: '100%', maxWidth: 520, borderRadius: 12, overflow: 'hidden', border: '1px solid #2e2e36', background: '#1e1f22', boxShadow: '0 32px 80px rgba(0,0,0,0.55)', userSelect: 'none' }}>
+    <div style={{ width: '100%', maxWidth: 520, borderRadius: 12, overflow: 'hidden', border: '1px solid #2e2e36', background: '#1e1e22', boxShadow: '0 32px 80px rgba(0,0,0,0.55)', userSelect: 'none' }}>
       {/* title bar */}
-      <div style={{ background: '#111214', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #2e2e36' }}>
+      <div style={{ background: '#111113', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #2e2e36' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {['#f23f43', '#f0b232', '#23a55a'].map((c) => <div key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />)}
         </div>
@@ -178,14 +178,14 @@ function DiscordMockup() {
 
       <div style={{ display: 'flex', height: 340 }}>
         {/* server icons */}
-        <div className="discord-sidebar" style={{ width: 56, background: '#1a1b1e', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 8, borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+        <div className="discord-sidebar" style={{ width: 56, background: '#18181b', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 8, borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
           {[{ bg: '#5865f2', label: 'LP', active: true }, { bg: '#23a55a', label: 'G', active: false }, { bg: '#f23f43', label: 'R', active: false }, { bg: '#f0b232', label: 'Y', active: false }].map(({ bg, label, active }, i) => (
             <div key={i} style={{ width: 36, height: 36, borderRadius: active ? 10 : '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0, outline: active ? '2px solid #5865f2' : 'none', outlineOffset: 2 }}>{label}</div>
           ))}
         </div>
 
         {/* channel list */}
-        <div className="discord-channels" style={{ width: 152, background: '#2b2d31', padding: '12px 0', borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
+        <div className="discord-channels" style={{ width: 152, background: '#2e2e36', padding: '12px 0', borderRight: '1px solid #2e2e36', flexShrink: 0 }}>
           <div style={{ padding: '4px 12px 8px', fontSize: 11, fontWeight: 700, color: '#6d6f78', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Text Channels</div>
           {['# general', '# rules', '# off-topic', '# bot-cmds'].map((ch, i) => (
             <div key={ch} style={{ padding: '5px 12px', fontSize: 13, color: i === 0 ? '#f2f3f5' : '#6d6f78', background: i === 0 ? 'rgba(88,101,242,0.15)' : 'transparent', borderLeft: i === 0 ? '2px solid #5865f2' : '2px solid transparent' }}>{ch}</div>
@@ -231,7 +231,7 @@ function DiscordMockup() {
                   <span style={{ fontSize: 10, color: '#52535a' }}>Today 14:22</span>
                   <span style={{ fontSize: 10, fontWeight: 600, color: '#5865f2', background: 'rgba(88,101,242,0.15)', padding: '1px 5px', borderRadius: 3 }}>BOT</span>
                 </div>
-                <div style={{ borderLeft: '3px solid #f23f43', background: '#2b2d31', borderRadius: '0 6px 6px 0', padding: '8px 10px', fontSize: 12, maxWidth: 230 }}>
+                <div style={{ borderLeft: '3px solid #f23f43', background: '#2e2e36', borderRadius: '0 6px 6px 0', padding: '8px 10px', fontSize: 12, maxWidth: 230 }}>
                   <div style={{ fontWeight: 700, color: '#f23f43', marginBottom: 3 }}>{sc.verdict}</div>
                   <div style={{ color: '#949ba4' }}>{sc.sub}</div>
                   <div style={{ color: '#52535a', marginTop: 2 }}>{sc.extra}</div>
@@ -303,9 +303,14 @@ function LiveStats() {
       <style>{`@keyframes lpPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
       {items.map((it) => (
         <div key={it.key} style={{ textAlign: 'center', minWidth: 110 }}>
-          <div style={{ fontSize: 48, fontWeight: 900, color: it.color, letterSpacing: '-0.04em', lineHeight: 1 }}>
-            <LiveNumber value={it.value} />{it.suffix}
-          </div>
+          {s === null ? (
+            /* hold a shimmer until the first fetch — never count up from "0+ servers" */
+            <div className="skeleton" style={{ width: 108, height: 48, margin: '0 auto', borderRadius: 10 }} />
+          ) : (
+            <div style={{ fontSize: 48, fontWeight: 900, color: it.color, letterSpacing: '-0.04em', lineHeight: 1 }}>
+              <LiveNumber value={it.value} />{it.suffix}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
             {it.live && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', animation: 'lpPulse 1.6s ease-in-out infinite' }} />}
             <span style={{ fontSize: 13, color: '#52535a', fontWeight: 500 }}>{it.label}</span>
@@ -411,7 +416,7 @@ function LinkScannerVisual() {
             style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
               border: `1px solid ${sel === i ? '#5865f2' : '#2e2e36'}`,
               background: sel === i ? 'rgba(88,101,242,0.15)' : 'transparent',
-              color: sel === i ? '#7289da' : '#949ba4' }}>
+              color: sel === i ? '#96a4ff' : '#949ba4' }}>
             {x.label}
           </button>
         ))}
@@ -421,14 +426,14 @@ function LinkScannerVisual() {
       <motion.div key={`${sel}-${scanning}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
         style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #2e2e36' }}>
         {scanning ? (
-          <div style={{ padding: '10px 12px', background: '#1e1f22', fontSize: 12, color: '#6d6f78' }}>🔎 Link Protect is scanning…</div>
+          <div style={{ padding: '10px 12px', background: '#1e1e22', fontSize: 12, color: '#6d6f78' }}>🔎 Link Protect is scanning…</div>
         ) : s.bad ? (
-          <div style={{ padding: '10px 12px', background: '#1e1f22', borderLeft: '3px solid #f23f43' }}>
+          <div style={{ padding: '10px 12px', background: '#1e1e22', borderLeft: '3px solid #f23f43' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#f23f43', marginBottom: 2 }}>🚫 {s.verdict}</div>
             <div style={{ fontSize: 12, color: '#949ba4' }}>Message deleted · Jake — Warning 1/5</div>
           </div>
         ) : (
-          <div style={{ padding: '10px 12px', background: '#1e1f22', borderLeft: '3px solid #23a55a' }}>
+          <div style={{ padding: '10px 12px', background: '#1e1e22', borderLeft: '3px solid #23a55a' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#23a55a', marginBottom: 2 }}>✓ {s.verdict}</div>
             <div style={{ fontSize: 12, color: '#949ba4' }}>No action taken.</div>
           </div>
@@ -463,7 +468,7 @@ function ScamShieldVisual() {
       </div>
 
       {channels.map((ch, i) => (
-        <div key={ch} style={{ borderRadius: 8, border: '1px solid #2e2e36', background: '#1e1f22', padding: '8px 12px', minHeight: 38 }}>
+        <div key={ch} style={{ borderRadius: 8, border: '1px solid #2e2e36', background: '#1e1e22', padding: '8px 12px', minHeight: 38 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#52535a', marginBottom: 3 }}># {ch}</div>
           {step > i && (
             <motion.div initial={{ opacity: 0, y: 3 }} animate={{ opacity: step >= 4 ? 0.35 : 1, y: 0 }} transition={{ duration: 0.2 }}
@@ -478,7 +483,7 @@ function ScamShieldVisual() {
       <div style={{ minHeight: 58 }}>
         {step >= 5 && (
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
-            style={{ padding: '10px 12px', background: '#1e1f22', borderRadius: 8, border: '1px solid #2e2e36', borderLeft: '3px solid #f23f43' }}>
+            style={{ padding: '10px 12px', background: '#1e1e22', borderRadius: 8, border: '1px solid #2e2e36', borderLeft: '3px solid #f23f43' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#f23f43', marginBottom: 2 }}>🛡️ Scam spam blocked</div>
             <div style={{ fontSize: 12, color: '#949ba4' }}>3 messages deleted · account banned · flagged network-wide</div>
           </motion.div>
@@ -534,7 +539,7 @@ function WarnSimulator() {
         </button>
       </div>
 
-      <div style={{ fontSize: 11, color: '#3e3e4a' }}>Thresholds (your rules): timeout at 3 · kick at 5 · ban at 10</div>
+      <div style={{ fontSize: 11, color: '#52535a' }}>Thresholds (your rules): timeout at 3 · kick at 5 · ban at 10</div>
     </div>
   );
 }
@@ -556,16 +561,16 @@ function SilentModeVisual() {
       <motion.div key={silent ? 'silent' : 'public'} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
         style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #2e2e36', fontSize: 12 }}>
         {silent ? (
-          <div style={{ padding: 12, background: '#1e1f22' }}>
+          <div style={{ padding: 12, background: '#1e1e22' }}>
             <div style={{ color: '#52535a', marginBottom: 8, fontWeight: 600 }}>📬 Private DM to user</div>
-            <div style={{ background: '#2b2d31', borderLeft: '3px solid #5865f2', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
+            <div style={{ background: '#2e2e36', borderLeft: '3px solid #5865f2', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
               ⚠️ Your message in <strong style={{ color: '#f2f3f5' }}>#general</strong> was removed (blocked link). Warning <strong style={{ color: '#f2f3f5' }}>1/5</strong>.
             </div>
           </div>
         ) : (
-          <div style={{ padding: 12, background: '#1e1f22' }}>
+          <div style={{ padding: 12, background: '#1e1e22' }}>
             <div style={{ color: '#52535a', marginBottom: 8, fontWeight: 600 }}>📢 Public channel message</div>
-            <div style={{ background: '#2b2d31', borderLeft: '3px solid #f23f43', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
+            <div style={{ background: '#2e2e36', borderLeft: '3px solid #f23f43', padding: '8px 10px', borderRadius: '0 4px 4px 0', color: '#949ba4' }}>
               🚫 <strong style={{ color: '#f23f43' }}>Link blocked</strong> · Jake — Nitro scam detected. Warning 1/5.
             </div>
           </div>
@@ -650,7 +655,7 @@ export default function LandingClient() {
       {/* LINK CHECKER */}
       <section style={{ padding: '80px 24px', borderBottom: '1px solid #18181b' }}>
         <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div className="eyebrow" style={{ marginBottom: 22 }}>
             <Shield size={12} /> Free URL Checker
           </div>
           <h2 className="cta-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
@@ -664,7 +669,7 @@ export default function LandingClient() {
             <LinkChecker />
           </div>
           <div style={{ marginTop: 16 }}>
-            <Link href="/check" style={{ fontSize: 13, fontWeight: 600, color: '#7289da', textDecoration: 'none' }}>
+            <Link href="/check" style={{ fontSize: 13, fontWeight: 600, color: '#96a4ff', textDecoration: 'none' }}>
               Open the full checker →
             </Link>
           </div>

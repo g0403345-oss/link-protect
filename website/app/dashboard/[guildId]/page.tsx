@@ -29,6 +29,14 @@ import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import PermFailBanner from '@/components/PermFailBanner';
+
+// Friendly names for protect.* keys — the Overview chips share them with the
+// Blockers tab instead of printing raw keys like "bit" or "nsfw".
+const PROTECT_LABELS: Record<string, string> = {
+  all: 'All Links', nsfw: 'NSFW', nitro: 'Nitro Scams', malware: 'Malware / Phishing',
+  invite: 'Invites', youtube: 'YouTube', google: 'Google', gif: 'GIFs',
+  twitch: 'Twitch', steam: 'Steam', bit: 'Shorteners',
+};
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
 import Navbar from '@/components/Navbar';
@@ -495,7 +503,7 @@ export default function GuildDashboard() {
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#949ba4'; (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; }}>
             <HelpCircle size={13} /> <span className="crumb-btn-label">Tour</span>
           </button>
-          <span className="crumb-id" style={{ fontSize: 11, color: '#2e2e36', fontFamily: 'monospace' }}>{guildId}</span>
+          <span className="crumb-id" style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>{guildId}</span>
         </div>
       </div>
 
@@ -551,7 +559,7 @@ export default function GuildDashboard() {
                   <Card title="Warning Thresholds">
                     <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, textAlign: 'center' }}>
                       {[
-                        { label: 'Kick at', value: warn.kick ?? 0, color: '#f0b232' },
+                        { label: 'Kick at', value: warn.kick ?? 0, color: '#e0683c' },
                         { label: 'Ban at', value: warn.ban ?? 0, color: '#f23f43' },
                         { label: 'Timeout at', value: warn.timeout?.warnings ?? 0, color: '#5865f2' },
                       ].map(({ label, value, color }) => (
@@ -566,12 +574,12 @@ export default function GuildDashboard() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {Object.entries(protect).map(([k, v]) => v ? (
                         <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 500, color: '#23a55a', background: 'rgba(35,165,90,0.1)', border: '1px solid rgba(35,165,90,0.2)', borderRadius: 99 }}>
-                          <CheckCircle2 size={11} /> {k}
+                          <CheckCircle2 size={11} /> {PROTECT_LABELS[k] ?? k}
                         </span>
                       ) : null)}
                       {data.silent && (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 500, color: '#949ba4', background: 'rgba(148,155,164,0.08)', border: '1px solid rgba(148,155,164,0.15)', borderRadius: 99 }}>
-                          <EyeOff size={11} /> silent
+                          <EyeOff size={11} /> Silent Mode
                         </span>
                       )}
                       {Object.values(protect).every((v) => !v) && !data.silent && (
@@ -709,7 +717,7 @@ export default function GuildDashboard() {
                             options={[
                               { id: 'delete',  label: 'Delete only', color: '#949ba4' },
                               { id: 'timeout', label: 'Timeout',     color: '#5865f2' },
-                              { id: 'kick',    label: 'Kick',        color: '#f0b232' },
+                              { id: 'kick',    label: 'Kick',        color: '#e0683c' },
                               { id: 'ban',     label: 'Ban',         color: '#f23f43' },
                             ]}
                           />
@@ -750,7 +758,7 @@ export default function GuildDashboard() {
                             onChange={(v) => patch('scamguard.join_action', v, 'Join action')}
                             disabled={saving === 'scamguard.join_action'}
                             options={[
-                              { id: 'kick', label: 'Kick', color: '#f0b232' },
+                              { id: 'kick', label: 'Kick', color: '#e0683c' },
                               { id: 'ban',  label: 'Ban',  color: '#f23f43' },
                             ]}
                           />
@@ -806,7 +814,7 @@ export default function GuildDashboard() {
                   <SectionHeader title="Warning System" description="Configure automatic actions when users accumulate warnings" icon={Ban} />
                   <Card title="Action Thresholds" tourId="thresholds">
                     <div className="thresholds-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-                      <NumberInput label="Kick threshold" description="User is kicked at this many warnings (0 = disabled)" value={warn.kick ?? 0} icon={<TrendingUp size={14} color="#f0b232" />} color="#f0b232" onSave={(v) => patch('warn.kick', v, 'Kick threshold')} saving={saving === 'warn.kick'} />
+                      <NumberInput label="Kick threshold" description="User is kicked at this many warnings (0 = disabled)" value={warn.kick ?? 0} icon={<TrendingUp size={14} color="#e0683c" />} color="#e0683c" onSave={(v) => patch('warn.kick', v, 'Kick threshold')} saving={saving === 'warn.kick'} />
                       <NumberInput label="Ban threshold" description="User is banned at this many warnings (0 = disabled)" value={warn.ban ?? 0} icon={<Ban size={14} color="#f23f43" />} color="#f23f43" onSave={(v) => patch('warn.ban', v, 'Ban threshold')} saving={saving === 'warn.ban'} />
                       <NumberInput label="Timeout threshold" description="User is timed out at this many warnings (0 = disabled)" value={warn.timeout?.warnings ?? 0} icon={<Clock size={14} color="#5865f2" />} color="#5865f2" onSave={(v) => patch('warn.timeout.warnings', v, 'Timeout threshold')} saving={saving === 'warn.timeout.warnings'} />
                     </div>
@@ -920,7 +928,7 @@ export default function GuildDashboard() {
                     <p style={{ fontSize: 12, color: '#6d6f78' }}>Whitelisted items bypass all link restrictions. Add Discord IDs (18-digit numbers).</p>
                   </div>
                   <PickerList title="Whitelisted Channels" description="Links are allowed in these channels" icon={<Lock size={13} color="#5865f2" />} pickerType="channel" guildId={guildId} value={channel.channel} onSave={(v) => patch('channel.channel', v, 'Whitelisted channels')} saving={saving === 'channel.channel'} />
-                  <PickerList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#9b59b6" />} pickerType="category" guildId={guildId} value={channel.category ?? []} onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
+                  <PickerList title="Whitelisted Categories" description="Links are allowed in all channels under these categories" icon={<Lock size={13} color="#5865f2" />} pickerType="category" guildId={guildId} value={channel.category ?? []} onSave={(v) => patch('channel.category', v, 'Whitelisted categories')} saving={saving === 'channel.category'} />
                   <PickerList title="Whitelisted Members" description="These users can post any links" icon={<Users size={13} color="#23a55a" />} pickerType="member" guildId={guildId} value={channel.member} onSave={(v) => patch('channel.member', v, 'Whitelisted members')} saving={saving === 'channel.member'} />
                   <PickerList title="Whitelisted Roles" description="Members with these roles can post any links" icon={<Shield size={13} color="#f0b232" />} pickerType="role" guildId={guildId} value={channel.role} onSave={(v) => patch('channel.role', v, 'Whitelisted roles')} saving={saving === 'channel.role'} />
 
@@ -1071,9 +1079,9 @@ export default function GuildDashboard() {
               {section === 'log' && (() => {
                 const actionMeta: Record<string, { label: string; color: string; bg: string }> = {
                   warned:  { label: 'Warned',   color: '#f0b232', bg: 'rgba(240,178,50,0.08)' },
-                  kicked:  { label: 'Kicked',   color: '#f23f43', bg: 'rgba(242,63,67,0.08)' },
+                  kicked:  { label: 'Kicked',   color: '#e0683c', bg: 'rgba(224,104,60,0.08)' },
                   banned:  { label: 'Banned',   color: '#f23f43', bg: 'rgba(242,63,67,0.12)' },
-                  timeout: { label: 'Timeout',  color: '#9b59b6', bg: 'rgba(155,89,182,0.08)' },
+                  timeout: { label: 'Timeout',  color: '#5865f2', bg: 'rgba(88,101,242,0.08)' },
                 };
                 const relTime = (ts: number) => {
                   const s = Math.floor(Date.now() / 1000 - ts);
@@ -1111,7 +1119,7 @@ export default function GuildDashboard() {
                           {actions.map((a, i) => {
                             const meta = actionMeta[a.action] ?? actionMeta.warned;
                             return (
-                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
+                              <div key={i} className="log-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
                                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: meta.bg, color: meta.color, flexShrink: 0, marginTop: 1 }}>
                                   {meta.label}
                                 </span>
@@ -1157,7 +1165,7 @@ export default function GuildDashboard() {
                           const s = Math.floor(Date.now() / 1000 - e.timestamp);
                           const rel = s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago`;
                           return (
-                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
+                            <div key={i} className="log-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
                               <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#6d6f78', flexShrink: 0, marginTop: 1 }}>{who.slice(0, 2).toUpperCase()}</div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{ fontSize: 13, color: '#f2f3f5', fontWeight: 500 }}>{e.description}</p>

@@ -125,7 +125,7 @@ export default function LinkChecker({ compact = false, detailed = false, initial
       )}
 
       {error && (
-        <div style={{ marginTop: 12, padding: '12px 14px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
+        <div style={{ marginTop: 12, padding: '12px 14px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f23f43' }}>
           {error}
         </div>
       )}

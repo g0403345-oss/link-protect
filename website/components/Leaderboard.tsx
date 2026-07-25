@@ -124,8 +124,8 @@ export default function Leaderboard() {
             badge and role, build a <strong style={{ color: '#ff922b' }}>🔥 daily streak</strong>{' '}
             and climb the milestone tiers — Bronze, Silver, Gold &amp; Diamond.
           </p>
-          <a href={VOTE_URL} target="_blank" rel="noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 22, padding: '12px 24px', fontSize: 14.5, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', boxShadow: '0 8px 24px rgba(88,101,242,0.4)' }}>
+          <a href={VOTE_URL} target="_blank" rel="noreferrer" className="btn-primary"
+            style={{ marginTop: 22, fontSize: 14.5, boxShadow: '0 8px 24px rgba(88,101,242,0.4)' }}>
             Vote on top.gg <ArrowRight size={15} />
           </a>
         </div>
@@ -133,7 +133,14 @@ export default function Leaderboard() {
 
       {/* ── Body ── */}
       <div style={{ padding: '28px 24px 26px' }}>
-        {board.length === 0 ? (
+        {data === null ? (
+          /* Loading — podium-shaped skeleton, no "no votes yet" flash */
+          <div className="lp-podium" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 14, padding: '12px 0 10px' }}>
+            <div className="skeleton" style={{ width: 150, height: 120, borderRadius: 14 }} />
+            <div className="skeleton" style={{ width: 150, height: 150, borderRadius: 14 }} />
+            <div className="skeleton" style={{ width: 150, height: 104, borderRadius: 14 }} />
+          </div>
+        ) : board.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '20px 0 8px' }}>
             <div style={{ fontSize: 34, marginBottom: 6 }}>🥇</div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>No votes yet this month</p>

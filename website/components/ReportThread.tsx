@@ -104,7 +104,7 @@ export default function ReportThread({
 
           {/* messages */}
           <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {error && <p style={{ fontSize: 13, color: '#f87171' }}>{error}</p>}
+            {error && <p style={{ fontSize: 13, color: '#f23f43' }}>{error}</p>}
             {!thread && !error && <p style={{ fontSize: 13, color: '#52535a' }}>Loading…</p>}
             {r && (
               <>
@@ -133,7 +133,7 @@ export default function ReportThread({
             <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderTop: '1px solid #1e1e22', flexWrap: 'wrap' }}>
               {r.type === 'malicious_link' && r.url && (
                 <button onClick={() => setStatus('resolved', true)} disabled={statusBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.4)', background: 'rgba(242,63,67,0.1)', color: '#f87171' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.4)', background: 'rgba(242,63,67,0.1)', color: '#f23f43' }}>
                   <ShieldPlus size={13} /> Add to threat DB
                 </button>
               )}

@@ -24,6 +24,11 @@ export function Celebration({ fire, onDone }: { fire: boolean; onDone?: () => vo
   useEffect(() => {
     if (!fire || ran.current) return;
     ran.current = true;
+    // Respect the OS "reduce motion" setting — skip the confetti entirely.
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      onDoneRef.current?.();
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');

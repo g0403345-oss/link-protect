@@ -16,7 +16,17 @@ export default function SupporterWall() {
       .catch(() => {});
   }, []);
 
-  if (!data || data.supporters.length === 0) return null;
+  if (data === null) {
+    // Reserve the section's height while loading so the landing doesn't jump.
+    return (
+      <div style={{ maxWidth: 860, margin: '28px auto 0', display: 'flex', justifyContent: 'center', gap: 8 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="skeleton" style={{ width: 38, height: 38, borderRadius: '50%' }} />
+        ))}
+      </div>
+    );
+  }
+  if (data.supporters.length === 0) return null;
   const extra = data.count - data.supporters.length;
 
   return (

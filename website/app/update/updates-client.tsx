@@ -40,6 +40,19 @@ const ENTRIES: Entry[] = [
     ],
   },
   {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 1.5,
+    title: 'Design polish — one look everywhere',
+    items: [
+      'Link previews: sharing any link-protect.com page in Discord or Twitter now shows a branded preview card.',
+      'One design language: unified colors (one green, one action color ramp for warn/kick/ban/timeout), shared buttons, matching toggles and the same eyebrow badge on every page.',
+      'Every page got the landing treatment — dot-grid headers on the checker, developers, changelog and legal pages, plus soft page-to-page transitions.',
+      'Proper 404 and error pages, loading skeletons instead of flashing zeros on the live stats, leaderboard and supporter wall.',
+      'Accessibility: visible keyboard focus rings, honored “reduce motion” (including the confetti), dark Firefox scrollbars, printable legal pages and readable footer text.',
+      'Faster first paint: the Inter font is now self-hosted instead of render-blocking, with steady tabular numerals on all counters.',
+      'Admin cleanup: consistent English throughout, real link-checker shortcuts on reports, and friendly protection names instead of raw keys on the Overview.',
+    ],
+  },
+  {
     product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 1,
     title: 'Permission-problem banner in the dashboard',
     items: [
@@ -253,13 +266,14 @@ export default function UpdatesClient() {
     .sort((a, b) => b.ts - a.ts);
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 60 }}>
+    <div style={{ minHeight: '100vh', paddingTop: 60, position: 'relative' }}>
+      <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
       <div style={{ maxWidth: 780, margin: '0 auto', padding: '56px 24px 96px' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div className="eyebrow" style={{ marginBottom: 20 }}>
             <History size={12} /> Changelog
           </div>
           <h1 style={{ fontSize: 'clamp(30px, 5.5vw, 44px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', lineHeight: 1.08, marginBottom: 12 }}>
@@ -279,6 +293,8 @@ export default function UpdatesClient() {
             const Icon = meta?.icon ?? Sparkles;
             return (
               <button key={t} onClick={() => setTab(t)}
+                onMouseEnter={(e) => { if (!active) { e.currentTarget.style.borderColor = '#52535a'; e.currentTarget.style.color = '#f2f3f5'; } }}
+                onMouseLeave={(e) => { if (!active) { e.currentTarget.style.borderColor = '#2e2e36'; e.currentTarget.style.color = '#949ba4'; } }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', fontSize: 13, fontWeight: 700, borderRadius: 99, cursor: 'pointer', border: `1px solid ${active ? color : '#2e2e36'}`, background: active ? `${color}1a` : '#111113', color: active ? color : '#949ba4', transition: 'all 0.15s' }}>
                 <Icon size={13} /> {meta?.label ?? 'All updates'}
               </button>

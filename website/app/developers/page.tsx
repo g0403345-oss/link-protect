@@ -43,7 +43,7 @@ function Inline({ children }: { children: React.ReactNode }) {
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p style={{ fontSize: 14, color: '#9a9aa4', lineHeight: 1.7, margin: '8px 0' }}>{children}</p>;
+  return <p style={{ fontSize: 14, color: '#949ba4', lineHeight: 1.7, margin: '8px 0' }}>{children}</p>;
 }
 
 const EVENTS = [
@@ -57,12 +57,13 @@ const EVENTS = [
 
 export default function DevelopersPage() {
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 60, paddingBottom: 96 }}>
+    <div style={{ minHeight: '100vh', paddingTop: 60, paddingBottom: 96, position: 'relative' }}>
+      <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
       <Section>
         <div style={{ paddingTop: 64, textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#7289da', background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 99, padding: '4px 12px', marginBottom: 22, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div className="eyebrow" style={{ marginBottom: 22 }}>
             <Code2 size={12} /> Developer Platform
           </div>
           <h1 style={{ fontSize: 'clamp(30px, 5.5vw, 44px)', fontWeight: 900, letterSpacing: '-0.04em', color: C.text, marginBottom: 14, lineHeight: 1.08 }}>
@@ -155,7 +156,7 @@ export default function DevelopersPage() {
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', margin: '10px 0' }}>
           {EVENTS.map(([ev, desc], i) => (
             <div key={ev} style={{ display: 'flex', gap: 14, padding: '9px 16px', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 12.5 }}>
-              <code style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: '#7289da', width: 150, flexShrink: 0 }}>{ev}</code>
+              <code style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: '#96a4ff', width: 150, flexShrink: 0 }}>{ev}</code>
               <span style={{ color: C.muted }}>{desc}</span>
             </div>
           ))}
@@ -213,7 +214,7 @@ function verify(rawBody, signatureHeader, secret) {
             The platform grows with what developers actually need — send a feature request from any
             server dashboard (Report → Feedback) or join the beta programme in the Developer tab.
           </p>
-          <Link href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', fontSize: 14, fontWeight: 700, background: C.accent, color: '#fff', borderRadius: 10, textDecoration: 'none' }}>
+          <Link href="/settings" className="btn-primary" style={{ fontSize: 14 }}>
             Request developer access
           </Link>
         </div>

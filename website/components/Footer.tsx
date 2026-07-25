@@ -76,8 +76,8 @@ export default function Footer() {
         </div>
 
         <div className="footer-row" style={{ borderTop: '1px solid #18181b', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ fontSize: 12, color: '#2e2e36' }}>© 2026 Link Protect. All rights reserved.</span>
-          <span style={{ fontSize: 12, color: '#2e2e36' }}>Not affiliated with Discord Inc.</span>
+          <span style={{ fontSize: 12, color: '#52535a' }}>© 2026 Link Protect. All rights reserved.</span>
+          <span style={{ fontSize: 12, color: '#52535a' }}>Not affiliated with Discord Inc.</span>
         </div>
       </div>
     </footer>

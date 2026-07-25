@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     <path d="${SHIELD}" fill="none" stroke="#5865f2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
   <text x="42" y="27" font-family="${FONT}" font-size="13" font-weight="700" fill="#f2f3f5">Link Protect</text>
-  <text x="${W - 16}" y="27" font-family="${FONT}" font-size="11" fill="#9a9aa4" text-anchor="end">${esc(name)}</text>
+  <text x="${W - 16}" y="27" font-family="${FONT}" font-size="11" fill="#949ba4" text-anchor="end">${esc(name)}</text>
   <line x1="16" y1="40" x2="${W - 16}" y2="40" stroke="#2e2e36"/>
   ${cols.map((c, i) => {
     const cx = 18 + colW * i + colW / 2;

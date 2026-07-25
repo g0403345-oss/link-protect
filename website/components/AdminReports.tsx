@@ -76,7 +76,7 @@ export default function AdminReports() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12, alignItems: 'center' }}>
         {STATUSES.map((s) => (
           <button key={s || 'all'} onClick={() => setStatus(s)}
-            style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${status === s ? '#5865f2' : '#2e2e36'}`, background: status === s ? 'rgba(88,101,242,0.15)' : 'transparent', color: status === s ? '#7289da' : '#949ba4', textTransform: 'capitalize' }}>
+            style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${status === s ? '#5865f2' : '#2e2e36'}`, background: status === s ? 'rgba(88,101,242,0.15)' : 'transparent', color: status === s ? '#96a4ff' : '#949ba4', textTransform: 'capitalize' }}>
             {s || 'all'}{s && counts[s] ? ` ${counts[s]}` : ''}
           </button>
         ))}
@@ -87,7 +87,7 @@ export default function AdminReports() {
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
         <button onClick={() => setType('')}
-          style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${type === '' ? '#5865f2' : '#2e2e36'}`, background: type === '' ? 'rgba(88,101,242,0.12)' : 'transparent', color: type === '' ? '#7289da' : '#949ba4' }}>
+          style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${type === '' ? '#5865f2' : '#2e2e36'}`, background: type === '' ? 'rgba(88,101,242,0.12)' : 'transparent', color: type === '' ? '#96a4ff' : '#949ba4' }}>
           All types
         </button>
         {(Object.keys(TYPE_META) as ReportType[]).map((t) => (
@@ -100,7 +100,7 @@ export default function AdminReports() {
       </div>
 
       {error && (
-        <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
+        <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f23f43' }}>
           Bot API unreachable.
         </div>
       )}
@@ -129,7 +129,7 @@ export default function AdminReports() {
               {r.url && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontFamily: 'monospace', color: '#f2f3f5', wordBreak: 'break-all' }}>{r.url}</span>
-                  <a href={`/check?`} onClick={(e) => e.preventDefault()} title={r.url}><ExternalLink size={12} color="#52535a" /></a>
+                  <a href={`/check?url=${encodeURIComponent(r.url)}`} target="_blank" rel="noreferrer" title="Analyze in the link checker"><ExternalLink size={12} color="#52535a" /></a>
                 </div>
               )}
               {r.message && <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.5, marginBottom: 8 }}>{r.message}</p>}
@@ -138,12 +138,12 @@ export default function AdminReports() {
                 <span style={{ fontSize: 11, color: '#52535a' }}>by {r.username ?? `…${r.userId.slice(-4)}`}{r.guildId ? ` · guild …${r.guildId.slice(-4)}` : ''}</span>
                 <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
                   <button onClick={() => setOpenId(r.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#7289da' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(88,101,242,0.4)', background: 'rgba(88,101,242,0.1)', color: '#96a4ff' }}>
                     <MessageSquare size={13} /> Reply
                   </button>
                   {r.type === 'malicious_link' && (
                     <button onClick={() => act(r.id, { status: 'resolved', promote: true })} disabled={busy === r.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.4)', background: 'rgba(242,63,67,0.1)', color: '#f87171' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid rgba(242,63,67,0.4)', background: 'rgba(242,63,67,0.1)', color: '#f23f43' }}>
                       <ShieldPlus size={13} /> Add to threat DB
                     </button>
                   )}

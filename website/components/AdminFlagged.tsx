@@ -38,7 +38,7 @@ function relTime(ts: number) {
 }
 
 function fmtDate(ts: number) {
-  return new Date(ts * 1000).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(ts * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function accountAge(ts: number) {
@@ -109,7 +109,7 @@ export default function AdminFlagged() {
         <div style={{ position: 'relative', flex: 1, maxWidth: 420 }}>
           <Search size={14} color="#52535a" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
           <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Nach Name oder User-ID suchen — beliebige ID prüfbar"
+            placeholder="Search by name or user ID — any ID can be inspected"
             style={{ width: '100%', padding: '9px 12px 9px 34px', fontSize: 13, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit' }} />
         </div>
         <button onClick={load} disabled={loading}
@@ -123,13 +123,13 @@ export default function AdminFlagged() {
       {/* look up an arbitrary id that isn't in the flagged list */}
       {!detail && !detailLoading && searchIdNotListed && (
         <button onClick={() => openDetail(search.trim())}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.35)', borderRadius: 8, color: '#7289da', cursor: 'pointer' }}>
-          <Search size={13} /> ID {search.trim()} inspizieren (nicht geflaggt)
+          style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, background: 'rgba(88,101,242,0.1)', border: '1px solid rgba(88,101,242,0.35)', borderRadius: 8, color: '#96a4ff', cursor: 'pointer' }}>
+          <Search size={13} /> Inspect ID {search.trim()} (not flagged)
         </button>
       )}
 
       {!detail && !detailLoading && error && (
-        <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, fontSize: 13, color: '#f87171' }}>
+        <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, fontSize: 13, color: '#f23f43' }}>
           Bot API unreachable.
         </div>
       )}
@@ -138,7 +138,7 @@ export default function AdminFlagged() {
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <ShieldOff size={30} color="#2e2e36" style={{ margin: '0 auto 10px' }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: '#949ba4' }}>
-            {rows.length === 0 ? 'Keine geflaggten Accounts' : 'Kein Treffer'}
+            {rows.length === 0 ? 'No flagged accounts' : 'No match'}
           </p>
         </div>
       )}
@@ -158,7 +158,7 @@ export default function AdminFlagged() {
               <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#52535a' }}>{r.userId}</div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 12, color: '#f0b232', fontWeight: 700 }}>{r.incidents}× erwischt</span>
+              <span style={{ fontSize: 12, color: '#f0b232', fontWeight: 700 }}>{r.incidents}× caught</span>
               <span style={{ fontSize: 12, color: '#f23f43', fontWeight: 700 }}>{r.guilds} Server</span>
               <span style={{ fontSize: 11, color: '#52535a' }}>{relTime(r.lastSeen)}</span>
             </div>
@@ -172,7 +172,7 @@ export default function AdminFlagged() {
         <div style={{ marginTop: 4 }}>
           <button onClick={() => setDetail(null)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer' }}>
-            <ChevronLeft size={14} /> Alle geflaggten Accounts
+            <ChevronLeft size={14} /> All flagged accounts
           </button>
           <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: 22 }}>
             {detailLoading || !detail ? (
@@ -211,7 +211,7 @@ export default function AdminFlagged() {
                     return (
                       <div style={{ background: '#18181b', border: `1px solid ${age.fresh ? 'rgba(242,63,67,0.4)' : '#2e2e36'}`, borderRadius: 9, padding: '10px 12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', marginBottom: 4 }}>
-                          <CalendarClock size={10} /> Account-Alter
+                          <CalendarClock size={10} /> Account age
                         </div>
                         <div style={{ fontSize: 15, fontWeight: 800, color: age.fresh ? '#f23f43' : '#f2f3f5' }}>
                           {age.label} {age.fresh && '⚠️'}
@@ -222,10 +222,10 @@ export default function AdminFlagged() {
                   })()}
                   <div style={{ background: '#18181b', border: '1px solid #2e2e36', borderRadius: 9, padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#52535a', textTransform: 'uppercase', marginBottom: 4 }}>
-                      <ShieldAlert size={10} /> Flag-Status
+                      <ShieldAlert size={10} /> Flag status
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: detail.flag ? '#f23f43' : '#23a55a' }}>
-                      {detail.flag ? `${detail.flag.incidents}× · ${detail.guilds.length} Server` : 'Nicht geflaggt'}
+                      {detail.flag ? `${detail.flag.incidents}× · ${detail.guilds.length} servers` : 'Not flagged'}
                     </div>
                     {detail.flag && <div style={{ fontSize: 10, color: '#52535a', marginTop: 2 }}>zuletzt {relTime(detail.flag.lastSeen)}</div>}
                   </div>
@@ -242,18 +242,18 @@ export default function AdminFlagged() {
                 {detail.flag && (
                   <button onClick={unflag} disabled={busy}
                     style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 18, padding: '10px 16px', fontSize: 13, fontWeight: 800, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(35,165,90,0.5)', background: confirmUnflag ? '#23a55a' : 'rgba(35,165,90,0.1)', color: confirmUnflag ? '#fff' : '#23a55a' }}>
-                    <ShieldOff size={14} /> {confirmUnflag ? 'Bestätigen — Flag netzwerkweit entfernen?' : 'Flag aufheben'}
+                    <ShieldOff size={14} /> {confirmUnflag ? 'Confirm — remove the flag network-wide?' : 'Remove flag'}
                   </button>
                 )}
 
                 {/* evidence: what they actually posted */}
-                <SectionLabel icon={<FileWarning size={11} />} text={`Erwischte Nachrichten (${detail.evidence.length})`} color="#f0b232" />
-                {detail.evidence.length === 0 && <Empty text="Keine gespeicherten Nachrichten (Flag entstand vor der Evidence-Funktion). Andere Nachrichten speichern wir aus Datenschutzgründen nicht." />}
+                <SectionLabel icon={<FileWarning size={11} />} text={`Caught messages (${detail.evidence.length})`} color="#f0b232" />
+                {detail.evidence.length === 0 && <Empty text="No stored messages (this flag predates the evidence feature). Other messages are never stored for privacy reasons." />}
                 {detail.evidence.map((ev, i) => (
                   <div key={i} style={{ background: '#18181b', border: '1px solid rgba(240,178,50,0.25)', borderLeft: '3px solid #f0b232', borderRadius: 8, padding: '9px 12px', marginBottom: 8 }}>
                     <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#52535a', marginBottom: 6, flexWrap: 'wrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Hash size={10} /> {ev.channels} Channels</span>
-                      <a href={`/dashboard/${ev.guildId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#7289da', textDecoration: 'none' }}><Server size={10} /> {ev.guildName ?? `Server …${ev.guildId.slice(-4)}`}</a>
+                      <a href={`/dashboard/${ev.guildId}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#96a4ff', textDecoration: 'none' }}><Server size={10} /> {ev.guildName ?? `Server …${ev.guildId.slice(-4)}`}</a>
                       <span style={{ marginLeft: 'auto' }}>{fmtDate(ev.createdAt)}</span>
                     </div>
                     {ev.content && <p style={{ fontSize: 12.5, fontFamily: 'monospace', color: '#e0e1e5', lineHeight: 1.5, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{ev.content}</p>}
@@ -267,7 +267,7 @@ export default function AdminFlagged() {
                           </a>
                         ) : (
                           <a key={j} href={at.url} target="_blank" rel="noreferrer"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#7289da', textDecoration: 'none', background: '#111113', border: '1px solid #2e2e36', borderRadius: 6, padding: '4px 9px' }}>
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#96a4ff', textDecoration: 'none', background: '#111113', border: '1px solid #2e2e36', borderRadius: 6, padding: '4px 9px' }}>
                             <Paperclip size={11} /> {at.name} <span style={{ color: '#52535a' }}>({Math.round(at.size / 1024)} KB)</span>
                           </a>
                         ))}
@@ -315,20 +315,20 @@ export default function AdminFlagged() {
 
                 {/* action history */}
                 <SectionLabel icon={<Activity size={11} />} text={`Moderations-Historie (${detail.actions.length})`} color="#5865f2" />
-                {detail.actions.length === 0 && <Empty text="Keine Aktionen aufgezeichnet." />}
+                {detail.actions.length === 0 && <Empty text="No actions recorded." />}
                 {detail.actions.map((a, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12.5, padding: '5px 0', borderBottom: '1px solid #1a1a1e', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 800, color: ACTION_COLOR[a.action] ?? '#949ba4', textTransform: 'capitalize', flexShrink: 0 }}>{a.action}</span>
                     <span style={{ color: '#949ba4', minWidth: 0 }}>{a.reason}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: '#52535a', flexShrink: 0 }}>
-                      <a href={`/dashboard/${a.guildId}`} target="_blank" rel="noreferrer" style={{ color: '#7289da', textDecoration: 'none' }}>{a.guildName ?? `Server …${a.guildId.slice(-4)}`}</a> · {fmtDate(a.timestamp)}
+                      <a href={`/dashboard/${a.guildId}`} target="_blank" rel="noreferrer" style={{ color: '#96a4ff', textDecoration: 'none' }}>{a.guildName ?? `Server …${a.guildId.slice(-4)}`}</a> · {fmtDate(a.timestamp)}
                     </span>
                   </div>
                 ))}
 
                 <a href={`https://discord.com/users/${detail.userId}`} target="_blank" rel="noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 16, fontSize: 12, fontWeight: 600, color: '#7289da', textDecoration: 'none' }}>
-                  <ExternalLink size={12} /> Discord-Profil öffnen
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 16, fontSize: 12, fontWeight: 600, color: '#96a4ff', textDecoration: 'none' }}>
+                  <ExternalLink size={12} /> Open Discord profile
                 </a>
               </>
             )}

@@ -145,7 +145,7 @@ export default function SettingsPage() {
                 onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
                 onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}
               />
-              {error && <p style={{ fontSize: 12.5, color: '#f87171', marginBottom: 10 }}>{error}</p>}
+              {error && <p style={{ fontSize: 12.5, color: '#f23f43', marginBottom: 10 }}>{error}</p>}
               <button onClick={apply} disabled={sending}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: sending ? 0.6 : 1 }}>
                 {sending ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}

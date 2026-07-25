@@ -87,10 +87,10 @@ function ToggleTrack({
       disabled={disabled}
       onClick={onClick}
       className={`
-        relative inline-flex items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5865f2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1e1f22]
+        relative inline-flex items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5865f2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1e1e22]
         ${trackClass}
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-        ${checked ? 'bg-[#3ba55d]' : 'bg-[#4e5058]'}
+        ${checked ? 'bg-[#23a55a]' : 'bg-[#4e5058]'}
       `}
     >
       <motion.span

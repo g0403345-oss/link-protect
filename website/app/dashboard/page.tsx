@@ -184,7 +184,7 @@ export default function DashboardPage() {
               <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2 }}>
                 {([['list', LayoutList], ['poster', LayoutGrid]] as const).map(([id, Icon]) => (
                   <button key={id} onClick={() => switchView(id)} title={id === 'list' ? 'List view' : 'Poster view'}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 26, borderRadius: 6, border: 'none', cursor: 'pointer', background: view === id ? 'rgba(88,101,242,0.2)' : 'transparent', color: view === id ? '#7289da' : '#52535a' }}>
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 26, borderRadius: 6, border: 'none', cursor: 'pointer', background: view === id ? 'rgba(88,101,242,0.2)' : 'transparent', color: view === id ? '#96a4ff' : '#52535a' }}>
                     <Icon size={14} />
                   </button>
                 ))}

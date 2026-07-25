@@ -114,7 +114,7 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
                         return (
                           <button key={t.id} onClick={() => setType(t.id)}
                             style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', textAlign: 'left', borderRadius: 9, cursor: 'pointer', border: `1px solid ${active ? '#5865f2' : '#2e2e36'}`, background: active ? 'rgba(88,101,242,0.1)' : '#18181b' }}>
-                            <t.icon size={15} color={active ? '#7289da' : '#6d6f78'} />
+                            <t.icon size={15} color={active ? '#96a4ff' : '#6d6f78'} />
                             <span style={{ fontSize: 12.5, fontWeight: 700, color: active ? '#f2f3f5' : '#949ba4' }}>{t.label}</span>
                             <span style={{ fontSize: 10.5, color: '#52535a', lineHeight: 1.3 }}>{t.desc}</span>
                           </button>
@@ -153,7 +153,7 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {CATEGORIES.map((c) => (
                             <button key={c} onClick={() => setCategory(c)}
-                              style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${category === c ? '#5865f2' : '#2e2e36'}`, background: category === c ? 'rgba(88,101,242,0.15)' : 'transparent', color: category === c ? '#7289da' : '#949ba4' }}>
+                              style={{ fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${category === c ? '#5865f2' : '#2e2e36'}`, background: category === c ? 'rgba(88,101,242,0.15)' : 'transparent', color: category === c ? '#96a4ff' : '#949ba4' }}>
                               {c}
                             </button>
                           ))}
@@ -171,7 +171,7 @@ export default function ReportForm({ guildId }: { guildId?: string }) {
                         onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')} onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')} />
                     </div>
 
-                    {error && <p style={{ fontSize: 12, color: '#f87171', margin: 0 }}>{error}</p>}
+                    {error && <p style={{ fontSize: 12, color: '#f23f43', margin: 0 }}>{error}</p>}
 
                     <button onClick={submit} disabled={submitting}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px', fontSize: 14, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>

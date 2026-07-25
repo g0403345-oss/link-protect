@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   <rect width="${W}" height="${H}" rx="12" fill="#121214"/>
   <rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="11.5" fill="none" stroke="#2e2e36"/>
   <text x="18" y="26" font-family="${FONT}" font-size="13" font-weight="700" fill="#f2f3f5">🏆 Top Voters</text>
-  <text x="${W - 18}" y="26" font-family="${FONT}" font-size="10" fill="#9a9aa4" text-anchor="end">${esc(month)}</text>
+  <text x="${W - 18}" y="26" font-family="${FONT}" font-size="10" fill="#949ba4" text-anchor="end">${esc(month)}</text>
   <line x1="16" y1="38" x2="${W - 16}" y2="38" stroke="#2e2e36"/>
   ${rows || `<text x="${W / 2}" y="72" font-family="${FONT}" font-size="11" fill="#76767f" text-anchor="middle">No votes yet this month</text>`}
   <text x="${W / 2}" y="${H - 8}" font-family="${FONT}" font-size="8.5" fill="#52535a" text-anchor="middle">vote on top.gg · link-protect.com</text>

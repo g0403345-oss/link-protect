@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Search, Loader2 } from 'lucide-react';
+import { X, Search, Loader2, Hash, Volume2, Megaphone, List, Folder } from 'lucide-react';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 
 interface DiscordChannel { id: string; name: string; type: number; position: number; parent_id?: string | null; }
@@ -21,11 +21,13 @@ interface Props {
   saving: boolean;
 }
 
-function channelIcon(type: number) {
-  if (type === 2 || type === 13) return '🔊';
-  if (type === 15 || type === 16) return '≡';
-  if (type === 5) return '📢';
-  return '#';
+// lucide instead of emoji — emoji render differently on every OS and clash
+// with the icon set used everywhere else.
+function ChannelIcon({ type, size = 12 }: { type: number; size?: number }) {
+  if (type === 2 || type === 13) return <Volume2 size={size} />;
+  if (type === 15 || type === 16) return <List size={size} />;
+  if (type === 5) return <Megaphone size={size} />;
+  return <Hash size={size} />;
 }
 
 function roleColor(color: number) {
@@ -120,7 +122,7 @@ export default function PickerList({ title, description, icon, pickerType, guild
   const resolveName = (id: string): string => {
     if (pickerType === 'channel') {
       const ch = channels.find(c => c.id === id);
-      return ch ? `${channelIcon(ch.type)} ${ch.name}` : `#…${id.slice(-4)}`;
+      return ch ? ch.name : `#…${id.slice(-4)}`;
     }
     if (pickerType === 'category') {
       return channels.find(c => c.id === id && c.type === 4)?.name ?? `…${id.slice(-4)}`;
@@ -241,7 +243,7 @@ export default function PickerList({ title, description, icon, pickerType, guild
                           <button key={ch.id} style={btnStyle} onClick={() => addItem(ch.id)}
                             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#232329'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#b5bac1'; }}>
-                            <span style={{ color: '#52535a', fontSize: 13, fontFamily: 'monospace', flexShrink: 0 }}>{channelIcon(ch.type)}</span>
+                            <span style={{ color: '#52535a', display: 'inline-flex', flexShrink: 0 }}><ChannelIcon type={ch.type} size={13} /></span>
                             {ch.name}
                           </button>
                         ))}
@@ -256,7 +258,8 @@ export default function PickerList({ title, description, icon, pickerType, guild
                       <button key={ch.id} style={btnStyle} onClick={() => addItem(ch.id)}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#232329'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#b5bac1'; }}>
-                        📁 {ch.name}
+                        <span style={{ color: '#52535a', display: 'inline-flex', flexShrink: 0 }}><Folder size={13} /></span>
+                        {ch.name}
                       </button>
                     ))
                 )}

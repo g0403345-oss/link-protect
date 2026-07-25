@@ -38,7 +38,7 @@ const PAGE_SIZE = 24;
 
 const ACTION_META: Record<string, { label: string; color: string; bg: string }> = {
   warned:  { label: 'Warned',  color: '#f0b232', bg: 'rgba(240,178,50,0.10)' },
-  kicked:  { label: 'Kicked',  color: '#f23f43', bg: 'rgba(242,63,67,0.10)' },
+  kicked:  { label: 'Kicked',  color: '#e0683c', bg: 'rgba(224,104,60,0.10)' },
   banned:  { label: 'Banned',  color: '#f23f43', bg: 'rgba(242,63,67,0.14)' },
   timeout: { label: 'Timeout', color: '#5865f2', bg: 'rgba(88,101,242,0.10)' },
 };
@@ -338,7 +338,7 @@ export default function AdminPanel() {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setFeedOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', height: 36, borderRadius: 8, background: feedOpen ? 'rgba(88,101,242,0.15)' : '#18181b', border: `1px solid ${feedOpen ? 'rgba(88,101,242,0.4)' : '#2e2e36'}`, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: feedOpen ? '#7289da' : '#949ba4' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', height: 36, borderRadius: 8, background: feedOpen ? 'rgba(88,101,242,0.15)' : '#18181b', border: `1px solid ${feedOpen ? 'rgba(88,101,242,0.4)' : '#2e2e36'}`, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: feedOpen ? '#96a4ff' : '#949ba4' }}>
                 <Activity size={14} />
                 Live Feed
                 {feedActions.length > 0 && (
@@ -403,8 +403,8 @@ export default function AdminPanel() {
             <button
               role="switch" aria-checked={lockCommands} disabled={lockSaving}
               onClick={() => toggleLockCommands(!lockCommands)}
-              style={{ position: 'relative', width: 46, height: 26, borderRadius: 99, flexShrink: 0, border: 'none', cursor: lockSaving ? 'wait' : 'pointer', background: lockCommands ? '#5865f2' : '#3a3a42', transition: 'background 0.2s', opacity: lockSaving ? 0.6 : 1 }}>
-              <span style={{ position: 'absolute', top: 3, left: lockCommands ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              style={{ position: 'relative', width: 40, height: 20, borderRadius: 99, flexShrink: 0, border: 'none', cursor: lockSaving ? 'wait' : 'pointer', background: lockCommands ? '#23a55a' : '#2e2e36', transition: 'background 0.2s', opacity: lockSaving ? 0.6 : 1 }}>
+              <span style={{ position: 'absolute', top: 2, left: lockCommands ? 22 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </button>
           </div>
 
@@ -418,10 +418,10 @@ export default function AdminPanel() {
           </div>
 
           {apiError && !loading && (
-            <div style={{ padding: '20px 24px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, marginBottom: 16 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: '#f87171', margin: 0 }}>Bot-API nicht erreichbar</p>
-              <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
-                <code style={{ background: '#1e1e22', padding: '1px 5px', borderRadius: 4 }}>sudo systemctl restart linkprotect-api.service</code>
+            <div style={{ padding: '20px 24px', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.2)', borderRadius: 10, marginBottom: 16 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#f23f43', margin: 0 }}>Bot API unreachable</p>
+              <p style={{ fontSize: 12, color: '#949ba4', margin: '4px 0 0' }}>
+                The bot server isn&apos;t responding. Check that it&apos;s online — data reappears automatically once it&apos;s back.
               </p>
             </div>
           )}
@@ -508,7 +508,7 @@ export default function AdminPanel() {
                     </button>
                   )}
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: selectedUser ? 'rgba(88,101,242,0.15)' : 'rgba(88,101,242,0.15)', border: '1px solid rgba(88,101,242,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Activity size={13} color="#7289da" />
+                    <Activity size={13} color="#96a4ff" />
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#f2f3f5' }}>
