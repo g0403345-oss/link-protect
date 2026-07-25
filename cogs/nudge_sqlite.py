@@ -17,7 +17,7 @@ import discord
 from discord.ext import commands
 
 from .shared import (get_settings, extract_urls, load_known_bad_sync,
-                     known_bad_category, _domain_of, DBRef)
+                     known_bad_category, DBRef)
 
 _KB_TTL = 600  # refresh the known-bad set every 10 min
 
@@ -61,8 +61,8 @@ class ActivationNudge(commands.Cog):
         if not kb:
             return
         category = None
-        for u in urls[:5]:
-            category = known_bad_category(_domain_of(u), kb)
+        for _url, domain in urls[:5]:
+            category = known_bad_category(domain, kb)
             if category:
                 break
         if not category:

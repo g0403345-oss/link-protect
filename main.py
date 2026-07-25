@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.6.1"
+BOT_VERSION = "2.6.2"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -816,6 +816,19 @@ async def nootification_error(ctx, error):
 
 _CHANGELOG = [
     {
+        "version": "2.6.2",
+        "date": "25.07.2026",
+        "fields": [
+            ("🖱️ Right-click moderation",
+             " • Right-click any message → Apps → **Warn for this\n"
+             "   message**: warns the author with the message as reason\n"
+             "   and evidence — same engine, zero typing.\n"
+             " • **Check links in message**: every link goes through the\n"
+             "   threat database + Google Safe Browsing, verdict only\n"
+             "   visible to you."),
+        ],
+    },
+    {
         "version": "2.6.1",
         "date": "25.07.2026",
         "fields": [
@@ -1114,7 +1127,8 @@ _HELP_PAGES = {
              "**/warn add** — warn a member  ·  **/warn list** — their warnings\n"
              "**/warn remove · reset · clear-server** — manage records\n"
              "**/warn kick-at · ban-at · timeout · decay** — escalation thresholds\n"
-             "**/warn log** — send every action into a mod channel (**/warn log-off** stops it)"),
+             "**/warn log** — send every action into a mod channel (**/warn log-off** stops it)\n"
+             "-# Tip: right-click any message → **Apps** → *Warn for this message* / *Check links*"),
     "lists": ("📋 Whitelist & blacklist",
               "**/whitelist channel-add / member-add / role-add** — let them bypass blockers\n"
               "**/whitelist only-link** — links allowed only in one channel\n"
@@ -2365,6 +2379,105 @@ async def _list_blacklist(ctx):
             inline=False)
     embed.set_footer(text=f"Total: {len(links)} blacklisted link(s)")
     await ctx.followup.send(embed=embed)
+
+
+
+
+# ═══ Right-click moderation (message context-menu apps, v2.6.2) ═══
+# Apps → "Warn for this message" / "Check links in message" on any message.
+
+@bot.message_command(name="Warn for this message",
+                     default_member_permissions=discord.Permissions(manage_messages=True))
+async def _ctx_warn_message(ctx, message: discord.Message):
+    """Warn the author with the message itself as reason + evidence — same
+    engine as /warn add, zero typing for the moderator."""
+    await ctx.defer(ephemeral=True)
+    if not (ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator):
+        return await ctx.followup.send(embed=brand_embed(
+            "⛔ Missing permission", "You need `Manage Messages` to warn members.", kind="error"))
+    member = message.author
+    if member.bot:
+        return await ctx.followup.send(embed=brand_embed(
+            "⛔ Can't warn a bot", "Pick a message from a human member.", kind="error"))
+    if not isinstance(member, discord.Member):
+        member = ctx.guild.get_member(member.id)
+        if member is None:
+            return await ctx.followup.send(embed=brand_embed(
+                "⛔ Not a member", "This user is no longer on the server.", kind="error"))
+    excerpt = (message.content or "").strip().replace("\n", " ")
+    reason = f'Inappropriate message: "{excerpt[:140]}"' if excerpt else "Inappropriate message (attachment/embed)"
+    from cogs.shared import apply_warn_member, get_settings
+    settings = await get_settings(str(ctx.guild.id))
+    await apply_warn_member(bot, member, message.channel, settings, reason,
+                            content=message.content or None, moderator=ctx.author)
+    await ctx.followup.send(embed=brand_embed(
+        "✅ Warning issued",
+        f"{member.mention} was warned for [this message]({message.jump_url}). "
+        "Escalation follows your thresholds automatically.", kind="success"))
+
+
+@bot.message_command(name="Check links in message")
+async def _ctx_check_links(ctx, message: discord.Message):
+    """Run every link in the message through the threat DB + Google Safe
+    Browsing — verdict stays ephemeral, nobody is called out publicly."""
+    await ctx.defer(ephemeral=True)
+    from cogs.shared import extract_urls, load_known_bad_sync, known_bad_category
+    pairs = extract_urls(message.content or "")[:3]  # [(url, domain), …]
+    if not pairs:
+        return await ctx.followup.send(embed=brand_embed(
+            "ℹ️ No links found", "This message doesn't contain any links.", kind="info"))
+    urls = [u for u, _d in pairs]
+
+    verdicts: dict[str, str | None] = {}
+    try:
+        kb = await asyncio.to_thread(load_known_bad_sync)
+    except Exception:
+        kb = {}
+    pending = []
+    for u, domain in pairs:
+        cat = known_bad_category(domain, kb) if kb else None
+        if cat:
+            verdicts[u] = f"known {cat}"
+        else:
+            pending.append(u if u.startswith(("http://", "https://")) else "https://" + u)
+
+    if pending and SAFE_BROWSING_KEY:
+        payload = {
+            "client": {"clientId": "link-protect-bot", "clientVersion": BOT_VERSION},
+            "threatInfo": {
+                "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING",
+                                "POTENTIALLY_HARMFUL_APPLICATION", "UNWANTED_SOFTWARE"],
+                "platformTypes": ["ANY_PLATFORM"],
+                "threatEntryTypes": ["URL"],
+                "threatEntries": [{"url": u} for u in pending],
+            },
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                        "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+                        f"?key={SAFE_BROWSING_KEY}", json=payload,
+                        timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    matches = (await resp.json()).get("matches", [])
+            flagged = {m.get("threat", {}).get("url"): m.get("threatType", "THREAT") for m in matches}
+            for u in pending:
+                if u in flagged:
+                    verdicts[u] = flagged[u].replace("_", " ").lower()
+        except Exception:
+            pass
+
+    bad = {u: v for u, v in verdicts.items() if v}
+    lines = []
+    for u in urls:
+        full = u if u.startswith(("http://", "https://")) else "https://" + u
+        v = verdicts.get(u) or verdicts.get(full)
+        lines.append(f"{'🚨' if v else '✅'} ||`{u[:70]}`|| — {('**' + v + '**') if v else 'no threat found'}")
+    e = brand_embed(
+        "🚨 Dangerous link detected" if bad else "✅ No threats found",
+        "\n".join(lines) + ("\n\n⛔ Do **not** click or share the flagged link(s)." if bad
+                             else "\n\n*No guarantee — stay careful with logins and downloads.*"),
+        kind="error" if bad else "success")
+    await ctx.followup.send(embed=e)
 
 
 # ═══ Embeds 2.0: "Remove warning" button on log embeds (survives restarts —

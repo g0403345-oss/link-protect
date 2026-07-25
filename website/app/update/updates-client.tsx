@@ -30,6 +30,14 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 8, version: '2.6.2',
+    title: 'Right-click moderation',
+    items: [
+      'Right-click any message → Apps → “Warn for this message”: the author gets warned with the message itself as reason and evidence — same warn engine, zero typing.',
+      '“Check links in message” runs every link through the Link Protect threat database plus Google Safe Browsing; the verdict is only visible to you.',
+    ],
+  },
+  {
     product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 7, version: '2.6.1',
     title: 'Protected from minute one',
     items: [
