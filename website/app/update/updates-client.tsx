@@ -40,6 +40,18 @@ const ENTRIES: Entry[] = [
     ],
   },
   {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 3,
+    title: 'Server dashboard redesign',
+    items: [
+      'New command-center header: your server icon as a blurred banner, a state color that shifts with what’s happening (calm / threat handled / lockdown), an animated Security-Score ring and one clear next step.',
+      'Live pulse: a slim 14-day activity sparkline right under the breadcrumb.',
+      'Link blockers became a tile wall — grouped, glowing icon tiles instead of a toggle list, with Block All Links as a master tile.',
+      'The activity log is now a real timeline: grouped by day, with avatars, filter chips and expandable details per entry.',
+      'Grouped sidebar (Protection / Members / Insights / System) with live badges — new log entries since your last visit, and a warning when the verification health check fails.',
+      'Warnings stat card shows a weekly delta with a sparkline watermark; empty states got personality.',
+    ],
+  },
+  {
     product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 1.5,
     title: 'Design polish — one look everywhere',
     items: [
