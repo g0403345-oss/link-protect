@@ -12,12 +12,13 @@ import EmptyState from '@/components/EmptyState';
 
 export interface TimelineAction {
   user_id: string; username: string; channel_id: string;
-  action: 'warned' | 'kicked' | 'banned' | 'timeout';
+  action: 'warned' | 'kicked' | 'banned' | 'timeout' | 'unwarned';
   reason: string; warn_count: number; timestamp: number;
 }
 
 const META: Record<string, { label: string; color: string }> = {
   warned:  { label: 'Warned',  color: '#f0b232' },
+  unwarned: { label: 'Removed', color: '#23a55a' },
   kicked:  { label: 'Kicked',  color: '#e0683c' },
   banned:  { label: 'Banned',  color: '#f23f43' },
   timeout: { label: 'Timeout', color: '#5865f2' },
@@ -101,7 +102,7 @@ export default function ActivityTimeline({ guildId, actions, onNavigate }: {
     <div>
       {/* Filter chips */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-        {['all', 'warned', 'kicked', 'banned', 'timeout'].map((f) => {
+        {['all', 'warned', 'unwarned', 'kicked', 'banned', 'timeout'].map((f) => {
           const active = filter === f;
           const color = f === 'all' ? '#96a4ff' : META[f].color;
           const n = counts[f] ?? 0;

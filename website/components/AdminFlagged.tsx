@@ -26,7 +26,7 @@ interface Detail {
 
 const IMG_RE = /\.(png|jpe?g|gif|webp)(\?|$)/i;
 const ACTION_COLOR: Record<string, string> = {
-  warned: '#f0b232', kicked: '#e0683c', banned: '#f23f43', timeout: '#5865f2',
+  warned: '#f0b232', kicked: '#e0683c', banned: '#f23f43', timeout: '#5865f2', unwarned: '#23a55a',
 };
 
 function relTime(ts: number) {

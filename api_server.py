@@ -2322,7 +2322,6 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "log.digest",
         "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
         "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
-        "messages.accent",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
@@ -3466,7 +3465,7 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
 
     # Mirror the REAL embed the bot sends — title, fields, footer and buttons —
     # so the test never looks like the bot would drop parts of the message.
-    embed: dict = {"description": text, "color": _guild_accent(data)}
+    embed: dict = {"description": text, "color": 0x5B6CFF}
     components: list = []
 
     def _link_btn(label: str, url: str):
@@ -3488,7 +3487,6 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
                       "footer": {"text": warn_footer}})
     elif body.kind == "action_dm":
         embed.update({"color": 0xE0683C})
-        _link_btn("Appeal this decision", "https://link-protect.com/appeal")
     elif body.kind == "verify_dm":
         embed.update({"title": f"Verify to unlock {gname}",
                       "footer": {"text": "Link Protect • link-protect.com"}})
@@ -4229,7 +4227,6 @@ MOBILE_ALLOWED_PATHS = {
     "verify.page.headline", "verify.page.message", "verify.page.accent",    "log.digest",
     "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
     "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
-    "messages.accent",
 }
 
 

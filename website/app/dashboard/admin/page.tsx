@@ -39,6 +39,7 @@ const PAGE_SIZE = 24;
 const ACTION_META: Record<string, { label: string; color: string; bg: string }> = {
   warned:  { label: 'Warned',  color: '#f0b232', bg: 'rgba(240,178,50,0.10)' },
   kicked:  { label: 'Kicked',  color: '#e0683c', bg: 'rgba(224,104,60,0.10)' },
+  unwarned: { label: 'Removed', color: '#23a55a', bg: 'rgba(35,165,90,0.10)' },
   banned:  { label: 'Banned',  color: '#f23f43', bg: 'rgba(242,63,67,0.14)' },
   timeout: { label: 'Timeout', color: '#5865f2', bg: 'rgba(88,101,242,0.10)' },
 };

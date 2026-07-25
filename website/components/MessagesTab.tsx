@@ -80,9 +80,7 @@ const SAMPLE: Record<string, string> = {
   '{link}': 'https://link-protect.com/verify/…',
 };
 
-const ACCENT_SWATCHES = ['#5B6CFF', '#5865f2', '#23a55a', '#f0b232', '#eb459e', '#f23f43'];
 const DEFAULT_ACCENT = '#5B6CFF';
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const MAX_LEN = 400;
 
 function substitute(tpl: string): string {
@@ -142,10 +140,8 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   const [testBusy, setTestBusy] = useState(false);
   const taRefs = useRef<Partial<Record<TemplateKey, HTMLTextAreaElement | null>>>({});
 
-  /* accent */
-  const savedAccent = HEX_RE.test(msgs.accent ?? '') ? (msgs.accent as string) : DEFAULT_ACCENT;
-  const [accentDraft, setAccentDraft] = useState(savedAccent);
-  const previewAccent = HEX_RE.test(accentDraft) ? accentDraft : savedAccent;
+  /* Embeds always use the brand color — a per-server accent proved pointless. */
+  const previewAccent = DEFAULT_ACCENT;
 
   const insertVar = (key: TemplateKey, token: string) => {
     const el = taRefs.current[key];
@@ -301,28 +297,6 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
             })}
           </Card>
 
-          {/* 3 · Embed accent */}
-          <Card title="Embed accent">
-            <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
-              The color stripe on the left edge of every embed the bot sends.
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {ACCENT_SWATCHES.map((c) => (
-                <button key={c} title={c}
-                  onClick={() => { setAccentDraft(c); patch('messages.accent', c, 'Embed accent'); }}
-                  disabled={saving === 'messages.accent'}
-                  style={{ width: 26, height: 26, borderRadius: 8, background: c, border: previewAccent.toLowerCase() === c.toLowerCase() ? '2px solid #f2f3f5' : '2px solid transparent', cursor: 'pointer' }} />
-              ))}
-              <input value={accentDraft} onChange={(e) => setAccentDraft(e.target.value)} maxLength={7} spellCheck={false}
-                style={{ width: 90, padding: '6px 9px', fontSize: 13, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', outline: 'none', fontFamily: 'monospace' }} />
-              {HEX_RE.test(accentDraft) && accentDraft.toLowerCase() !== savedAccent.toLowerCase() && (
-                <button onClick={() => patch('messages.accent', accentDraft, 'Embed accent')} disabled={saving === 'messages.accent'}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving === 'messages.accent' ? 0.6 : 1 }}>
-                  {saving === 'messages.accent' ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
-                </button>
-              )}
-            </div>
-          </Card>
         </div>
 
         {/* ── Right column: live preview (sticky on desktop) ── */}

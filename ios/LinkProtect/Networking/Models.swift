@@ -68,9 +68,10 @@ struct ServerData: Codable, Equatable {
     var raid = Raid()
     var scamguard = ScamGuard()
     var verify = Verify()
+    var messages = Messages()
     var overrides: [String: ChannelOverride] = [:]
 
-    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, scamguard, verify, overrides }
+    enum CodingKeys: String, CodingKey { case protect, silent, channel, link, log, warn, decay, raid, scamguard, verify, messages, overrides }
 
     /// Empty defaults — used as a non-nil fallback while data loads.
     init() {}
@@ -87,6 +88,7 @@ struct ServerData: Codable, Equatable {
         raid = (try? c.decode(Raid.self, forKey: .raid)) ?? Raid()
         scamguard = (try? c.decode(ScamGuard.self, forKey: .scamguard)) ?? ScamGuard()
         verify = (try? c.decode(Verify.self, forKey: .verify)) ?? Verify()
+        messages = (try? c.decode(Messages.self, forKey: .messages)) ?? Messages()
         overrides = (try? c.decode([String: ChannelOverride].self, forKey: .overrides)) ?? [:]
     }
 
@@ -142,6 +144,36 @@ struct ServerData: Codable, Equatable {
             roleId = try? c.decode(String.self, forKey: .roleId)
             minAccountAgeDays = (try? c.decode(Int.self, forKey: .minAccountAgeDays)) ?? 0
             page = (try? c.decode(Page.self, forKey: .page)) ?? Page()
+        }
+        func encode(to encoder: Encoder) throws {}
+    }
+
+    /// Custom bot message templates (`messages.<key>` in the settings JSON).
+    /// Empty string = server uses the built-in default text.
+    struct Messages: Codable, Equatable {
+        var warnChannel = ""
+        var warnManual = ""
+        var warnDm = ""
+        var actionDm = ""
+        var verifyDm = ""
+        var lockdownAnnounce = ""
+        init() {}
+        enum CodingKeys: String, CodingKey {
+            case warnChannel = "warn_channel"
+            case warnManual = "warn_manual"
+            case warnDm = "warn_dm"
+            case actionDm = "action_dm"
+            case verifyDm = "verify_dm"
+            case lockdownAnnounce = "lockdown_announce"
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            warnChannel = (try? c.decode(String.self, forKey: .warnChannel)) ?? ""
+            warnManual = (try? c.decode(String.self, forKey: .warnManual)) ?? ""
+            warnDm = (try? c.decode(String.self, forKey: .warnDm)) ?? ""
+            actionDm = (try? c.decode(String.self, forKey: .actionDm)) ?? ""
+            verifyDm = (try? c.decode(String.self, forKey: .verifyDm)) ?? ""
+            lockdownAnnounce = (try? c.decode(String.self, forKey: .lockdownAnnounce)) ?? ""
         }
         func encode(to encoder: Encoder) throws {}
     }
@@ -255,17 +287,20 @@ struct ServerData: Codable, Equatable {
         var activated = false
         var logChannel: String = ""
         var onlylink = false
+        /// One summary embed per day instead of a message per action.
+        var digest = false
 
         enum CodingKeys: String, CodingKey {
             case activated = "Activated"
             case logChannel = "log-channel"
-            case onlylink
+            case onlylink, digest
         }
         init() {}
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             activated = (try? c.decode(Bool.self, forKey: .activated)) ?? false
             onlylink = (try? c.decode(Bool.self, forKey: .onlylink)) ?? false
+            digest = (try? c.decode(Bool.self, forKey: .digest)) ?? false
             // log-channel may arrive as a number or string.
             if let n = try? c.decode(Int.self, forKey: .logChannel) {
                 logChannel = n == 0 ? "" : String(n)

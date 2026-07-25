@@ -46,7 +46,7 @@ interface ScamShieldStats { flaggedTotal: number; flaggedWeek: number; guildCatc
 
 interface GuildAction {
   user_id: string; username: string; channel_id: string;
-  action: 'warned' | 'kicked' | 'banned' | 'timeout';
+  action: 'warned' | 'kicked' | 'banned' | 'timeout' | 'unwarned';
   reason: string; warn_count: number; timestamp: number;
 }
 

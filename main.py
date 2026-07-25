@@ -819,11 +819,11 @@ _CHANGELOG = [
             ("💬 Message Studio",
              " • Customize every bot message — warnings, DMs, verify &\n"
              "   lockdown texts — in the dashboard's new Messages tab,\n"
-             "   with variables, tone presets and your own embed color."),
+             "   with variables and tone presets."),
             ("✨ Smarter embeds",
              " • Log entries show avatars, timestamps and action colors.\n"
              " • Buttons: remove a warning or open the dashboard right\n"
-             "   from the log — banned users get an appeal link.\n"
+             "   from the log — removals are logged transparently.\n"
              " • Optional daily digest: one summary embed per day.\n"
              " • Warned members always see their count and how many\n"
              "   warnings remain until timeout, kick or ban."),
@@ -2378,6 +2378,33 @@ async def _lp_component_listener(interaction: discord.Interaction):
             if isinstance(data.get(k), list) and data[k]:
                 data[k] = data[k][:-1]
         await asyncio.to_thread(ref.set, data)
+        # Replace the original log embed with a removal notice — the old entry
+        # disappears, the audit trail stays visible in channel AND web log.
+        guild = interaction.guild
+        target = guild.get_member(int(uid)) if guild else None
+        tname = getattr(target, "name", None) or f"User …{uid[-4:]}"
+        try:
+            await interaction.message.delete()
+        except Exception:
+            pass
+        removed = discord.Embed(
+            title="↩️ Warning removed",
+            description=(f"{interaction.user.mention} removed a warning from <@{uid}>.\n"
+                         f"They now have **{count - 1}** warning(s)."),
+            color=0x23A55A,
+        )
+        removed.timestamp = discord.utils.utcnow()
+        try:
+            await interaction.channel.send(embed=removed)
+        except Exception:
+            pass
+        try:
+            from cogs.shared import _log_action_sync
+            await asyncio.to_thread(
+                _log_action_sync, int(gid), uid, tname, str(interaction.channel.id),
+                "unwarned", f"Warning removed by {interaction.user.name}", count - 1)
+        except Exception:
+            pass
         await interaction.response.send_message(
             f"↩️ Removed one warning from <@{uid}> — they now have **{count - 1}**.", ephemeral=True)
     except Exception:

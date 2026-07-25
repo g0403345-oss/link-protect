@@ -1219,9 +1219,7 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
                 color=ACTION_COLORS.get("banned" if attempted == "ban" else
                                         "kicked" if attempted == "kick" else "timeout", 0xF23F43),
             )
-            _view = discord.ui.View(timeout=None)
-            _view.add_item(discord.ui.Button(label="Appeal this decision", url=APPEAL_URL))
-            await member.send(embed=_dm, view=_view)
+            await member.send(embed=_dm)
         except Exception:
             pass
         try:

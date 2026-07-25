@@ -33,8 +33,8 @@ const ENTRIES: Entry[] = [
     product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 5, version: '2.6.0',
     title: 'Message Studio, smarter embeds & a tidy command list',
     items: [
-      'Every message the bot sends — warnings, DMs, the verification invite, the lockdown announcement — now uses your templates from the dashboard’s Messages tab, with your accent color on every embed.',
-      'Log embeds grew up: member avatars, timestamps, one action color ramp (warn / kick / ban / timeout) matching the web dashboard — and buttons to remove a warning or open the dashboard right from Discord. Banned members get an appeal link in their DM.',
+      'Every message the bot sends — warnings, DMs, the verification invite, the lockdown announcement — now uses your templates from the dashboard’s Messages tab.',
+      'Log embeds grew up: member avatars, timestamps, one action color ramp (warn / kick / ban / timeout) matching the web dashboard — and buttons to remove a warning or open the dashboard right from Discord. Removing a warning replaces the log entry with a removal notice, visible in the web activity log too. Accounts flagged in the scam network get an appeal link in their DM.',
       'Optional daily digest: one summary embed per day instead of a message per action.',
       '61 commands became 18: all enable-/disable- pairs are now /blocker, warnings live under /warn (add · list · remove · reset · kick-at · ban-at · timeout · decay · log), whitelists under /whitelist, the blacklist under /blacklist — plus a rewritten /help with topic picker.',
       'Escalations now DM the member before a kick or ban (customizable), so people always know what happened.',
@@ -47,7 +47,7 @@ const ENTRIES: Entry[] = [
     items: [
       'New Messages tab in the server dashboard: customize every text the bot sends — blocked-link warnings, manual warns, silent-mode DMs, escalation DMs, the verification DM and the lockdown announcement.',
       'Tone presets (Friendly / Neutral / Strict) fill all templates in one click; variables like {user}, {reason} or {warnings} insert as chips right at your cursor.',
-      'Live Discord-style preview with sample values that follows the field you’re editing, plus a custom accent color for the bot’s embeds.',
+      'Live Discord-style preview with sample values that follows the field you’re editing — and scrolls with you.',
       '“Send me a test DM” delivers any template to your own Discord — as the complete embed with title, warning count, footer and buttons, exactly as members see it; the live preview follows you while scrolling.',
       'Warn-log: new Daily digest option — one summary embed per day instead of a message per action (Scam Shield, raid and lockdown alerts stay live).',
     ],

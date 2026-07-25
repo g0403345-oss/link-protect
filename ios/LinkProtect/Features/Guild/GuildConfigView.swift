@@ -95,6 +95,7 @@ struct GuildConfigView: View {
         case .blockers:     BlockersSection(vm: vm)
         case .scamShield:   ScamShieldSection(vm: vm)
         case .verification: VerificationSection(vm: vm)
+        case .messages:     MessagesSection(vm: vm)
         case .warnings:     WarningsSection(vm: vm)
         case .channelRules: ChannelRulesSection(vm: vm)
         case .access:       AccessSection(vm: vm)
@@ -107,7 +108,7 @@ struct GuildConfigView: View {
 }
 
 enum ConfigSection: String, CaseIterable, Identifiable {
-    case overview, blockers, scamShield, verification, warnings, channelRules, access, blacklist, stats, log, audit
+    case overview, blockers, scamShield, verification, messages, warnings, channelRules, access, blacklist, stats, log, audit
     var id: String { rawValue }
 
     var label: String {
@@ -116,6 +117,7 @@ enum ConfigSection: String, CaseIterable, Identifiable {
         case .blockers: return "Blockers"
         case .scamShield: return "Scam Shield"
         case .verification: return "Verification"
+        case .messages: return "Messages"
         case .warnings: return "Warnings"
         case .channelRules: return "Channels"
         case .access: return "Access"
@@ -131,6 +133,7 @@ enum ConfigSection: String, CaseIterable, Identifiable {
         case .blockers: return "link"
         case .scamShield: return "exclamationmark.shield"
         case .verification: return "checkmark.seal"
+        case .messages: return "text.bubble"
         case .warnings: return "exclamationmark.triangle"
         case .channelRules: return "number.square"
         case .access: return "lock"

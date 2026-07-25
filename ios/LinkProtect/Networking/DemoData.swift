@@ -49,6 +49,10 @@ enum DemoData {
         d.log.logChannel = "300000000000000009"
         d.scamguard.enabled = true
         d.scamguard.joinCheck = true
+        // Custom bot messages: one template customized so the Messages section
+        // shows the save/reset flow; the rest fall back to the defaults.
+        d.messages.warnChannel = "{user}, that link isn't allowed here.\n**Reason:** {reason} ({warnings} warnings)"
+        d.log.digest = false
         return d
     }
 

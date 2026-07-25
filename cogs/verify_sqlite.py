@@ -9,7 +9,7 @@ removal, account-age check, page config) lives in api_server.py.
 import discord
 from discord.ext import commands
 
-from .shared import get_settings, render_message, message_accent
+from .shared import get_settings, render_message
 
 
 class VerifyGate(commands.Cog):
@@ -44,7 +44,7 @@ class VerifyGate(commands.Cog):
                 description=render_message(settings, "verify_dm", user=member.mention,
                                            username=member.name, server=member.guild.name,
                                            link=link),
-                color=message_accent(settings),
+                color=0x5B6CFF,
             )
             embed.set_footer(text="Link Protect • link-protect.com")
             view = discord.ui.View(timeout=None)
