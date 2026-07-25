@@ -123,6 +123,13 @@ const ENTRIES: Entry[] = [
 
   /* ── iOS App ─────────────────────────────────────────────────── */
   {
+    product: 'app', date: 'July 25, 2026', ts: d('2026-07-25') + 0.5, upcoming: true,
+    title: 'Message Studio in the app',
+    items: [
+      'New Messages section in every server config: edit all six bot templates on the go — with variable chips, character counter, reset to default and the daily-digest toggle.',
+    ],
+  },
+  {
     product: 'app', date: 'July 25, 2026', ts: d('2026-07-25'), upcoming: true, version: '1.1.0',
     title: 'Lockdown, verification, Share Extension & a real Watch app',
     items: [
