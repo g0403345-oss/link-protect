@@ -29,6 +29,12 @@ import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import PermFailBanner from '@/components/PermFailBanner';
+import GuildHero from '@/components/GuildHero';
+import PulseStrip from '@/components/PulseStrip';
+import BlockerWall from '@/components/BlockerWall';
+import ActivityTimeline from '@/components/ActivityTimeline';
+import SetupChecklist from '@/components/SetupChecklist';
+import EmptyState from '@/components/EmptyState';
 
 // Friendly names for protect.* keys — the Overview chips share them with the
 // Blockers tab instead of printing raw keys like "bit" or "nsfw".
@@ -78,17 +84,36 @@ function Card({ title, children, tourId }: { title: string; children: React.Reac
   );
 }
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: typeof Shield; color: string }) {
+function StatCard({ label, value, icon: Icon, color, spark, delta }: {
+  label: string; value: number | string; icon: typeof Shield; color: string;
+  /** Optional mini-trend rendered as a watermark + "+N this week" chip. */
+  spark?: number[]; delta?: number | null;
+}) {
+  const max = spark?.length ? Math.max(1, ...spark) : 1;
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+    <div style={{ position: 'relative', background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: '14px 16px', overflow: 'hidden' }}>
+      {spark && spark.length > 1 && (
+        <svg aria-hidden viewBox={`0 0 ${spark.length - 1} 10`} preserveAspectRatio="none"
+          style={{ position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', height: 34, opacity: 0.6 }}>
+          <polygon fill={`${color}14`}
+            points={`0,10 ${spark.map((v, i) => `${i},${10 - (v / max) * 8.5}`).join(' ')} ${spark.length - 1},10`} />
+        </svg>
+      )}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div style={{ width: 28, height: 28, borderRadius: 7, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon size={14} style={{ color }} />
         </div>
         <span style={{ fontSize: 12, color: '#52535a', fontWeight: 500 }}>{label}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 900, color, letterSpacing: '-0.02em' }}>
-        {typeof value === 'number' ? value.toLocaleString() : value}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 26, fontWeight: 900, color, letterSpacing: '-0.02em' }}>
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </span>
+        {typeof delta === 'number' && delta !== 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: delta > 0 ? '#f0b232' : '#23a55a' }}>
+            {delta > 0 ? `+${delta}` : delta} this week {delta > 0 ? '↑' : '↓'}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -174,6 +199,12 @@ export default function GuildDashboard() {
   // random jump). Reset both the content container and the window.
   const selectSection = useCallback((id: Section) => {
     setSection(id);
+    if (id === 'log') {
+      // Mark the activity log as read — clears the sidebar "new" badge.
+      const now = Math.floor(Date.now() / 1000);
+      setLogSeenTs(now);
+      try { localStorage.setItem(`lp_logseen_${guildId}`, String(now)); } catch { /* ignore */ }
+    }
     requestAnimationFrame(() => {
       mainRef.current?.scrollTo({ top: 0 });
       window.scrollTo({ top: 0 });
@@ -210,6 +241,28 @@ export default function GuildDashboard() {
   const [devApproved, setDevApproved] = useState(false);
   // Subtle per-server accent glow derived from the guild icon's average color.
   const tint = useGuildTint(guildId, guildInfo?.icon);
+
+  // Redesign: 14-day trend (pulse strip + stat sparkline), verify-health badge
+  // and the "new log entries since last visit" counter.
+  const [trend14, setTrend14] = useState<number[] | null>(null);
+  const [verifyIssue, setVerifyIssue] = useState(false);
+  const [logSeenTs, setLogSeenTs] = useState(0);
+  useEffect(() => {
+    fetch(`/api/guild/${guildId}/trends?days=14`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.perDay) setTrend14((d.perDay as { count: number }[]).map((x) => x.count)); })
+      .catch(() => {});
+  }, [guildId]);
+  useEffect(() => {
+    try { setLogSeenTs(parseInt(localStorage.getItem(`lp_logseen_${guildId}`) ?? '0') || 0); } catch { /* ignore */ }
+  }, [guildId]);
+  useEffect(() => {
+    if (!data?.verify?.enabled) { setVerifyIssue(false); return; }
+    fetch(`/api/guild/${guildId}/verify/health`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setVerifyIssue(d ? !d.ok : false))
+      .catch(() => {});
+  }, [guildId, data]);
 
   const closeTour = useCallback(() => {
     setTourRun(false);
@@ -438,6 +491,10 @@ export default function GuildDashboard() {
   }
 
   const protect = data.protect ?? {};
+  const newLogCount = actions.filter((a) => a.timestamp > logSeenTs).length;
+  const weekDelta = trend14 && trend14.length >= 14
+    ? trend14.slice(-7).reduce((a, b) => a + b, 0) - trend14.slice(0, 7).reduce((a, b) => a + b, 0)
+    : null;
   const warn = data.warn ?? {};
   const channel = data.channel ?? { channel: [], category: [], member: [], role: [] };
   const links = data.link?.links ?? [];
@@ -507,6 +564,10 @@ export default function GuildDashboard() {
         </div>
       </div>
 
+      <div className="pulse-strip">
+        <PulseStrip guildId={guildId} />
+      </div>
+
       {/* Mobile section tab strip — hidden on desktop, sticky below breadcrumb */}
       <div className="mobile-only" style={{ overflowX: 'auto', gap: 6, padding: '10px 16px', background: '#111113', borderBottom: '1px solid #1e1e22', scrollbarWidth: 'none', position: 'sticky', top: 104, zIndex: 30 }}>
         {NAV.map(({ id, label, icon: Icon }) => {
@@ -523,17 +584,40 @@ export default function GuildDashboard() {
       <div style={{ display: 'flex', flex: 1 }}>
         {/* Sidebar */}
         <aside data-tour="nav" className="guild-sidebar" style={{ width: 220, background: '#111113', borderRight: '1px solid #1e1e22', flexShrink: 0, position: 'sticky', top: 104, height: 'calc(100vh - 104px)', overflowY: 'auto', padding: '12px 8px' }}>
-          {NAV.map(({ id, label, icon: Icon, desc }) => {
-            const active = section === id;
+          {[
+            { title: '', ids: ['overview'] },
+            { title: 'Protection', ids: ['blockers', 'scamshield', 'verification', 'blacklist'] },
+            { title: 'Members', ids: ['warnings', 'channelrules', 'access'] },
+            { title: 'Insights', ids: ['stats', 'log', 'audit'] },
+            { title: 'System', ids: ['developer'] },
+          ].map(({ title, ids }) => {
+            const items = NAV.filter((n) => (ids as string[]).includes(n.id));
+            if (!items.length) return null;
             return (
-              <button key={id} onClick={() => selectSection(id)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', marginBottom: 2, transition: 'background 0.1s', background: active ? 'rgba(88,101,242,0.12)' : 'transparent', borderLeft: active ? '2px solid #5865f2' : '2px solid transparent' }}>
-                <Icon size={15} color={active ? '#5865f2' : '#52535a'} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#f2f3f5' : '#949ba4' }}>{label}</div>
-                  <div style={{ fontSize: 11, color: '#52535a', marginTop: 1 }}>{desc}</div>
-                </div>
-              </button>
+              <div key={title || 'top'} style={{ marginBottom: 4 }}>
+                {title && <div style={{ fontSize: 10.5, fontWeight: 800, color: '#494a52', letterSpacing: '0.09em', textTransform: 'uppercase', padding: '10px 12px 4px' }}>{title}</div>}
+                {items.map(({ id, label, icon: Icon, desc }) => {
+                  const active = section === id;
+                  const badge = id === 'log' && newLogCount > 0 ? String(Math.min(99, newLogCount))
+                    : id === 'verification' && verifyIssue ? '!' : null;
+                  return (
+                    <button key={id} onClick={() => selectSection(id)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', marginBottom: 2, transition: 'background 0.1s', background: active ? 'rgba(88,101,242,0.12)' : 'transparent', borderLeft: active ? '2px solid #5865f2' : '2px solid transparent' }}>
+                      <Icon size={15} color={active ? '#5865f2' : '#52535a'} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#f2f3f5' : '#949ba4' }}>{label}</div>
+                        <div style={{ fontSize: 11, color: '#52535a', marginTop: 1 }}>{desc}</div>
+                      </div>
+                      {badge && (
+                        <span title={badge === '!' ? 'The permission check found a problem' : `${badge} new entries`}
+                          style={{ minWidth: 17, height: 17, padding: '0 5px', borderRadius: 99, background: badge === '!' ? 'rgba(240,178,50,0.15)' : 'rgba(88,101,242,0.15)', color: badge === '!' ? '#f0b232' : '#96a4ff', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </aside>
@@ -550,9 +634,11 @@ export default function GuildDashboard() {
               {/* OVERVIEW */}
               {section === 'overview' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <SectionHeader title="Overview" description="Quick summary of your server's protection status" icon={Shield} />
+                  <GuildHero guildId={guildId} name={guildInfo?.name ?? 'Your server'} icon={guildInfo?.icon}
+                    data={data} stats={stats} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
+                  <SetupChecklist guildId={guildId} data={data} onNavigate={(sec) => selectSection(sec as Section)} />
                   <div data-tour="overview-stats" className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                    <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" />
+                    <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" spark={trend14 ?? undefined} delta={weekDelta} />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
                     <StatCard label="Active blockers" value={Object.values(protect).filter(Boolean).length} icon={Shield} color="#23a55a" />
                   </div>
@@ -619,31 +705,11 @@ export default function GuildDashboard() {
                     <PresetsCard guildId={guildId} onToast={addToast} onApplied={refreshDataSilently} />
                   </div>
                   <Card title="Platform Blockers" tourId="blockers">
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {[
-                        { key: 'all',     label: 'Block All Links',      description: 'Block every external link (overrides all others)' },
-                        { key: 'nsfw',    label: 'NSFW Content',         description: 'Block known adult/NSFW websites' },
-                        { key: 'nitro',   label: 'Nitro Scams',          description: 'Block fake Discord Nitro scam links' },
-                        { key: 'malware', label: 'Malware / Phishing',   description: 'Block known malware and phishing URLs' },
-                        { key: 'invite',  label: 'Discord Invites',      description: 'Block discord.gg invite links' },
-                        { key: 'youtube', label: 'YouTube',              description: 'Block youtube.com and youtu.be links' },
-                        { key: 'google',  label: 'Google',               description: 'Block google.com links' },
-                        { key: 'gif',     label: 'GIFs',                 description: 'Block GIF links (tenor, giphy, etc.)' },
-                        { key: 'twitch',  label: 'Twitch',               description: 'Block twitch.tv links' },
-                        { key: 'steam',   label: 'Steam',                description: 'Block Steam community and store links' },
-                        { key: 'bit',     label: 'bit.ly & shorteners',  description: 'Block URL shortener links' },
-                      ].map(({ key, label, description }) => (
-                        <div key={key} style={{ borderBottom: '1px solid #1e1e22', margin: '0 -18px', padding: '0 18px' }}>
-                          <ToggleSwitch
-                            checked={!!protect[key as keyof typeof protect]}
-                            onChange={(v) => patch(`protect.${key}`, v, label)}
-                            label={label}
-                            description={description}
-                            disabled={saving === `protect.${key}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    <BlockerWall
+                      protect={protect as Record<string, boolean | undefined>}
+                      saving={saving}
+                      onToggle={(key, v, label) => patch(`protect.${key}`, v, label)}
+                    />
                   </Card>
                   <Card title="Silent Mode" tourId="silent">
                     <ToggleSwitch
@@ -1076,72 +1142,29 @@ export default function GuildDashboard() {
               )}
 
               {/* LOG */}
-              {section === 'log' && (() => {
-                const actionMeta: Record<string, { label: string; color: string; bg: string }> = {
-                  warned:  { label: 'Warned',   color: '#f0b232', bg: 'rgba(240,178,50,0.08)' },
-                  kicked:  { label: 'Kicked',   color: '#e0683c', bg: 'rgba(224,104,60,0.08)' },
-                  banned:  { label: 'Banned',   color: '#f23f43', bg: 'rgba(242,63,67,0.12)' },
-                  timeout: { label: 'Timeout',  color: '#5865f2', bg: 'rgba(88,101,242,0.08)' },
-                };
-                const relTime = (ts: number) => {
-                  const s = Math.floor(Date.now() / 1000 - ts);
-                  if (s < 60) return `${s}s ago`;
-                  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-                  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-                  return `${Math.floor(s / 86400)}d ago`;
-                };
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                      <SectionHeader title="Activity Log" description="Live moderation feed — auto-refreshes every 5 seconds" icon={Activity} />
-                      <button onClick={fetchActions} style={{ padding: '7px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'border-color 0.15s' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52535a')}
-                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}>
-                        <RefreshCw size={13} color="#6d6f78" />
-                      </button>
-                    </div>
-                    <WarnLogConfig
-                      guildId={guildId}
-                      channelId={data.log?.['log-channel'] ?? 0}
-                      activated={!!data.log?.Activated}
-                      onPatch={patch}
-                      saving={saving}
-                      show={data.log?.show}
-                    />
-                    <Card title={`Recent Actions (${actions.length})`} tourId="log">
-                      {actions.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                          <Activity size={28} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
-                          <p style={{ fontSize: 13, color: '#52535a' }}>No moderation actions yet</p>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {actions.map((a, i) => {
-                            const meta = actionMeta[a.action] ?? actionMeta.warned;
-                            return (
-                              <div key={i} className="log-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: meta.bg, color: meta.color, flexShrink: 0, marginTop: 1 }}>
-                                  {meta.label}
-                                </span>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: '#f2f3f5' }}>{a.username}</span>
-                                    <span style={{ fontSize: 11, color: '#52535a' }}>warn #{a.warn_count}</span>
-                                    <span style={{ fontSize: 11, color: '#2e2e36' }}>•</span>
-                                    <span style={{ fontSize: 11, color: '#52535a', fontFamily: 'monospace' }}>#{a.channel_id.slice(-4)}</span>
-                                  </div>
-                                  <p style={{ fontSize: 12, color: '#6d6f78', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.reason}</p>
-                                </div>
-                                <span style={{ fontSize: 11, color: '#52535a', flexShrink: 0, marginTop: 1 }}>{relTime(a.timestamp)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </Card>
+              {section === 'log' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <SectionHeader title="Activity Log" description="Live moderation feed — auto-refreshes every 5 seconds" icon={Activity} />
+                    <button onClick={fetchActions} style={{ padding: '7px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer', transition: 'border-color 0.15s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52535a')}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2e2e36')}>
+                      <RefreshCw size={13} color="#6d6f78" />
+                    </button>
                   </div>
-                );
-              })()}
+                  <WarnLogConfig
+                    guildId={guildId}
+                    channelId={data.log?.['log-channel'] ?? 0}
+                    activated={!!data.log?.Activated}
+                    onPatch={patch}
+                    saving={saving}
+                    show={data.log?.show}
+                  />
+                  <Card title={`Recent Actions (${actions.length})`} tourId="log">
+                    <ActivityTimeline guildId={guildId} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
+                  </Card>
+                </div>
+              )}
 
               {/* AUDIT LOG */}
               {section === 'audit' && (
@@ -1154,10 +1177,8 @@ export default function GuildDashboard() {
                   </div>
                   <Card title={`Recent Changes (${audit.length})`} tourId="audit">
                     {audit.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                        <History size={28} color="#2e2e36" style={{ margin: '0 auto 8px' }} />
-                        <p style={{ fontSize: 13, color: '#52535a' }}>No setting changes recorded yet</p>
-                      </div>
+                      <EmptyState icon={History} title="No changes recorded yet"
+                        sub="Every settings change — from the dashboard, the app or a bot command — lands here with who changed it and when." />
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {audit.map((e, i) => {

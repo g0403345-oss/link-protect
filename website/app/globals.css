@@ -236,6 +236,9 @@ input[type='number'] { -moz-appearance: textfield; }
 
   /* Guild dashboard — breadcrumb: drop the long ID + button labels on phones */
   .crumb-id { display: none !important; }
+  .pulse-strip { display: none !important; }
+  .guild-hero-inner { padding: 18px 16px !important; gap: 14px !important; }
+  .guild-hero-score { width: 100%; }
   .crumb-btn-label { display: none !important; }
 
   /* Guild dashboard — grids */
