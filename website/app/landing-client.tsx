@@ -638,6 +638,13 @@ export default function LandingClient() {
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; (e.currentTarget as HTMLElement).style.color = '#949ba4'; }}>
                 Dashboard
               </Link>
+              <Link href="/intro"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: 14, fontWeight: 600, color: '#6d6f78', borderRadius: 10, textDecoration: 'none', transition: 'color 0.15s' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#f2f3f5')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#6d6f78')}>
+                <span style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: '50%', background: 'rgba(88,101,242,0.14)', border: '1px solid rgba(88,101,242,0.35)', alignItems: 'center', justifyContent: 'center', fontSize: 10, paddingLeft: 2 }}>▶</span>
+                Watch the intro
+              </Link>
             </div>
           </motion.div>
 
