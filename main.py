@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.6.0"
+BOT_VERSION = "2.6.1"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -583,10 +583,13 @@ async def on_guild_join(guild):
             "invite": False,
             "twitch": False,
             "bit": False,
-            "nitro": False,
+            # Core protection is ON for new servers (since 2.6.1): malware and
+            # nitro-scam links have zero false-positive risk. 85% of installs
+            # never enabled anything — now the bot is useful from minute one.
+            "nitro": True,
             "all": False,
             "steam": False,
-            "malware": False
+            "malware": True
         }
     }
     await asyncio.to_thread(
@@ -812,6 +815,18 @@ async def nootification_error(ctx, error):
         await ctx.respond(embed=embed, ephemeral=True)
 
 _CHANGELOG = [
+    {
+        "version": "2.6.1",
+        "date": "25.07.2026",
+        "fields": [
+            ("🛡️ Protected from minute one",
+             " • New servers start with the malware/phishing and nitro-scam\n"
+             "   blockers already on (zero false-positive risk).\n"
+             " • On servers with protection off, spotting a KNOWN scam link\n"
+             "   now triggers a one-time hint with a one-click\n"
+             "   'Enable Balanced protection' button. Shown once, ever."),
+        ],
+    },
     {
         "version": "2.6.0",
         "date": "25.07.2026",
@@ -1234,6 +1249,25 @@ _PRESETS = {
 }
 
 
+def _apply_preset_sync(guild_id: str, preset: str) -> bool:
+    """Write a preset's settings. Returns True when warn thresholds were set."""
+    p = _PRESETS[preset]
+    for key, val in p["protect"].items():
+        db.reference(f"/servers/{guild_id}/protect/{key}").set(val)
+    db.reference(f"/servers/{guild_id}/raid/enabled").set(p["raid"])
+    db.reference(f"/servers/{guild_id}/scamguard/enabled").set(p["scam"])
+    db.reference(f"/servers/{guild_id}/scamguard/join_check").set(p["join_check"])
+    warn = db.reference(f"/servers/{guild_id}/warn").get() or {}
+    timeout_cfg = warn.get("timeout") or {}
+    if preset != "minimal" and not warn.get("kick") and not warn.get("ban") \
+            and not timeout_cfg.get("warnings"):
+        db.reference(f"/servers/{guild_id}/warn/timeout").set({"warnings": 3, "time": 10})
+        db.reference(f"/servers/{guild_id}/warn/kick").set(5)
+        db.reference(f"/servers/{guild_id}/warn/ban").set(8)
+        return True
+    return False
+
+
 @bot.slash_command(name="setup-preset",
                    description="Set up protection with one command: Minimal, Balanced or Strict")
 async def _setup_preset(ctx, preset: discord.Option(str, "Protection level",
@@ -1248,27 +1282,8 @@ async def _setup_preset(ctx, preset: discord.Option(str, "Protection level",
     p = _PRESETS[preset]
     guild_id = str(ctx.guild.id)
 
-    def _apply():
-        for key, val in p["protect"].items():
-            db.reference(f"/servers/{guild_id}/protect/{key}").set(val)
-        db.reference(f"/servers/{guild_id}/raid/enabled").set(p["raid"])
-        db.reference(f"/servers/{guild_id}/scamguard/enabled").set(p["scam"])
-        db.reference(f"/servers/{guild_id}/scamguard/join_check").set(p["join_check"])
-        # Make escalation actually work out of the box — but never overwrite
-        # thresholds the server has already configured.
-        warn = db.reference(f"/servers/{guild_id}/warn").get() or {}
-        touched_warn = False
-        timeout_cfg = warn.get("timeout") or {}
-        if preset != "minimal" and not warn.get("kick") and not warn.get("ban") \
-                and not timeout_cfg.get("warnings"):
-            db.reference(f"/servers/{guild_id}/warn/timeout").set({"warnings": 3, "time": 10})
-            db.reference(f"/servers/{guild_id}/warn/kick").set(5)
-            db.reference(f"/servers/{guild_id}/warn/ban").set(8)
-            touched_warn = True
-        return touched_warn
-
     try:
-        touched_warn = await asyncio.to_thread(_apply)
+        touched_warn = await asyncio.to_thread(_apply_preset_sync, guild_id, preset)
     except Exception as e:
         await ctx.followup.send(embed=brand_embed(
             "⛔ Error", f"Couldn't apply the preset.\n```{str(e)[:200]}```", kind="error"))
@@ -2360,7 +2375,35 @@ async def _lp_component_listener(interaction: discord.Interaction):
         cid = (interaction.data or {}).get("custom_id", "")
     except Exception:
         return
-    if not isinstance(cid, str) or not cid.startswith("lpw:rm:"):
+    if not isinstance(cid, str):
+        return
+    # Activation nudge: "Enable Balanced protection" button (see cogs/nudge_sqlite)
+    if cid.startswith("lpn:balanced:"):
+        try:
+            gid = cid.split(":", 2)[2]
+            perms = getattr(interaction.user, "guild_permissions", None)
+            if not perms or not (perms.manage_guild or perms.administrator):
+                return await interaction.response.send_message(
+                    "Only members with `Manage Server` can enable protection — "
+                    "ping an admin to press this button.", ephemeral=True)
+            await asyncio.to_thread(_apply_preset_sync, gid, "balanced")
+            done = brand_embed(
+                "🛡️ Balanced protection is live",
+                f"Enabled by {interaction.user.mention}: malware & phishing, nitro scams, "
+                "shorteners, NSFW, raid protection and Scam Shield.\n"
+                "Fine-tune everything (log channel, thresholds, verification) in the dashboard.",
+                kind="success")
+            view = discord.ui.View(timeout=None)
+            view.add_item(discord.ui.Button(label="Open dashboard", style=discord.ButtonStyle.link,
+                                            url=f"https://link-protect.com/dashboard/{gid}"))
+            await interaction.response.edit_message(embed=done, view=view)
+        except Exception:
+            try:
+                await interaction.response.send_message("Couldn't apply the preset — try /setup-preset.", ephemeral=True)
+            except Exception:
+                pass
+        return
+    if not cid.startswith("lpw:rm:"):
         return
     try:
         _, _, gid, uid = cid.split(":", 3)

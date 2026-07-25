@@ -30,6 +30,14 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 7, version: '2.6.1',
+    title: 'Protected from minute one',
+    items: [
+      'New servers start with the malware/phishing and nitro-scam blockers already enabled — the two protections with zero false-positive risk.',
+      'On servers that never enabled protection, spotting a known scam link from the threat database now triggers a one-time hint with a one-click “Enable Balanced protection” button (admins only). Shown once per server, ever — no spam.',
+    ],
+  },
+  {
     product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 6,
     title: 'Meet Link Protect — the animated intro',
     items: [
