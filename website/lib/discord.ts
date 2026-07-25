@@ -95,7 +95,7 @@ export function getGuildIconUrl(guild: DiscordGuild, size = 128): string {
   return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${ext}?size=${size}`;
 }
 
-export const BOT_INVITE = `https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376537111638&integration_type=0&scope=bot`;
+export const BOT_INVITE = `https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376805547126&integration_type=0&scope=bot`;
 export const SUPPORT_SERVER = `https://discord.gg/BjDC9t329E`;
 export const BOT_ID = '888390889892892684';
 export const APP_STORE_URL = 'https://apps.apple.com/de/app/link-protect-server-guard/id6783911538';

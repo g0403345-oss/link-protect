@@ -51,7 +51,7 @@ struct ManagedGuild: Codable, Equatable, Hashable, Identifiable {
 
     /// Bot invite pre-targeted at this server (and locked to it).
     var inviteURL: URL {
-        URL(string: "https://discord.com/oauth2/authorize?client_id=\(AppConfig.Discord.clientID)&permissions=1376537111638&scope=bot&guild_id=\(id)&disable_guild_select=true")!
+        URL(string: "https://discord.com/oauth2/authorize?client_id=\(AppConfig.Discord.clientID)&permissions=1376805547126&scope=bot&guild_id=\(id)&disable_guild_select=true")!
     }
 }
 

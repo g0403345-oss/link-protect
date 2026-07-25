@@ -918,7 +918,9 @@ _CHANGELOG = [
              "   kick/ban/timeout someone (missing permission or role rank),\n"
              "   you now get an orange alert in your log channel, a banner\n"
              "   in the web dashboard and a push to the app — with the exact\n"
-             "   fix. No more silently failed actions."),
+             "   fix. No more silently failed actions.\n"
+             " • The invite link now requests Manage Roles & Manage Server\n"
+             "   up front — the verification gate and lockdown need them."),
         ],
     },
     {
@@ -1165,7 +1167,7 @@ async def _invite(ctx):
     embed = brand_embed(
         "➕ Invite Link Protect",
         "Protect another server in 30 seconds — "
-        "[**click here to invite Link Protect**](https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376537111638&integration_type=0&scope=bot)",
+        "[**click here to invite Link Protect**](https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376805547126&integration_type=0&scope=bot)",
     )
     await ctx.respond(embed=embed)
 

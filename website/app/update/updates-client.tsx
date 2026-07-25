@@ -36,6 +36,7 @@ const ENTRIES: Entry[] = [
       'When Scam Shield, Raid Shield or a warn escalation can’t kick, ban or time out someone — missing permission or role rank — the failure is no longer silent.',
       'You get an orange alert in your log channel with the exact cause and fix, and the app receives a push notification.',
       'Repeated failures for the same user are deduplicated to one alert per hour.',
+      'The invite link now requests Manage Roles & Manage Server up front — the verification gate and emergency lockdown need them, so fresh installs start without permission gaps.',
     ],
   },
   {

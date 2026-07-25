@@ -300,7 +300,7 @@ private struct EmptyServersState: View {
             Text("You need the “Manage Server” permission on a server that has the Link Protect bot. Invite it, then pull to refresh.")
                 .font(.system(size: 14)).foregroundStyle(Theme.faint).multilineTextAlignment(.center)
             PrimaryButton(title: "Invite the bot", systemImage: "plus", fill: false) {
-                UIApplication.shared.open(URL(string: "https://discord.com/oauth2/authorize?client_id=\(AppConfig.Discord.clientID)&permissions=1376537111638&scope=bot")!)
+                UIApplication.shared.open(URL(string: "https://discord.com/oauth2/authorize?client_id=\(AppConfig.Discord.clientID)&permissions=1376805547126&scope=bot")!)
             }
             .padding(.top, 4)
         }

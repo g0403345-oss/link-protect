@@ -70,6 +70,6 @@ Everything is interactive; nothing is sent to a server in demo mode.
 
 - [ ] Create a dedicated Discord account for review (no 2FA).
 - [ ] Create a server, invite the bot:
-      `https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376537111638&scope=bot`
+      `https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376805547126&scope=bot`
 - [ ] Trigger a couple of moderation actions so Statistics / Activity aren't empty.
 - [ ] Paste the credentials into the Notes-for-Review block above.
