@@ -137,8 +137,6 @@ export default function PremiumCard({ guildId, onToast, onNavigate }: {
               </div>
             ))}
           </div>
-            ))}
-          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2 }}>
