@@ -30,6 +30,15 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 10,
+    title: 'A notification centre you can actually use',
+    items: [
+      'Every notification expands on click to show its full text — nothing gets cut off anymore.',
+      'Every type now has a real action: open the report conversation, jump to the admin panel for developer requests, or open your dashboard.',
+      'Polished look: unread dots on the icon, a “new” counter in the header, hover states, soft blur backdrop and a subtle entrance animation.',
+    ],
+  },
+  {
     product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 9,
     title: 'Leaderboard names are stable now',
     items: [
