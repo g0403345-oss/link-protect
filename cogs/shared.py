@@ -1149,6 +1149,10 @@ def load_flagged_ids_sync() -> set:
 
 async def apply_warn(bot, message, settings: dict, reason: str) -> None:
     """Increment warn count and handle kick/ban/timeout for a blocked message."""
+    import discord
+    # Author already left (or webhook/system message) → there's nobody to warn.
+    if not isinstance(message.author, discord.Member):
+        return
     await apply_warn_member(bot, message.author, message.channel, settings, reason,
                             content=message.content)
 
