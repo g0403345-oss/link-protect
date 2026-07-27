@@ -73,13 +73,13 @@ _DEFAULT_TEMPLATE = {
     "onlylink": False,
     "safe": {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
-        "invite": False, "twitch": False, "bit": False, "nitro": False, "steam": False
+        "invite": False, "twitch": False, "bit": False, "nitro": True, "steam": False
     },
     "warn": {"kick": 3, "ban": 5},
     "protect": {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
-        "invite": False, "twitch": False, "bit": False, "nitro": False,
-        "all": False, "steam": False, "malware": False
+        "invite": False, "twitch": False, "bit": False, "nitro": True,
+        "all": False, "steam": False, "malware": True
     }
 }
 
@@ -568,7 +568,7 @@ async def on_guild_join(guild):
             "invite": False,
             "twitch": False,
             "bit": False,
-            "nitro": False,
+            "nitro": True,
             "steam": False
         },
         "warn": {
@@ -592,9 +592,12 @@ async def on_guild_join(guild):
             "malware": True
         }
     }
-    await asyncio.to_thread(
-        lambda: db.reference(f"/servers/{guild.id}").set(data)
-    )
+    # Re-invites keep every setting: only seed defaults for genuinely new servers.
+    existing = await asyncio.to_thread(lambda: db.reference(f"/servers/{guild.id}").get())
+    if not existing:
+        await asyncio.to_thread(
+            lambda: db.reference(f"/servers/{guild.id}").set(data)
+        )
     owner_id = guild.owner_id
     total_text_channels = len(guild.text_channels)
     total_voice_channels = len(guild.voice_channels)
@@ -609,7 +612,11 @@ async def on_guild_join(guild):
     embed.add_field(name="Created at", value=f"```{create}```", inline=True)
     embed.set_footer(text=f"Total servers: {len(bot.guilds)}")
     channel = bot.get_channel(889218205636247582)
-    await channel.send(embed=embed)
+    if channel:
+        try:
+            await channel.send(embed=embed)
+        except Exception:
+            pass
     try:
         owner = await bot.fetch_user(owner_id)
     except discord.NotFound:
@@ -620,13 +627,15 @@ async def on_guild_join(guild):
         return
     embed = brand_embed(
         "Welcome to Link Protect 👋",
-        f"Thanks for adding me to **{guild.name}**! I block phishing, scams, "
-        "malware and unwanted links — automatically, before they spread.",
+        f"Thanks for adding me to **{guild.name}**! Good news first: "
+        "**you're already protected** — the malware/phishing and nitro-scam "
+        "blockers are on from this very second, no setup needed.",
     )
-    embed.add_field(name="🚀 Set up in 30 seconds", value=(
-        "Run **`/setup-preset`** in your server and pick a protection level "
-        "(Minimal · Balanced · Strict) — or fine-tune everything in the "
-        "[web dashboard](https://link-protect.com/dashboard)."), inline=False)
+    embed.add_field(name="🚀 Level up in 30 seconds", value=(
+        "Run **`/setup-preset`** and pick **Balanced** (recommended) to add "
+        "raid protection, Scam Shield and more — or fine-tune everything in the "
+        "[web dashboard](https://link-protect.com/dashboard). "
+        "Tip: set a log channel with **`/warn log`** so you see what I catch."), inline=False)
     embed.add_field(name="🛡️ What I protect you from", value=(
         "• Phishing, nitro scams & malware links\n"
         "• Cross-channel scam spam (Scam Shield) & link raids\n"
@@ -642,7 +651,11 @@ async def on_guild_join(guild):
     except Exception as e:
         return
     guild = bot.get_guild(876501708912603157)
+    if guild is None:
+        return
     channel = guild.get_channel(1284546741936459887)
+    if channel is None:
+        return
     new_name = f"📈| - {len(bot.guilds)} Server"
     try:
         await channel.edit(name=new_name)
@@ -652,6 +665,8 @@ async def on_guild_join(guild):
             await asyncio.sleep(retry_after)
             await channel.edit(name=new_name)
     timechannel = guild.get_channel(1284945488298115095)
+    if timechannel is None:
+        return
     current_time = datetime.now().strftime("%H:%M")
     new_time = f"🕒| {current_time} Uhr"
     try:
@@ -665,9 +680,8 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
-    data = await asyncio.to_thread(lambda: db.reference("/servers").get()) or {}
-    if str(guild.id) in data:
-        db.reference(f"/servers/{guild.id}").delete()
+    # Settings survive a kick + re-invite — deleting here destroyed every
+    # blocker/warn/whitelist config on a normal troubleshooting move.
     # Leave log (mirrors the join log; the leave channel had been dead since
     # Aug 2025) — red embed + running totals so churn vs. growth is visible.
     # Skip "ghost" stubs: Discord lists long-departed guilds as unavailable in
@@ -705,12 +719,12 @@ async def database(ctx):
         "onlylink": False,
         "safe": {
             "google": False, "youtube": False, "nsfw": False, "gif": False,
-            "invite": False, "twitch": False, "bit": False, "nitro": False, "steam": False
+            "invite": False, "twitch": False, "bit": False, "nitro": True, "steam": False
         },
         "warn": {"kick": 3, "ban": 5},
         "protect": {
             "google": False, "youtube": False, "nsfw": False, "gif": False,
-            "invite": False, "twitch": False, "bit": False, "nitro": False, "all": False, "steam": False, "malware": False
+            "invite": False, "twitch": False, "bit": False, "nitro": True, "all": False, "steam": False, "malware": True
         }
 }
     try:
@@ -775,9 +789,9 @@ async def nootification(ctx):
             if owner is None:
                 raise Exception("Owner not found")
             embed = discord.Embed(
-                title="🚀 Link Protect – Update to Version 2.0.00",
+                title=f"🚀 Link Protect — updated to v{BOT_VERSION}",
                 description=(
-                    "**We're excited to announce that Link Protect has been successfully updated to version `2.0.00`.**\n\n"
+                    f"**Link Protect has been updated to `v{BOT_VERSION}`.** All your settings keep working.**\n\n"
                     "🔒 All link types are now **reliably detected and filtered** again – including Discord invites, suspicious URLs, and custom patterns.\n"
                     "⚙️ Core features like `/blocker`, `/dashboard`, and advanced filtering have been updated, optimized, and fully restored.\n"
                     "🧪 Despite rigorous testing, bugs may still occur – if you notice anything unusual, please use `/support` to reach out on our support server.\nIts also important to tell me if the Bot does not detect a link!\n\n"
@@ -785,7 +799,7 @@ async def nootification(ctx):
                     "Your feedback and support have helped us grow into one of the most reliable anti-link bots on Discord.\n\n"
                     "🔧 More improvements and new features are on the way – stay tuned!\n\n"
                     "*– The Link Protect Dev Team*"),color=discord.Color.blurple())
-            embed.set_footer(text="⚠️ You have to set up the bot again! ⚠️")
+            embed.set_footer(text="No action needed — everything keeps working.")
             await owner.send(embed=embed)
             sent += 1
             await asyncio.sleep(0.7)
@@ -1025,6 +1039,28 @@ async def _check_link(ctx, url: discord.Option(str, "URL to scan (must start wit
     await ctx.defer()
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
+    # Our own threat DB first — the same source the blockers use. Without this,
+    # /check-link called domains "safe" that the bot itself blocks.
+    try:
+        from cogs.shared import load_known_bad_sync, known_bad_category, _domain_of
+        kb = await asyncio.to_thread(load_known_bad_sync)
+        cat = known_bad_category(_domain_of(url), kb) if kb else None
+        if cat:
+            await ctx.followup.send(embed=discord.Embed(
+                title="🚨 Dangerous Link Detected",
+                description=f"**URL:** ||`{url[:300]}`||\n**Threat:** `{cat}` "
+                            f"(Link Protect threat database)\n\n⛔ Do **not** click or share this link.",
+                color=discord.Color.red()))
+            return
+    except Exception:
+        pass
+    if not SAFE_BROWSING_KEY:
+        await ctx.followup.send(embed=discord.Embed(
+            title="⚠️ Partial scan only",
+            description="Nothing found in the Link Protect threat database, but the external "
+                        "malware scanner is currently unavailable — treat unknown links with care.",
+            color=discord.Color.orange()))
+        return
     SAFE_BROWSING_URL = (
         "https://safebrowsing.googleapis.com/v4/threatMatches:find"
         f"?key={SAFE_BROWSING_KEY}"
@@ -1133,7 +1169,7 @@ _HELP_PAGES = {
               "**/whitelist channel-add / member-add / role-add** — let them bypass blockers\n"
               "**/whitelist only-link** — links allowed only in one channel\n"
               "**/blacklist add / remove / list** — your custom blocked links\n"
-              "**/channel-mode · channel-block · channel-rules** — per-channel rules"),
+              "**/channel-mode · channel-block · channel-rules · channel-reset** — per-channel rules"),
     "security": ("🛡️ Security",
                  "**/lockdown** — freeze the whole server in an emergency (**/unlock** restores)\n"
                  "Scam Shield, Raid Shield & the verification gate are configured in the "
@@ -1141,7 +1177,8 @@ _HELP_PAGES = {
     "info": ("ℹ️ Info",
              "**/stats · /ping · /modstats · /update** — numbers & news\n"
              "**/invite** — add Link Protect to another server\n"
-             "**/support** — join the support server"),
+             "**/support** — join the support server\n"
+             "**/premium** — what Premium adds (protection itself is free forever)"),
 }
 
 
@@ -1159,6 +1196,31 @@ class _HelpView(discord.ui.View):
     async def _pick(self, select, interaction):
         title, body = _HELP_PAGES[select.values[0]]
         await interaction.response.edit_message(embed=brand_embed(title, body))
+
+
+@bot.slash_command(name="premium", description="What Link Protect Premium adds — and what stays free forever")
+async def _premium_cmd(ctx):
+    from cogs.shared import _get_conn as _pc
+    import json as _json
+    active = False
+    try:
+        row = _pc().execute("SELECT value FROM kv WHERE path=?", (f"premium:{ctx.guild.id}",)).fetchone()
+        d = _json.loads(row[0]) if row else {}
+        active = bool(d.get("active"))
+    except Exception:
+        pass
+    e = brand_embed(
+        "💎 Link Protect Premium",
+        ("**This server has Premium — thank you!** 💜\n\n" if active else "") +
+        "**Every security feature is free — for every server, forever.** "
+        "Premium adds personalization and extras, never protection:\n\n"
+        "• Custom embed color & footer, welcome/leave messages\n"
+        "• Verify page: your logo, own rules gate, vanity link\n"
+        "• Watchlist, night schedule & event mode, one-click undo\n"
+        "• Settings sync across servers · 10× API limits\n\n"
+        f"**3,49 €/month per server** — manage it in the "
+        f"[dashboard](https://link-protect.com/dashboard/{ctx.guild.id}).")
+    await ctx.respond(embed=e, ephemeral=True)
 
 
 @bot.slash_command(name="help", description="All commands and how to set up Link Protect")
@@ -1282,7 +1344,7 @@ def _apply_preset_sync(guild_id: str, preset: str) -> bool:
     return False
 
 
-@bot.slash_command(name="setup-preset",
+@bot.slash_command(name="setup-preset", default_member_permissions=discord.Permissions(manage_guild=True),
                    description="Set up protection with one command: Minimal, Balanced or Strict")
 async def _setup_preset(ctx, preset: discord.Option(str, "Protection level",
                                                     choices=["minimal", "balanced", "strict"])):
@@ -1396,14 +1458,14 @@ async def _call_lockdown(ctx, active: bool, reason: str | None) -> None:
 _LOCKDOWN_SLOWMODE_TEXT = "30s"
 
 
-@bot.slash_command(name="lockdown",
+@bot.slash_command(name="lockdown", default_member_permissions=discord.Permissions(manage_guild=True),
                    description="EMERGENCY: freeze the server — slowmode everywhere, invites paused, all links blocked")
 async def _lockdown_cmd(ctx, reason: discord.Option(str, "What's happening?", required=False) = None):
     await ctx.defer()
     await _call_lockdown(ctx, True, reason)
 
 
-@bot.slash_command(name="unlock", description="Lift the lockdown and restore everything")
+@bot.slash_command(name="unlock", default_member_permissions=discord.Permissions(manage_guild=True), description="Lift the lockdown and restore everything")
 async def _unlock_cmd(ctx):
     await ctx.defer()
     await _call_lockdown(ctx, False, None)
@@ -1426,13 +1488,13 @@ async def _dashboard(ctx):
     warn_data = await fetch(f"{base}/warn", {"kick": 3, "ban": 5})
     protect_data = await fetch(f"{base}/protect", {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
-        "invite": False, "twitch": False, "bit": False, "nitro": False, "all": False, "steam": False, "malware": False})
+        "invite": False, "twitch": False, "bit": False, "nitro": True, "all": False, "steam": False, "malware": True})
     if "steam" not in protect_data:
         protect_data["steam"] = False
         await asyncio.to_thread(lambda: db.reference(f"{base}/protect/steam").set(False))
     safe_data = await fetch(f"{base}/safe", {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
-        "invite": False, "twitch": False, "bit": False, "nitro": False, "steam": False})
+        "invite": False, "twitch": False, "bit": False, "nitro": True, "steam": False})
     channel_data = await fetch(f"{base}/channel", {"channel": [], "category": [], "member": [], "role": []})
     link_data = await fetch(f"{base}/link", {"links": 0})
     kick = warn_data.get("kick", 3)
@@ -1501,7 +1563,7 @@ async def _dashboard(ctx):
         print(f"[dashboard:respond] {e}")
 
 
-@wl_grp.command(name="channel-remove", description="Remove disabled channels the bot deletes links from")
+@wl_grp.command(name="channel-remove", description="Remove a channel from the whitelist")
 async def _dischannel(ctx, name: discord.Option(str, "Mention the channel to disable (e.g. #general)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1530,7 +1592,7 @@ async def _dischannel(ctx, name: discord.Option(str, "Mention the channel to dis
         await ctx.followup.send(embed=embed)
 
 
-@wl_grp.command(name="channel-add", description="Set channels the bot should NOT delete links from")
+@wl_grp.command(name="channel-add", description="Whitelist a channel — links are allowed there")
 async def _enchannel(ctx, name: discord.Option(str, "Mention the channel to enable (e.g. #general)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1609,7 +1671,7 @@ async def _dislink(ctx):
     await ctx.followup.send(embed=embed)
 
 
-@wl_grp.command(name="member-remove", description="Don't allow a member to send links")
+@wl_grp.command(name="member-remove", description="Remove a member from the whitelist")
 async def _dismember(ctx, member: discord.Option(str, "Mention the member to disable (e.g. @User)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1638,7 +1700,7 @@ async def _dismember(ctx, member: discord.Option(str, "Mention the member to dis
         await ctx.followup.send(embed=embed)
 
 
-@wl_grp.command(name="member-add", description="Allow a member to send links")
+@wl_grp.command(name="member-add", description="Whitelist a member — their links are always allowed")
 async def _enmember(ctx, member: discord.Option(str, "Mention the member to enable (e.g. @user)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1666,7 +1728,7 @@ async def _enmember(ctx, member: discord.Option(str, "Mention the member to enab
     await ctx.followup.send(embed=embed)
 
 
-@wl_grp.command(name="role-remove", description="Don't allow a role to send links")
+@wl_grp.command(name="role-remove", description="Remove a role from the whitelist")
 async def _disrole(ctx, role: discord.Option(str, "Mention the role to disable (e.g. @role)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1695,7 +1757,7 @@ async def _disrole(ctx, role: discord.Option(str, "Mention the role to disable (
         await ctx.followup.send(embed=embed)
 
 
-@wl_grp.command(name="role-add", description="Allow a role to send links")
+@wl_grp.command(name="role-add", description="Whitelist a role — its links are always allowed")
 async def _enrole(ctx, role: discord.Option(str, "Mention the role to enable (e.g. @role)")):
     await ctx.defer()
     guild_id = str(ctx.guild.id)
@@ -1888,7 +1950,7 @@ def _ov_ref(guild_id: str):
     return db.reference(f"/servers/{guild_id}/overrides")
 
 
-@bot.slash_command(name="channel-mode",
+@bot.slash_command(name="channel-mode", default_member_permissions=discord.Permissions(manage_guild=True),
                    description="Set how Link Protect behaves in one channel (default / off / custom)")
 async def _channelmode(
         ctx,
@@ -1923,7 +1985,7 @@ async def _channelmode(
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="channel-block",
+@bot.slash_command(name="channel-block", default_member_permissions=discord.Permissions(manage_guild=True),
                    description="Turn one blocker on/off for a single channel (uses that channel's custom rules)")
 async def _channelblock(
         ctx,
@@ -1995,7 +2057,7 @@ async def _channelrules(ctx, channel: discord.Option(discord.TextChannel, "Chann
     await ctx.followup.send(embed=embed)
 
 
-@bot.slash_command(name="channel-reset",
+@bot.slash_command(name="channel-reset", default_member_permissions=discord.Permissions(manage_guild=True),
                    description="Remove a channel's custom rules so it follows the server again")
 async def _channelreset(ctx, channel: discord.Option(discord.TextChannel, "Channel to reset")):
     await ctx.defer()
@@ -2284,7 +2346,7 @@ async def _diswarnlog(ctx):
     await ctx.followup.send(embed=embed)
 
 
-@bl_grp.command(name="remove", description="Whitelist a link from your blacklist")
+@bl_grp.command(name="remove", description="Remove a link from your blacklist")
 async def enable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
@@ -2313,7 +2375,7 @@ async def enable_link(ctx, link: str):
 
 
 
-@bl_grp.command(name="add", description="Blacklist a link (the bot will block this link)")
+@bl_grp.command(name="add", description="Add a link to your blacklist — always blocked")
 async def disable_link(ctx, link: str):
     await ctx.defer()
     server_id = str(ctx.guild.id)
@@ -2612,9 +2674,12 @@ async def _daily_digest():
             summary = " · ".join(f"**{n}** {a}" for a, n in sorted(totals.items(), key=lambda x: -x[1]))
             top = "\n".join(f"• **{u}** — {n} action(s)"
                              for u, n in sorted(per_user.items(), key=lambda x: -x[1])[:5])
+            from cogs.shared import message_accent as _ma, guild_footer as _gf
             e = brand_embed("📋 Daily moderation digest",
                             f"Last 24 hours: {summary}\n\n**Most active offenders:**\n{top}")
             e.timestamp = discord.utils.utcnow()
+            e.color = _ma(settings)
+            e.set_footer(text=_gf(settings))
             await ch.send(embed=e)
         except Exception:
             continue

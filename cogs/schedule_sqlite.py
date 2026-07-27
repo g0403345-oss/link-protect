@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands, tasks
 
-from .shared import _get_conn, DBRef, get_settings, invalidate
+from .shared import _get_conn, DBRef, get_settings, invalidate, _premium_active_sync
 
 _TZ = ZoneInfo("Europe/Berlin")
 
@@ -86,6 +86,8 @@ class PremiumAutomation(commands.Cog):
         hour = dt.datetime.now(_TZ).hour
         for gid, sc in await asyncio.to_thread(_kv_rows, "schedule:"):
             try:
+                if not await asyncio.to_thread(_premium_active_sync, gid):
+                    continue  # lapsed subscription — automation pauses
                 night = sc.get("night") or {}
                 applied = sc.get("applied")
                 f, t = int(night.get("fromHour", 0)), int(night.get("toHour", 8))

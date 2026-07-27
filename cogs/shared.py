@@ -774,6 +774,22 @@ def render_message(settings: dict, key: str, **vars) -> str:
     return out
 
 
+def guild_footer(settings: dict) -> str:
+    """Premium custom footer, brand footer otherwise."""
+    return ((settings.get("messages") or {}).get("footer_text") or "").strip()[:80] \
+        or "Link Protect • link-protect.com"
+
+
+def _premium_active_sync(guild_id) -> bool:
+    try:
+        row = _get_conn().execute("SELECT value FROM kv WHERE path=?",
+                                  (f"premium:{guild_id}",)).fetchone()
+        d = json.loads(row[0]) if row else {}
+        return bool(d.get("active")) and (not d.get("until") or int(d["until"]) > time.time() - 86400)
+    except Exception:
+        return False
+
+
 def message_accent(settings: dict) -> int:
     """The server's embed accent color (falls back to the brand blurple)."""
     raw = str((settings.get("messages") or {}).get("accent") or "").lstrip("#")
@@ -1368,6 +1384,8 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
     # Premium watchlist: a watched member triggering ANY action alerts the mods
     # immediately and is marked in the log.
     _watch = await asyncio.to_thread(_watchlist_entry_sync, guild_id, user_id)
+    if _watch and not await asyncio.to_thread(_premium_active_sync, guild_id):
+        _watch = None  # lapsed subscription — the watchlist perk pauses
     if _watch:
         await _push_guild_alert(
             guild_id, f"👁 Watchlisted member: {username}",

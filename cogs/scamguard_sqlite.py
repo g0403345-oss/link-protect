@@ -27,7 +27,7 @@ import aiohttp
 import discord
 from discord.ext import commands, tasks
 
-from .shared import (get_settings, is_whitelisted, resolve_channel, extract_urls,
+from .shared import (guild_footer, get_settings, is_whitelisted, resolve_channel, extract_urls,
                      record_blocked, flag_scammer_sync, get_flag_sync,
                      load_flagged_ids_sync, _log_action_sync, DBRef,
                      notify_action_failure)
@@ -388,7 +388,7 @@ class ScamShield(commands.Cog):
                 ),
                 color=discord.Color.red(),
             )
-            embed.set_footer(text="Link Protect · link-protect.com")
+            embed.set_footer(text=guild_footer(settings))
             view = discord.ui.View(timeout=None)
             view.add_item(discord.ui.Button(label="Appeal this decision",
                                             url="https://link-protect.com/appeal"))

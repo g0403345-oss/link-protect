@@ -5598,6 +5598,15 @@ async def mobile_patch_guild(request: Request, guild_id: str, body: PatchBody):
     actor_id = await _require_access(request, guild_id)
     if body.path not in MOBILE_ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
+    # Same premium gates as the web PATCH — the app must not bypass the paywall.
+    _MOBILE_PREMIUM_PATHS = {"messages.accent", "messages.welcome", "messages.leave",
+                             "messages.welcome_channel", "messages.footer_text",
+                             "verify.page.rules", "verify.page.require_accept"}
+    if body.path in _MOBILE_PREMIUM_PATHS and not _is_premium(guild_id):
+        raise HTTPException(status_code=403, detail="This personalization is a Premium feature")
+    if body.path.startswith("messages.") and isinstance(body.value, str) \
+            and len(body.value) > 400 and not _is_premium(guild_id):
+        raise HTTPException(status_code=403, detail="Templates over 400 characters are a Premium feature")
     data = _get_server(guild_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Guild not found")

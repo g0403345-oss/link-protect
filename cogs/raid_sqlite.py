@@ -146,7 +146,7 @@ class RaidProtection(commands.Cog):
         # Timeouts bounced off missing permissions → the admins must know.
         if perm_failed is not None:
             await notify_action_failure(self.bot, guild, settings,
-                                        feature="Raid Shield", action="timeout",
+                                        feature="Raid Protection", action="timeout",
                                         member=perm_failed)
 
         # One alarm embed → log channel if set, else the triggering channel.

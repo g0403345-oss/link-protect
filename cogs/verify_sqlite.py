@@ -39,6 +39,16 @@ class VerifyGate(commands.Cog):
         # Text is admin-customizable (Message Studio: messages.verify_dm).
         try:
             link = f"https://link-protect.com/verify/{member.guild.id}"
+            try:
+                import json as _json
+                from .shared import _get_conn as _vc
+                row = _vc().execute("SELECT value FROM kv WHERE path=?",
+                                    (f"vslugof:{member.guild.id}",)).fetchone()
+                slug = _json.loads(row[0]) if row else None
+                if slug:
+                    link = f"https://link-protect.com/verify/{slug}"
+            except Exception:
+                pass
             embed = discord.Embed(
                 title=f"Verify to unlock {member.guild.name}",
                 description=render_message(settings, "verify_dm", user=member.mention,
