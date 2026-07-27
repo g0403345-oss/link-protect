@@ -30,6 +30,13 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 9,
+    title: 'Leaderboard names are stable now',
+    items: [
+      'Voter names on the leaderboard and supporter wall no longer fall back to “User …1234” when a single Discord lookup times out — resolved names are cached for an hour and a stale name always beats no name.',
+    ],
+  },
+  {
     product: 'bot', date: 'July 25, 2026', ts: d('2026-07-25') + 8, version: '2.6.2',
     title: 'Right-click moderation',
     items: [

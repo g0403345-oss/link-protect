@@ -470,16 +470,29 @@ def _visible_name(name: str | None) -> str | None:
     return None
 
 
+# Resolved names live for an hour; on a FAILED lookup we serve the last good
+# value no matter how old — a stale name beats the "User …1234" fallback that
+# used to litter the leaderboard whenever one Discord call timed out.
+_name_cache: dict[str, tuple[float, dict]] = {}
+_NAME_TTL = 3600.0
+
+
 async def _resolve_users(ids: list) -> list:
-    """Best-effort {id, username, avatar} for each user id (for the team UI)."""
+    """Best-effort {id, username, avatar} for each user id (cached)."""
     out = []
     if not ids:
         return out
     if not BOT_TOKEN:
         return [{"id": str(i), "username": None, "avatar": None} for i in ids]
+    now = time.monotonic()
     async with httpx.AsyncClient() as client:
         for i in list(ids)[:50]:
-            info = {"id": str(i), "username": None, "avatar": None}
+            key = str(i)
+            cached = _name_cache.get(key)
+            if cached and now - cached[0] < _NAME_TTL:
+                out.append(dict(cached[1]))
+                continue
+            info = {"id": key, "username": None, "avatar": None}
             try:
                 r = await client.get(f"{DISCORD_API}/users/{i}",
                                      headers={"Authorization": f"Bot {BOT_TOKEN}"}, timeout=5)
@@ -492,6 +505,10 @@ async def _resolve_users(ids: list) -> list:
                     info["avatar"] = u.get("avatar")
             except Exception:
                 pass
+            if info["username"] is not None:
+                _name_cache[key] = (now, dict(info))
+            elif cached:
+                info = dict(cached[1])  # lookup failed → keep the stale name
             out.append(info)
     return out
 
