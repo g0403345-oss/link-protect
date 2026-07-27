@@ -7,22 +7,28 @@
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Gem, ArrowRight, Settings2, ChevronDown, ShieldCheck, Palette, MessageSquare,
-  Sparkles, Image as ImageIcon, Link2, Eye, Moon, Undo2, ArrowLeftRight, Zap,
-} from 'lucide-react';
+import { Gem, ArrowRight, Settings2, ChevronDown, ShieldCheck } from 'lucide-react';
 
-const PERK_TILES = [
-  { icon: Palette, title: 'Embed color', sub: 'Every bot message in your color' },
-  { icon: MessageSquare, title: 'Long templates', sub: 'Up to 1,500 characters' },
-  { icon: Sparkles, title: 'White-label verify', sub: 'No Link Protect branding' },
-  { icon: ImageIcon, title: 'Your logo', sub: 'On the verification page' },
-  { icon: Link2, title: 'Vanity link', sub: '/verify/your-server' },
-  { icon: Eye, title: 'Watchlist', sub: 'Observe members, instant alerts' },
-  { icon: Moon, title: 'Automation', sub: 'Night schedule & event mode' },
-  { icon: Undo2, title: 'One-click undo', sub: 'Fix false positives instantly' },
-  { icon: ArrowLeftRight, title: 'Server sync', sub: 'Copy settings to 25 servers' },
-  { icon: Zap, title: 'API Pro', sub: '10× rate · 20 keys · 10 webhooks' },
+const PERK_GROUPS: { title: string; items: string[] }[] = [
+  { title: 'Personalize', items: [
+    'Embed color & custom footer',
+    'Welcome & leave messages',
+    'Templates up to 1,500 characters',
+    'Verify page: your logo & rules gate',
+    'Vanity link — /verify/your-server',
+    'White-label (no Link Protect branding)',
+  ]},
+  { title: 'Moderate', items: [
+    'Watchlist with instant alerts',
+    'Night schedule & event mode',
+    'One-click false-positive undo',
+    'Sync settings to 25 servers',
+  ]},
+  { title: 'Develop', items: [
+    '600 API requests/min (10×)',
+    '20 API keys · 10 webhooks',
+    'Priority for new features',
+  ]},
 ];
 
 export default function PremiumCard({ guildId, onToast, onNavigate }: {
@@ -118,17 +124,19 @@ export default function PremiumCard({ guildId, onToast, onNavigate }: {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-            {PERK_TILES.map((pk) => (
-              <div key={pk.title} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '11px 12px', borderRadius: 10, background: '#141416', border: '1px solid #1e1e22' }}>
-                <span style={{ display: 'inline-flex', width: 28, height: 28, borderRadius: 8, background: 'rgba(88,101,242,0.1)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <pk.icon size={14} color="#96a4ff" />
-                </span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#f2f3f5' }}>{pk.title}</span>
-                  <span style={{ display: 'block', fontSize: 11.5, color: '#6d6f78', marginTop: 1 }}>{pk.sub}</span>
-                </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '4px 28px' }}>
+            {PERK_GROUPS.map((g) => (
+              <div key={g.title} style={{ paddingTop: 4 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#52535a', marginBottom: 8 }}>{g.title}</div>
+                {g.items.map((it) => (
+                  <div key={it} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '3.5px 0' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#5865f2', flexShrink: 0, marginTop: 6 }} />
+                    <span style={{ fontSize: 12.5, color: '#b5bac1', lineHeight: 1.45 }}>{it}</span>
+                  </div>
+                ))}
               </div>
+            ))}
+          </div>
             ))}
           </div>
 
