@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   UserCheck, RefreshCw, CheckCircle2, XCircle, Copy, Check, Save,
-  ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2, Zap,
+  ShieldCheck, Clock, Search, ChevronDown, ImagePlus, Trash2, Zap, Gem,
 } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
+import PremiumLockNote from '@/components/PremiumLockNote';
 import type { ServerData, VerifyHealth } from '@/lib/db';
 
 interface Role { id: string; name: string; color: number; position: number; }
@@ -62,6 +63,16 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
   const [bgError, setBgError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /* Premium branding: custom logo + vanity slug */
+  const [premium, setPremium] = useState<boolean | null>(null);
+  const [logoVersion, setLogoVersion] = useState<number | null>(null); // null = none
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const [slugSaved, setSlugSaved] = useState<string | null>(null);
+  const [slugDraft, setSlugDraft] = useState('');
+  const [slugBusy, setSlugBusy] = useState(false);
+
   /* one-click role + channel setup */
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupConfirm, setSetupConfirm] = useState(false);
@@ -107,7 +118,15 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       .catch(() => {});
     fetch(`/api/verify/${guildId}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.background) setBgVersion(d.backgroundVersion ?? 1); })
+      .then((d) => {
+        if (d?.background) setBgVersion(d.backgroundVersion ?? 1);
+        if (d?.logo) setLogoVersion(d.logoVersion ?? 1);
+        if (typeof d?.slug === 'string' && d.slug) { setSlugSaved(d.slug); setSlugDraft(d.slug); }
+      })
+      .catch(() => {});
+    fetch(`/api/guild/${guildId}/premium`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setPremium(!!d.active); })
       .catch(() => {});
   }, [guildId]);
 
@@ -151,6 +170,76 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       if (res.ok) setBgVersion(null);
     } catch { /* ignore */ }
     finally { setBgBusy(false); }
+  };
+
+  /** Same client-side pipeline as the background, tuned for a logo:
+   *  max 256px, PNG first (transparency), JPEG fallback, hard cap 512 KB. */
+  const processAndUploadLogo = async (file: File) => {
+    setLogoBusy(true); setLogoError(null);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 256 / bitmap.width, 256 / bitmap.height);
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error();
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      let blob: Blob | null = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+      if (!blob || blob.size > 512_000) {
+        for (const quality of [0.85, 0.7]) {
+          blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
+          if (blob && blob.size <= 512_000) break;
+        }
+      }
+      if (!blob) throw new Error();
+      if (blob.size > 512_000) { setLogoError('Logo is too complex — try a simpler image.'); return; }
+      const res = await fetch(`/api/guild/${guildId}/verify/logo`, { method: 'PUT', body: blob });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 403) { onToast?.('error', 'Premium feature'); return; }
+      if (!res.ok) { setLogoError(d.error ?? 'Upload failed'); return; }
+      setLogoVersion(d.version ?? Date.now());
+      onToast?.('success', 'Logo uploaded');
+    } catch {
+      setLogoError('Couldn’t read that image — use a JPEG, PNG or WebP.');
+    } finally {
+      setLogoBusy(false);
+      if (logoFileRef.current) logoFileRef.current.value = '';
+    }
+  };
+
+  const removeLogo = async () => {
+    setLogoBusy(true);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/verify/logo`, { method: 'DELETE' });
+      if (res.ok) setLogoVersion(null);
+    } catch { /* ignore */ }
+    finally { setLogoBusy(false); }
+  };
+
+  const slugDirty = slugDraft !== (slugSaved ?? '');
+  const slugValid = slugDraft === '' || /^[a-z0-9-]{3,32}$/.test(slugDraft);
+
+  const saveSlug = async () => {
+    if (!slugValid) return;
+    setSlugBusy(true);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/verify/slug`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: slugDraft }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 409) { onToast?.('error', 'That link is already taken — try another'); return; }
+      if (res.status === 403) { onToast?.('error', 'Premium feature'); return; }
+      if (!res.ok) { onToast?.('error', d.error ?? 'Could not save the link'); return; }
+      const saved = (d.slug ?? slugDraft) || null;
+      setSlugSaved(saved);
+      setSlugDraft(saved ?? '');
+      onToast?.('success', saved ? 'Vanity link saved' : 'Vanity link removed');
+    } catch { onToast?.('error', 'Could not reach the server'); }
+    finally { setSlugBusy(false); }
   };
 
   const loadHealth = useCallback(() => {
@@ -460,6 +549,80 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
         <p style={{ fontSize: 11.5, color: '#52535a', marginTop: 8 }}>
           New members automatically get this link in a DM — pin it in your rules channel too.
         </p>
+      </Card>
+
+      {/* Premium branding: custom logo + vanity link */}
+      <Card title="Premium Branding 💎">
+        {premium === false ? (
+          <PremiumLockNote text="💎 Your own logo on the verify page and a memorable vanity link — Premium extras. Protection itself stays free." />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Custom logo */}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 6 }}>Custom logo</label>
+              <p style={{ fontSize: 11.5, color: '#52535a', marginBottom: 10, lineHeight: 1.5 }}>
+                Replaces the Discord server icon on your verification page. Automatically resized
+                to max 256px and kept under 512&nbsp;KB — transparent PNGs look best.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                {logoVersion && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/verify/logo/${guildId}?v=${logoVersion}`} alt="Custom logo preview"
+                    style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'contain', background: '#0a0a0c', border: '1px solid #2e2e36', flexShrink: 0 }} />
+                )}
+                <input ref={logoFileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) processAndUploadLogo(f); }} />
+                <button onClick={() => logoFileRef.current?.click()} disabled={logoBusy}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 15px', fontSize: 12.5, fontWeight: 600, color: '#f2f3f5', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', opacity: logoBusy ? 0.6 : 1 }}>
+                  {logoBusy ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <ImagePlus size={13} />}
+                  {logoVersion ? 'Replace logo' : 'Upload logo'}
+                </button>
+                {logoVersion && (
+                  <button onClick={removeLogo} disabled={logoBusy}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 13px', fontSize: 12.5, fontWeight: 600, color: '#f23f43', background: 'rgba(242,63,67,0.08)', border: '1px solid rgba(242,63,67,0.3)', borderRadius: 8, cursor: 'pointer' }}>
+                    <Trash2 size={13} /> Remove
+                  </button>
+                )}
+              </div>
+              {logoError && <p style={{ fontSize: 12, color: '#f23f43', marginTop: 8 }}>{logoError}</p>}
+            </div>
+
+            {/* Vanity slug */}
+            <div style={{ paddingTop: 16, borderTop: '1px solid #1e1e22' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 6 }}>Vanity verify link</label>
+              <p style={{ fontSize: 11.5, color: '#52535a', marginBottom: 10, lineHeight: 1.5 }}>
+                A memorable address instead of the server ID — 3–32 characters, lowercase letters,
+                numbers and dashes. Leave it empty to remove the link.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: '#18181b', border: `1px solid ${slugDraft && !slugValid ? '#f23f43' : '#2e2e36'}`, borderRadius: 8, overflow: 'hidden' }}>
+                  <span style={{ padding: '9px 0 9px 12px', fontSize: 12.5, color: '#52535a', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>link-protect.com/verify/</span>
+                  <input value={slugDraft} maxLength={32} placeholder="my-server"
+                    onChange={(e) => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    style={{ width: 130, padding: '9px 12px 9px 2px', fontSize: 12.5, background: 'transparent', border: 'none', color: '#f2f3f5', outline: 'none', fontFamily: 'monospace' }} />
+                </div>
+                {slugDirty && (
+                  <button onClick={saveSlug} disabled={slugBusy || !slugValid}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', fontSize: 12, fontWeight: 600, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', opacity: slugBusy || !slugValid ? 0.5 : 1 }}>
+                    {slugBusy ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
+                  </button>
+                )}
+              </div>
+              {slugDraft !== '' && !slugValid && (
+                <p style={{ fontSize: 11.5, color: '#f23f43', marginTop: 8 }}>3–32 characters: a–z, 0–9 and dashes.</p>
+              )}
+              {slugSaved && !slugDirty && (
+                <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#23a55a', marginTop: 10 }}>
+                  <Gem size={12} /> Live at{' '}
+                  <a href={`https://link-protect.com/verify/${slugSaved}`} target="_blank" rel="noreferrer"
+                    style={{ color: '#96a4ff', fontFamily: 'monospace', textDecoration: 'none' }}>
+                    link-protect.com/verify/{slugSaved}
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

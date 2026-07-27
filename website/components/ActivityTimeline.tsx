@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Activity } from 'lucide-react';
+import { ChevronDown, Activity, Undo2, RefreshCw } from 'lucide-react';
 import EmptyState from '@/components/EmptyState';
 
 export interface TimelineAction {
@@ -32,6 +32,13 @@ function relTime(ts: number): string {
   return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** First domain-looking token in a warn reason (e.g. "blocked link: scam.gg/x")
+ *  — offered for allowlisting alongside the undo. */
+function extractDomain(reason: string): string | null {
+  const m = reason.match(/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
 function dayLabel(ts: number): string {
   const d = new Date(ts * 1000);
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -41,14 +48,38 @@ function dayLabel(ts: number): string {
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-export default function ActivityTimeline({ guildId, actions, onNavigate }: {
+export default function ActivityTimeline({ guildId, actions, onNavigate, onToast, onChanged }: {
   guildId: string;
   actions: TimelineAction[];
   onNavigate: (section: string) => void;
+  onToast?: (type: 'success' | 'error', message: string) => void;
+  onChanged?: () => void;
 }) {
   const [filter, setFilter] = useState<string>('all');
   const [open, setOpen] = useState<number | null>(null);
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
+  const [undoBusy, setUndoBusy] = useState(false);
+  const [allowDomain, setAllowDomain] = useState(false);
+
+  // Review-Undo (Premium): revert a false-positive warning straight from the log.
+  const undo = async (a: TimelineAction, domain: string | null) => {
+    setUndoBusy(true);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/actions/undo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: a.user_id, ...(allowDomain && domain ? { domain } : {}) }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 403) { onToast?.('error', 'Premium feature'); return; }
+      if (!res.ok) { onToast?.('error', d.error ?? 'Undo failed'); return; }
+      onToast?.('success',
+        `Warning removed — ${d.warnings ?? 0} left${d.allowlisted && domain ? ` · ${domain} allowlisted` : ''}`);
+      setOpen(null);
+      onChanged?.();
+    } catch { onToast?.('error', 'Could not reach the server'); }
+    finally { setUndoBusy(false); }
+  };
 
   // Resolve avatars for the users on screen — one batched request.
   useEffect(() => {
@@ -133,7 +164,7 @@ export default function ActivityTimeline({ guildId, actions, onNavigate }: {
                 return (
                   <div key={idx} className="log-row"
                     style={{ borderRadius: 9, background: isOpen ? 'rgba(88,101,242,0.05)' : 'transparent', border: `1px solid ${isOpen ? '#2e2e36' : 'transparent'}`, transition: 'all 0.15s' }}>
-                    <button onClick={() => setOpen(isOpen ? null : idx)}
+                    <button onClick={() => { setOpen(isOpen ? null : idx); setAllowDomain(false); }}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                       {av ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -152,16 +183,35 @@ export default function ActivityTimeline({ guildId, actions, onNavigate }: {
                       <span style={{ fontSize: 11, color: '#52535a', flexShrink: 0 }}>{relTime(a.timestamp)}</span>
                       <ChevronDown size={13} color="#52535a" style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                     </button>
-                    {isOpen && (
-                      <div style={{ padding: '2px 12px 11px 46px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        <div style={{ fontSize: 12.5, color: '#b5bac1', lineHeight: 1.55 }}>{a.reason}</div>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: '#6d6f78' }}>
-                          <span>Warning <b style={{ color: meta.color }}>#{a.warn_count}</b></span>
-                          {a.channel_id !== '0' && <span style={{ fontFamily: 'monospace' }}>channel …{a.channel_id.slice(-4)}</span>}
-                          <span>{new Date(a.timestamp * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    {isOpen && (() => {
+                      const domain = a.action === 'warned' ? extractDomain(a.reason) : null;
+                      return (
+                        <div style={{ padding: '2px 12px 11px 46px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ fontSize: 12.5, color: '#b5bac1', lineHeight: 1.55 }}>{a.reason}</div>
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: '#6d6f78' }}>
+                            <span>Warning <b style={{ color: meta.color }}>#{a.warn_count}</b></span>
+                            {a.channel_id !== '0' && <span style={{ fontFamily: 'monospace' }}>channel …{a.channel_id.slice(-4)}</span>}
+                            <span>{new Date(a.timestamp * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          {a.action === 'warned' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
+                              <button onClick={() => undo(a, domain)} disabled={undoBusy}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: 0, fontSize: 11.5, fontWeight: 600, color: '#23a55a', background: 'none', border: 'none', cursor: 'pointer', opacity: undoBusy ? 0.5 : 1 }}>
+                                {undoBusy ? <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Undo2 size={11} />}
+                                False positive? Undo
+                              </button>
+                              {domain && (
+                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6d6f78', cursor: 'pointer', userSelect: 'none' }}>
+                                  <input type="checkbox" checked={allowDomain} onChange={(e) => setAllowDomain(e.target.checked)}
+                                    style={{ accentColor: '#23a55a', width: 12, height: 12, cursor: 'pointer' }} />
+                                  also allow <span style={{ fontFamily: 'monospace', color: '#949ba4' }}>{domain}</span>
+                                </label>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })}

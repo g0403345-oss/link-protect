@@ -90,7 +90,12 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
 
         {(phase === 'ready' || phase === 'verifying' || phase === 'failed') && cfg && (
           <>
-            {cfg.icon ? (
+            {cfg.logo ? (
+              // Premium branding: the server's own logo replaces the guild icon.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/api/verify/logo/${cfg.guildId}?v=${cfg.logoVersion ?? 1}`} alt=""
+                style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 14px', display: 'block', objectFit: 'contain' }} />
+            ) : cfg.icon ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={`https://cdn.discordapp.com/icons/${cfg.guildId}/${cfg.icon}.webp?size=128`} alt=""
                 style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 14px', display: 'block', border: '2px solid rgba(255,255,255,0.08)' }} />
@@ -150,7 +155,7 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24, paddingTop: 16, borderTop: '1px solid #1e1e22' }}>
           <Image src="/logo.webp" alt="" width={16} height={16} style={{ borderRadius: 4 }} />
-          {!(cfg as { premium?: boolean } | null)?.premium && (
+          {!cfg?.premium && (
             <span style={{ fontSize: 11, color: '#52535a' }}>Protected by <a href="https://link-protect.com" style={{ color: '#6d6f78', textDecoration: 'none', fontWeight: 600 }}>Link Protect</a></span>
           )}
         </div>

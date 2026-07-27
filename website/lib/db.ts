@@ -283,6 +283,12 @@ export interface VerifyPublicConfig {
   page: { headline: string; message: string; accent: string };
   background: boolean;
   backgroundVersion: number;
+  /** Premium branding: custom logo shown instead of the guild icon. */
+  logo?: boolean;
+  logoVersion?: number;
+  /** Premium vanity slug — link-protect.com/verify/<slug>. */
+  slug?: string | null;
+  premium?: boolean;
 }
 
 export async function getVerifyPublic(guildId: string): Promise<VerifyPublicConfig> {

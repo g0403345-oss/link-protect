@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { Search, RefreshCw, Plus, Settings, ExternalLink, Shield, Flame, LayoutList, LayoutGrid, TrendingUp } from 'lucide-react';
+import { Search, RefreshCw, Plus, Settings, ExternalLink, Shield, Flame, LayoutList, LayoutGrid, TrendingUp, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import SyncModal, { type SyncServer } from '@/components/SyncModal';
 import type { EnrichedGuild } from '@/app/api/guilds/route';
 import type { GuildOverviewEntry } from '@/lib/db';
 import { BOT_INVITE } from '@/lib/discord';
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
   const [overview, setOverview] = useState<Record<string, GuildOverviewEntry>>({});
   const [view, setView] = useState<ViewMode>('list');
+  const [syncOpen, setSyncOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -117,6 +119,15 @@ export default function DashboardPage() {
   const botServers = filtered.filter((g) => g.botPresent);
   const otherServers = filtered.filter((g) => !g.botPresent);
 
+  // Sync modal input: every bot-installed server (unfiltered — searching must
+  // not shrink the choices), Premium flag from the overview batch.
+  const syncServers: SyncServer[] = useMemo(
+    () => guilds.filter((g) => g.botPresent).map((g) => ({
+      id: g.id, name: g.name, iconUrl: g.iconUrl, premium: !!overview[g.id]?.premium,
+    })),
+    [guilds, overview]
+  );
+
   // Aggregate across every protected server (unfiltered — the summary should
   // not change while searching).
   const totals = useMemo(() => {
@@ -189,6 +200,14 @@ export default function DashboardPage() {
                   </button>
                 ))}
               </div>
+              {syncServers.length >= 2 && (
+                <button onClick={() => setSyncOpen(true)} title="Copy settings from one server to others"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; (e.currentTarget as HTMLElement).style.borderColor = '#5865f2'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#949ba4'; (e.currentTarget as HTMLElement).style.borderColor = '#2e2e36'; }}>
+                  <ArrowLeftRight size={13} /> Sync settings
+                </button>
+              )}
               <button onClick={() => fetchGuilds()} disabled={loadState === 'loading'}
                 style={{ width: 36, height: 36, borderRadius: 8, background: '#18181b', border: '1px solid #2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <RefreshCw size={14} color="#6d6f78" style={{ animation: loadState === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
@@ -306,6 +325,8 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <SyncModal open={syncOpen} servers={syncServers} onClose={() => setSyncOpen(false)} />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }

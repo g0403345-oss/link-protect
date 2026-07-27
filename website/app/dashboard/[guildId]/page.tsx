@@ -36,6 +36,9 @@ import PulseStrip from '@/components/PulseStrip';
 import BlockerWall from '@/components/BlockerWall';
 import ActivityTimeline from '@/components/ActivityTimeline';
 import EmptyState from '@/components/EmptyState';
+import WatchlistCard from '@/components/WatchlistCard';
+import AutomationCard from '@/components/AutomationCard';
+import WeeklyReportCard from '@/components/WeeklyReportCard';
 
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
@@ -675,6 +678,9 @@ export default function GuildDashboard() {
                       onToggle={(key, v, label) => patch(`protect.${key}`, v, label)}
                     />
                   </Card>
+                  <Card title="Automation 🌙">
+                    <AutomationCard guildId={guildId} onToast={addToast} />
+                  </Card>
                   <Card title="Silent Mode" tourId="silent">
                     <ToggleSwitch
                       checked={!!data.silent}
@@ -928,6 +934,9 @@ export default function GuildDashboard() {
                     </p>
                     <MemberModeration guildId={guildId} onToast={addToast} onChanged={() => { fetchData(); fetchStats(); }} />
                   </Card>
+                  <Card title="Watchlist 👁">
+                    <WatchlistCard guildId={guildId} onToast={addToast} />
+                  </Card>
                 </div>
               )}
 
@@ -1080,6 +1089,9 @@ export default function GuildDashboard() {
                         <StatCard label="Ban threshold" value={stats.banThreshold} icon={Ban} color="#f23f43" />
                       </div>
                       <TrendsChart guildId={guildId} />
+                      <Card title="Weekly report 📊">
+                        <WeeklyReportCard guildId={guildId} />
+                      </Card>
                       <Card title="Top Warned Users">
                         {stats.topWarned.length === 0 ? (
                           <div style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -1134,7 +1146,7 @@ export default function GuildDashboard() {
                     digest={!!data.log?.digest}
                   />
                   <Card title={`Recent Actions (${actions.length})`} tourId="log">
-                    <ActivityTimeline guildId={guildId} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
+                    <ActivityTimeline guildId={guildId} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} onToast={addToast} onChanged={fetchActions} />
                   </Card>
                 </div>
               )}

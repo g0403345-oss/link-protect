@@ -30,6 +30,19 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 5,
+    title: 'Premium wave 3 — six new extras (protection stays free)',
+    items: [
+      'Weekly report: totals with week-over-week deltas, top offenders and reasons, a per-day chart — printable as PDF, plus a Sunday summary embed in your log channel.',
+      'Watchlist: put suspicious members under observation for 3-30 days — every action they trigger alerts you instantly and is marked 👁 in the log.',
+      'Review & undo: one click on any warning marks it as a false positive — warning removed, domain optionally allowlisted, everything logged.',
+      'Automation: a night schedule that applies Strict/Balanced automatically (and restores your daytime settings), plus a one-tap event mode that blocks all links for 1-6 hours.',
+      'Verify branding: your own logo on the verification page and a vanity link like link-protect.com/verify/your-server.',
+      'Multi-server sync: copy blockers, thresholds, messages and more from one server to up to 25 others in one click.',
+      'And to be crystal clear: every security feature remains free for every server, forever — Premium is personalization and extras, never protection.',
+    ],
+  },
+  {
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 4,
     title: 'Link Protect Premium 💎',
     items: [
