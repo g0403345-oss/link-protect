@@ -191,6 +191,7 @@ export interface GuildOverviewEntry {
   last7: number[];
   today: number;
   known: boolean;
+  premium?: boolean;
 }
 
 export async function getGuildsOverview(ids: string[]): Promise<{ guilds: Record<string, GuildOverviewEntry> }> {

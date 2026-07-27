@@ -339,6 +339,7 @@ function GuildRow({ guild, index, stats }: { guild: EnrichedGuild; index: number
               it squeezed names down to one letter on 3-column layouts. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{guild.name}</span>
+            {stats?.premium && <span title="Link Protect Premium" style={{ fontSize: 10, fontWeight: 700, color: '#96a4ff', background: 'rgba(88,101,242,0.14)', border: '1px solid rgba(88,101,242,0.3)', padding: '1px 6px', borderRadius: 99, flexShrink: 0 }}>💎 Premium</span>}
             {guild.owner && <span style={{ fontSize: 10, fontWeight: 600, color: '#f0b232', background: 'rgba(240,178,50,0.12)', padding: '1px 6px', borderRadius: 99, flexShrink: 0 }}>Owner</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -398,7 +399,7 @@ function GuildPoster({ guild, index, stats }: { guild: EnrichedGuild; index: num
             t.parentElement?.insertBefore(d, t);
           }} />
         <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: '#f2f3f5', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {guild.name}
+          {guild.name}{stats?.premium ? ' 💎' : ''}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: guild.botPresent ? '#23a55a' : '#949ba4', background: guild.botPresent ? 'rgba(35,165,90,0.14)' : 'rgba(148,155,164,0.1)', padding: '2px 8px', borderRadius: 99 }}>

@@ -3624,7 +3624,8 @@ async def guilds_overview(request: Request, body: OverviewBody):
                     wu += 1
             ab = sum(1 for v in (data.get("protect") or {}).values() if v)
         out[gid] = {"totalWarnings": tw, "warnedUsers": wu, "activeBlockers": ab,
-                    "last7": per[gid], "today": today[gid], "known": data is not None}
+                    "last7": per[gid], "today": today[gid], "known": data is not None,
+                    "premium": _is_premium(str(gid))}
     return {"guilds": out}
 
 
