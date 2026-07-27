@@ -150,7 +150,9 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24, paddingTop: 16, borderTop: '1px solid #1e1e22' }}>
           <Image src="/logo.webp" alt="" width={16} height={16} style={{ borderRadius: 4 }} />
-          <span style={{ fontSize: 11, color: '#52535a' }}>Protected by <a href="https://link-protect.com" style={{ color: '#6d6f78', textDecoration: 'none', fontWeight: 600 }}>Link Protect</a></span>
+          {!(cfg as { premium?: boolean } | null)?.premium && (
+            <span style={{ fontSize: 11, color: '#52535a' }}>Protected by <a href="https://link-protect.com" style={{ color: '#6d6f78', textDecoration: 'none', fontWeight: 600 }}>Link Protect</a></span>
+          )}
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

@@ -81,7 +81,8 @@ const SAMPLE: Record<string, string> = {
 };
 
 const DEFAULT_ACCENT = '#5B6CFF';
-const MAX_LEN = 400;
+const FREE_LEN = 400;
+const PREMIUM_LEN = 1500;
 
 function substitute(tpl: string): string {
   let out = tpl;
@@ -134,7 +135,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
     return init;
   });
   const setDraft = (key: TemplateKey, value: string) =>
-    setDrafts((prev) => ({ ...prev, [key]: value.slice(0, MAX_LEN) }));
+    setDrafts((prev) => ({ ...prev, [key]: value.slice(0, maxLen) }));
 
   const [previewKey, setPreviewKey] = useState<TemplateKey>('warn_channel');
   const [testBusy, setTestBusy] = useState(false);
@@ -155,6 +156,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
     return () => { alive = false; };
   }, [guildId]);
   useEffect(() => { setAccentDraft(savedAccent); }, [savedAccent]);
+  const maxLen = premium ? PREMIUM_LEN : FREE_LEN;
   const previewAccent = premium && HEX_RE.test(accentDraft) ? accentDraft : (premium ? savedAccent : DEFAULT_ACCENT);
 
   const insertVar = (key: TemplateKey, token: string) => {
@@ -167,7 +169,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
     setDraft(key, cur.slice(0, start) + token + cur.slice(end));
     requestAnimationFrame(() => {
       el.focus();
-      const pos = Math.min(start + token.length, MAX_LEN);
+      const pos = Math.min(start + token.length, maxLen);
       el.setSelectionRange(pos, pos);
     });
   };
@@ -175,7 +177,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   const applyPreset = (values: Record<TemplateKey, string>) => {
     setDrafts((prev) => {
       const next = { ...prev };
-      for (const f of FIELDS) next[f.key] = values[f.key].slice(0, MAX_LEN);
+      for (const f of FIELDS) next[f.key] = values[f.key].slice(0, maxLen);
       return next;
     });
   };
@@ -275,7 +277,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                     className="discord-input"
                     value={draft}
                     rows={draft.split('\n').length > 2 ? Math.min(6, draft.split('\n').length) : 2}
-                    maxLength={MAX_LEN}
+                    maxLength={maxLen}
                     onChange={(e) => { setDraft(f.key, e.target.value); setPreviewKey(f.key); }}
                     onFocus={() => setPreviewKey(f.key)}
                     style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 56, borderColor: dirty ? '#f0b232' : undefined }}
@@ -284,14 +286,14 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                     {f.vars.map((v) => (
                       <button key={v} onClick={() => insertVar(f.key, v)} title={`Insert ${v}`} style={chip}>{v}</button>
                     ))}
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: draft.length >= MAX_LEN ? '#f23f43' : '#52535a', fontVariantNumeric: 'tabular-nums' }}>
-                      {draft.length}/{MAX_LEN}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: draft.length >= maxLen ? '#f23f43' : '#52535a', fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.length}/{maxLen}
                     </span>
                   </div>
                   {(dirty || hasCustom) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9 }}>
                       {dirty && (
-                        <button onClick={() => patch(path, draft.slice(0, MAX_LEN), f.label)} disabled={busy}
+                        <button onClick={() => patch(path, draft.slice(0, maxLen), f.label)} disabled={busy}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
                           {busy ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
                         </button>

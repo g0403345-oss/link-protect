@@ -63,9 +63,14 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
   onNavigate: (section: string) => void;
 }) {
   const [lockdown, setLockdown] = useState(false);
+  const [premium, setPremium] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    fetch(`/api/guild/${guildId}/premium`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setPremium(!!d.active); })
+      .catch(() => {});
     fetch(`/api/guild/${guildId}/lockdown`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (alive && d) setLockdown(!!d.active); })
@@ -127,6 +132,7 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
           <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', color: '#f2f3f5', lineHeight: 1.15, marginBottom: 8 }}>{name}</h1>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
             {chip(<><MoodIcon size={12} /> {moodLabel}</>, mood)}
+            {premium && chip(<>💎 Premium</>, '#96a4ff')}
             {actions[0] && chip(<>Last action {relTime(actions[0].timestamp)}</>, '#949ba4')}
           </div>
           {/* One clear next step — everything else lives in its own tab */}

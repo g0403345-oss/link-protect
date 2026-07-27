@@ -2691,6 +2691,10 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
     if body.path == "messages.accent" and not _is_premium(guild_id):
         raise HTTPException(status_code=403, detail="Custom embed colors are a Premium feature")
+    if body.path.startswith("messages.") and isinstance(body.value, str) \
+            and len(body.value) > 400 and not _is_premium(guild_id):
+        raise HTTPException(status_code=403,
+                            detail="Templates over 400 characters are a Premium feature")
 
     data = _get_server(guild_id)
     if data is None:
@@ -3788,7 +3792,7 @@ _MESSAGE_DEFAULTS = {
 
 def _render_guild_message(data: dict, key: str, **vars) -> str:
     tpl = ((data.get("messages") or {}).get(key) or "").strip() or _MESSAGE_DEFAULTS.get(key, "")
-    out = tpl[:700]
+    out = tpl[:1500]
     for name, val in vars.items():
         if val is not None:
             out = out.replace("{" + name + "}", str(val))
@@ -4161,7 +4165,8 @@ async def verify_public(request: Request, guild_id: str):
             "name": info.get("name"), "icon": info.get("icon"),
             "minAccountAgeDays": cfg["min_account_age_days"],
             "page": cfg["page"],
-            "background": has_bg, "backgroundVersion": bg_ver}
+            "background": has_bg, "backgroundVersion": bg_ver,
+            "premium": _is_premium(str(guild_id))}
 
 
 class VerifyCompleteBody(BaseModel):

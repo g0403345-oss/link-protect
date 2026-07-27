@@ -749,7 +749,7 @@ def render_message(settings: dict, key: str, **vars) -> str:
     """Fill a message template. Unknown {tokens} stay literal, custom templates
     are capped at 700 chars so nobody can turn the bot into a spam cannon."""
     tpl = ((settings.get("messages") or {}).get(key) or "").strip() or DEFAULT_MESSAGES.get(key, "")
-    tpl = tpl[:700]
+    tpl = tpl[:1500]
     out = tpl
     for name in _TEMPLATE_VARS:
         if name in vars and vars[name] is not None:

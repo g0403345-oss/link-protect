@@ -11,9 +11,10 @@ import { Gem, ArrowRight, Settings2 } from 'lucide-react';
 
 const PERKS = [
   'Custom embed color for every bot message',
+  'Message templates up to 1,500 characters',
+  'White-label verify page (no “Protected by” line)',
   '10× API rate limit · 20 keys · 10 webhooks',
-  'Premium badge on your dashboard',
-  'More perks landing every release — locked to this price',
+  '💎 badge — and more perks every release, locked to this price',
 ];
 
 export default function PremiumCard({ guildId, onToast }: {

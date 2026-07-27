@@ -33,7 +33,7 @@ const ENTRIES: Entry[] = [
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 4,
     title: 'Link Protect Premium 💎',
     items: [
-      'Premium per server (3,49 €/month or 29 €/year via Stripe): custom embed accent color for every bot message, 10× API rate limit with 20 keys and 10 webhooks, and a premium badge — with more perks landing every release.',
+      'Premium per server (3,49 €/month or 29 €/year via Stripe): custom embed accent color, message templates up to 1,500 characters, a white-label verify page without the “Protected by” line, 10× API rate limit with 20 keys and 10 webhooks, and a 💎 badge — with more perks landing every release.',
       'Upgrade straight from the server Overview; manage or cancel anytime through the Stripe customer portal. All protection features stay free for everyone, forever.',
     ],
   },
