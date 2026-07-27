@@ -92,7 +92,7 @@ export interface ServerData {
     role_mode?: 'quarantine' | 'verified';
     role_id?: string | null;
     min_account_age_days?: number;
-    page?: { headline?: string; message?: string; accent?: string };
+    page?: { headline?: string; message?: string; accent?: string; rules?: string; require_accept?: boolean };
   };
   overrides?: Record<string, ChannelOverride>;
   /** Message Studio — custom bot message templates. Empty/missing = default text. */
@@ -103,6 +103,14 @@ export interface ServerData {
     action_dm?: string;
     verify_dm?: string;
     lockdown_announce?: string;
+    /** Premium: posted when a member joins — empty/missing = disabled. */
+    welcome?: string;
+    /** Premium: posted when a member leaves — empty/missing = disabled. */
+    leave?: string;
+    /** Premium: channel id (string snowflake) for welcome/leave messages. */
+    welcome_channel?: string;
+    /** Premium: custom footer line on bot embeds (max 80 chars). */
+    footer_text?: string;
     accent?: string;
   };
 }
@@ -280,7 +288,7 @@ export interface VerifyPublicConfig {
   name: string | null;
   icon: string | null;
   minAccountAgeDays: number;
-  page: { headline: string; message: string; accent: string };
+  page: { headline: string; message: string; accent: string; rules?: string; require_accept?: boolean };
   background: boolean;
   backgroundVersion: number;
   /** Premium branding: custom logo shown instead of the guild icon. */

@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, AlertTriangle, Lock, List, BarChart3,
-  ChevronLeft, Save, CheckCircle2, XCircle, RefreshCw,
+  ChevronLeft, ChevronDown, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
   Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck, MessageSquare,
 } from 'lucide-react';
@@ -41,6 +41,7 @@ import AutomationCard from '@/components/AutomationCard';
 
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
+import type { EnrichedGuild } from '@/app/api/guilds/route';
 import Navbar from '@/components/Navbar';
 
 type Section = 'overview' | 'blockers' | 'scamshield' | 'verification' | 'warnings' | 'channelrules' | 'access' | 'messages' | 'blacklist' | 'stats' | 'log' | 'audit' | 'developer';
@@ -71,6 +72,109 @@ function useToast() {
 }
 
 /* ── sub-components ────────────────────────────────────────── */
+
+/** Breadcrumb server switcher — the current server (icon + name) opens a panel
+ *  listing the user's other bot-installed servers for one-click switching.
+ *  Uses the same client source as the /dashboard list page: the sessionStorage
+ *  cache for an instant paint, then a fresh '/api/guilds' fetch. */
+function ServerSwitcher({ guildId, guildInfo }: {
+  guildId: string;
+  guildInfo: { name: string; icon: string | null } | null;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [guilds, setGuilds] = useState<EnrichedGuild[]>([]);
+  const fetched = useRef(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const load = useCallback(() => {
+    if (fetched.current) return;
+    fetched.current = true;
+    try {
+      const cached = sessionStorage.getItem('lp_guilds_v1');
+      if (cached) setGuilds(JSON.parse(cached) as EnrichedGuild[]);
+    } catch { /* ignore */ }
+    fetch('/api/guilds')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: EnrichedGuild[] | null) => {
+        if (Array.isArray(d)) {
+          setGuilds(d);
+          try { sessionStorage.setItem('lp_guilds_v1', JSON.stringify(d)); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => { /* cache (if any) still shows */ });
+  }, []);
+
+  const others = guilds.filter((g) => g.botPresent && g.id !== guildId);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => { load(); setOpen((o) => !o); }} title="Switch server"
+        aria-haspopup="listbox" aria-expanded={open}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 8px', margin: '-4px -8px', background: open ? '#18181b' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', transition: 'background 0.12s' }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = '#18181b')}
+        onMouseLeave={(e) => { if (!open) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        {guildInfo?.icon ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`https://cdn.discordapp.com/icons/${guildId}/${guildInfo.icon}.webp?size=32`} alt=""
+            style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: 20, height: 20, borderRadius: 6, background: '#5865f2', flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>
+          {guildInfo?.name ?? 'Server Settings'}
+        </span>
+        <ChevronDown size={13} color="#52535a" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, width: 260, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 10, zIndex: 60, overflow: 'hidden', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+          <div style={{ padding: '8px 12px 6px', fontSize: 10.5, fontWeight: 800, color: '#494a52', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+            Switch server
+          </div>
+          <div style={{ maxHeight: 240, overflowY: 'auto', paddingBottom: 4 }}>
+            {others.map((g) => (
+              <button key={g.id} onClick={() => { setOpen(false); router.push(`/dashboard/${g.id}`); }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 12px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = '#232329')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.iconUrl} alt="" style={{ width: 22, height: 22, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                  onError={(e) => {
+                    const t = e.currentTarget; t.style.display = 'none';
+                    const d = document.createElement('div');
+                    d.style.cssText = 'width:22px;height:22px;border-radius:6px;background:#5865f2;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0';
+                    d.textContent = (g.name[0] ?? '?').toUpperCase();
+                    t.parentElement?.insertBefore(d, t);
+                  }} />
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#f2f3f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
+              </button>
+            ))}
+            {others.length === 0 && (
+              <p style={{ padding: '8px 12px 10px', fontSize: 12, color: '#52535a' }}>
+                {guilds.length === 0 ? 'Loading servers…' : 'No other servers with Link Protect'}
+              </p>
+            )}
+          </div>
+          <Link href="/dashboard" onClick={() => setOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', fontSize: 12.5, fontWeight: 600, color: '#96a4ff', textDecoration: 'none', borderTop: '1px solid #2e2e36', background: 'transparent', transition: 'background 0.12s' }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = '#232329')}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
+            All servers <span aria-hidden>→</span>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Card({ title, children, tourId }: { title: string; children: React.ReactNode; tourId?: string }) {
   return (
@@ -422,7 +526,12 @@ export default function GuildDashboard() {
     setSaving(path);
     try {
       const res = await fetch(`/api/guild/${guildId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, value }) });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // Surface the server's reason (e.g. "Premium feature" on gated paths)
+        // instead of a generic failure message.
+        const d = await res.json().catch(() => ({} as { error?: string }));
+        throw new Error(typeof d?.error === 'string' && d.error ? d.error : 'Failed to save');
+      }
       setData((prev) => {
         if (!prev) return prev;
         const u = JSON.parse(JSON.stringify(prev)) as ServerData;
@@ -439,7 +548,7 @@ export default function GuildDashboard() {
         return u;
       });
       addToast('success', label ? `${label} saved` : 'Saved');
-    } catch { addToast('error', 'Failed to save'); }
+    } catch (e) { addToast('error', e instanceof Error && e.message ? e.message : 'Failed to save'); }
     finally { setSaving(null); }
   }, [guildId, addToast]);
 
@@ -536,18 +645,7 @@ export default function GuildDashboard() {
           <ChevronLeft size={13} /> All servers
         </Link>
         <span style={{ color: '#2e2e36' }}>/</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          {guildInfo?.icon ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={`https://cdn.discordapp.com/icons/${guildId}/${guildInfo.icon}.webp?size=32`} alt=""
-              style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0 }} />
-          ) : (
-            <div style={{ width: 20, height: 20, borderRadius: 6, background: '#5865f2', flexShrink: 0 }} />
-          )}
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>
-            {guildInfo?.name ?? 'Server Settings'}
-          </span>
-        </div>
+        <ServerSwitcher guildId={guildId} guildInfo={guildInfo} />
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div data-tour="lockdown"><LockdownControl guildId={guildId} onToast={addToast} /></div>
           <ReportForm guildId={guildId} />

@@ -2686,11 +2686,17 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
         "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
         "messages.accent",  # premium-gated below
+        "messages.welcome", "messages.leave", "messages.welcome_channel",
+        "messages.footer_text",
+        "verify.page.rules", "verify.page.require_accept",
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
-    if body.path == "messages.accent" and not _is_premium(guild_id):
-        raise HTTPException(status_code=403, detail="Custom embed colors are a Premium feature")
+    _PREMIUM_PATHS = {"messages.accent", "messages.welcome", "messages.leave",
+                      "messages.welcome_channel", "messages.footer_text",
+                      "verify.page.rules", "verify.page.require_accept"}
+    if body.path in _PREMIUM_PATHS and not _is_premium(guild_id):
+        raise HTTPException(status_code=403, detail="This personalization is a Premium feature")
     if body.path.startswith("messages.") and isinstance(body.value, str) \
             and len(body.value) > 400 and not _is_premium(guild_id):
         raise HTTPException(status_code=403,
@@ -3705,7 +3711,9 @@ def _verify_cfg(data: dict | None) -> dict:
         "min_account_age_days": int(v.get("min_account_age_days") or 0),
         "page": {"headline": str(page["headline"])[:80] or _VERIFY_DEFAULT_PAGE["headline"],
                  "message": str(page["message"])[:400] or _VERIFY_DEFAULT_PAGE["message"],
-                 "accent": accent},
+                 "accent": accent,
+                 "rules": str(page.get("rules") or "")[:1500],
+                 "require_accept": bool(page.get("require_accept"))},
     }
 
 
@@ -5029,6 +5037,9 @@ MOBILE_ALLOWED_PATHS = {
     "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
     "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
     "messages.accent",
+    "messages.welcome", "messages.leave", "messages.welcome_channel",
+    "messages.footer_text",
+    "verify.page.rules", "verify.page.require_accept",
 }
 
 

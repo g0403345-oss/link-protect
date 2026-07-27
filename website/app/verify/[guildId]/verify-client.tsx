@@ -13,6 +13,9 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
   const [cfg, setCfg] = useState<VerifyPublicConfig | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  /* Premium rules gate: the checkbox state, restored across the OAuth redirect
+     (the page reloads on return, which would otherwise un-tick the box). */
+  const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
     fetch(`/api/verify/${guildId}`)
@@ -25,8 +28,24 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
       .catch(() => setPhase('disabled'));
   }, [guildId]);
 
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(`lp_rules_ok_${guildId}`)) {
+        setAccepted(true);
+        sessionStorage.removeItem(`lp_rules_ok_${guildId}`);
+      }
+    } catch { /* ignore */ }
+  }, [guildId]);
+
+  const rules = (cfg?.page.rules ?? '').trim();
+  const requireAccept = !!cfg?.page.require_accept;
+  const canVerify = !requireAccept || accepted;
+
   const verify = async () => {
+    if (!canVerify) return;
     if (status !== 'authenticated') {
+      // Remember the ticked box across the Discord OAuth round-trip.
+      try { if (requireAccept) sessionStorage.setItem(`lp_rules_ok_${guildId}`, '1'); } catch { /* ignore */ }
       signIn('discord', { callbackUrl: `/verify/${guildId}?auto=1` });
       return;
     }
@@ -121,8 +140,23 @@ export default function VerifyClient({ guildId }: { guildId: string }) {
               </div>
             )}
 
-            <button onClick={verify} disabled={phase === 'verifying'}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginTop: 14, padding: '13px 28px', fontSize: 15, fontWeight: 700, background: accent, color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer', opacity: phase === 'verifying' ? 0.5 : 1, boxShadow: `0 8px 24px ${accent}55` }}>
+            {/* Server rules (Premium rules gate) */}
+            {rules && (
+              <div style={{ margin: '12px 0 0', maxHeight: 180, overflowY: 'auto', textAlign: 'left', padding: '12px 14px', background: '#18181b', border: '1px solid #26262c', borderRadius: 10, fontSize: 12.5, color: '#b5bac1', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {rules}
+              </div>
+            )}
+            {requireAccept && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, textAlign: 'left', cursor: 'pointer', fontSize: 12.5, color: accepted ? '#f2f3f5' : '#949ba4', lineHeight: 1.5, userSelect: 'none' }}>
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)}
+                  style={{ accentColor: accent, width: 15, height: 15, marginTop: 1, flexShrink: 0, cursor: 'pointer' }} />
+                I have read and accept the rules
+              </label>
+            )}
+
+            <button onClick={verify} disabled={phase === 'verifying' || !canVerify}
+              title={!canVerify ? 'Accept the rules first' : undefined}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginTop: 14, padding: '13px 28px', fontSize: 15, fontWeight: 700, background: accent, color: '#fff', border: 'none', borderRadius: 11, cursor: !canVerify ? 'not-allowed' : 'pointer', opacity: phase === 'verifying' || !canVerify ? 0.5 : 1, boxShadow: !canVerify ? 'none' : `0 8px 24px ${accent}55`, transition: 'opacity 0.15s, box-shadow 0.15s' }}>
               {phase === 'verifying'
                 ? <><RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} /> Verifying…</>
                 : <>

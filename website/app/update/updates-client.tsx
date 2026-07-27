@@ -30,6 +30,15 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 6,
+    title: 'Server switcher, Message Studio 2.0 & a rules gate',
+    items: [
+      'Jump between servers right from the breadcrumb — click the server name for a dropdown of all your Link Protect servers.',
+      'Message Studio grew welcome & leave messages (with channel picker), a custom embed footer, and a Deutsch tone preset that fills every template in German (welcome/footer are Premium extras).',
+      'Verify page rules gate (Premium): show your own rules on the verification page and require members to accept them before verifying — survives the Discord login round-trip.',
+    ],
+  },
+  {
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 5,
     title: 'Premium wave 3 — six new extras (protection stays free)',
     items: [

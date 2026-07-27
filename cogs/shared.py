@@ -753,6 +753,9 @@ DEFAULT_MESSAGES = {
     "verify_dm": "Welcome to **{server}**! Verify your account to unlock the server: {link}",
     "lockdown_announce": "🚨 **Emergency lockdown active.** Links are blocked and invites are "
                          "paused while the moderators handle the situation.",
+    # Premium extras — empty default means the feature is off until configured.
+    "welcome": "",
+    "leave": "",
 }
 
 _TEMPLATE_VARS = {"user", "username", "server", "reason", "warnings", "remaining",

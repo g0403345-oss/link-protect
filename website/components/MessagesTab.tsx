@@ -1,13 +1,14 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Heart, Minus, Gavel, RefreshCw, Save, Send, RotateCcw, Info } from 'lucide-react';
+import { Heart, Minus, Gavel, Languages, Gem, RefreshCw, Save, Send, RotateCcw, Info } from 'lucide-react';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
+import PremiumLockNote from '@/components/PremiumLockNote';
 import type { ServerData } from '@/lib/db';
 
 /* ── template model ─────────────────────────────────────────── */
 
-type TemplateKey = 'warn_channel' | 'warn_manual' | 'warn_dm' | 'action_dm' | 'verify_dm' | 'lockdown_announce';
+type TemplateKey = 'warn_channel' | 'warn_manual' | 'warn_dm' | 'action_dm' | 'verify_dm' | 'lockdown_announce' | 'welcome' | 'leave';
 
 const DEFAULTS: Record<TemplateKey, string> = {
   warn_channel: '{user} — your message was removed.\n**Reason:** {reason}',
@@ -16,11 +17,15 @@ const DEFAULTS: Record<TemplateKey, string> = {
   action_dm: 'You were **{action}** on **{server}** after reaching {warnings} warnings.',
   verify_dm: 'Welcome to **{server}**! Verify your account to unlock the server: {link}',
   lockdown_announce: '🚨 **Emergency lockdown active.** Links are blocked and invites are paused while the moderators handle the situation.',
+  // Welcome/leave are opt-in Premium extras: empty = disabled (no default text).
+  welcome: '',
+  leave: '',
 };
 
 const WARN_VARS = ['{user}', '{username}', '{server}', '{reason}', '{warnings}', '{remaining}', '{channel}'];
+const JOIN_VARS = ['{user}', '{username}', '{server}'];
 
-const FIELDS: { key: TemplateKey; label: string; desc: string; short: string; context: string; vars: string[] }[] = [
+const FIELDS: { key: TemplateKey; label: string; desc: string; short: string; context: string; vars: string[]; premium?: boolean }[] = [
   { key: 'warn_channel', label: 'Blocked-link warning', short: 'Blocked link', context: 'Posted in the channel',
     desc: 'Public warning posted in the channel when a link is auto-blocked', vars: WARN_VARS },
   { key: 'warn_manual', label: 'Manual warn announcement', short: 'Manual warn', context: 'Posted in the channel',
@@ -33,6 +38,10 @@ const FIELDS: { key: TemplateKey; label: string; desc: string; short: string; co
     desc: 'The DM with the verification link that new members get on join', vars: ['{user}', '{username}', '{server}', '{link}'] },
   { key: 'lockdown_announce', label: 'Lockdown announcement', short: 'Lockdown', context: 'Posted in the channel',
     desc: 'Posted when the emergency lockdown is activated', vars: ['{server}'] },
+  { key: 'welcome', label: 'Welcome message', short: 'Welcome', context: 'Posted in the welcome channel',
+    desc: 'Posted when a member joins — leave empty to disable', vars: JOIN_VARS, premium: true },
+  { key: 'leave', label: 'Leave message', short: 'Leave', context: 'Posted in the welcome channel',
+    desc: 'Posted when a member leaves', vars: JOIN_VARS, premium: true },
 ];
 
 /* ── tone presets ───────────────────────────────────────────── */
@@ -47,11 +56,17 @@ const PRESETS: { id: string; label: string; desc: string; color: string; icon: t
       action_dm: 'Sorry {username} — you were **{action}** on **{server}** after {warnings} warnings. 💛 If you think this was a mistake, feel free to reach out to the mods.',
       verify_dm: 'Welcome to **{server}**! 🎉 One quick step and you’re in — verify your account here: {link}',
       lockdown_announce: '🚨 Hang tight everyone — **lockdown is active** while the mods handle something. Links and invites are paused, back to normal soon! 💙',
+      welcome: 'Welcome to **{server}**, {user}! 🎉 Great to have you here — make yourself at home!',
+      leave: '**{username}** just left the server. Safe travels! 👋',
     },
   },
   {
     id: 'neutral', label: 'Neutral', desc: 'The clear defaults', color: '#5865f2', icon: Minus,
-    values: { ...DEFAULTS },
+    values: {
+      ...DEFAULTS,
+      welcome: 'Welcome to **{server}**, {user}!',
+      leave: '**{username}** has left the server.',
+    },
   },
   {
     id: 'strict', label: 'Strict', desc: 'Terse and formal, no emoji', color: '#f23f43', icon: Gavel,
@@ -62,6 +77,21 @@ const PRESETS: { id: string; label: string; desc: string; color: string; icon: t
       action_dm: 'You have been **{action}** on **{server}** after {warnings} warnings. This action was automatic.',
       verify_dm: 'You have joined **{server}**. Access requires verification: {link}',
       lockdown_announce: '**Emergency lockdown in effect.** Links are blocked and invites are paused until further notice.',
+      welcome: 'Welcome to **{server}**, {user}. Read the rules before posting.',
+      leave: '**{username}** has left the server.',
+    },
+  },
+  {
+    id: 'deutsch', label: 'Deutsch', desc: 'Alle Vorlagen auf Deutsch', color: '#f0b232', icon: Languages,
+    values: {
+      warn_channel: '{user} — deine Nachricht wurde entfernt.\n**Grund:** {reason}',
+      warn_manual: '{user} wurde von einem Moderator verwarnt.\n**Grund:** {reason}',
+      warn_dm: 'Dein Link auf **{server}** wurde entfernt.\n**Grund:** {reason}',
+      action_dm: 'Du wurdest nach {warnings} Verwarnungen auf **{server}** **{action}**.',
+      verify_dm: 'Willkommen auf **{server}**! Verifiziere dein Konto, um den Server freizuschalten: {link}',
+      lockdown_announce: '🚨 **Notfall-Lockdown aktiv.** Links sind blockiert und Einladungen pausiert, während die Moderatoren die Lage klären.',
+      welcome: 'Willkommen auf **{server}**, {user}! Schön, dass du da bist.',
+      leave: '**{username}** hat den Server verlassen.',
     },
   },
 ];
@@ -80,13 +110,20 @@ const SAMPLE: Record<string, string> = {
   '{link}': 'https://link-protect.com/verify/…',
 };
 
+/* Welcome/leave previews are about a fresh member, not an offender. */
+const JOIN_SAMPLE: Record<string, string> = {
+  '{user}': '@NewMember',
+  '{username}': 'NewMember',
+};
+
 const DEFAULT_ACCENT = '#5B6CFF';
 const FREE_LEN = 400;
 const PREMIUM_LEN = 1500;
 
-function substitute(tpl: string): string {
+function substitute(tpl: string, key?: TemplateKey): string {
+  const map = key === 'welcome' || key === 'leave' ? { ...SAMPLE, ...JOIN_SAMPLE } : SAMPLE;
   let out = tpl;
-  for (const [tok, val] of Object.entries(SAMPLE)) out = out.split(tok).join(val);
+  for (const [tok, val] of Object.entries(map)) out = out.split(tok).join(val);
   return out;
 }
 
@@ -159,6 +196,35 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   const maxLen = premium ? PREMIUM_LEN : FREE_LEN;
   const previewAccent = premium && HEX_RE.test(accentDraft) ? accentDraft : (premium ? savedAccent : DEFAULT_ACCENT);
 
+  /* Embed footer (Premium) — shown on welcome/leave/verify embeds. */
+  const savedFooter = msgs.footer_text ?? '';
+  const [footerDraft, setFooterDraft] = useState(savedFooter);
+  useEffect(() => { setFooterDraft(savedFooter); }, [savedFooter]);
+  const footerDirty = footerDraft !== savedFooter;
+  const DEFAULT_FOOTER = 'Link Protect • link-protect.com';
+
+  /* Welcome channel (Premium) — same source as the warn-log picker. */
+  const [channels, setChannels] = useState<{ id: string; name: string; type: number; position: number }[]>([]);
+  const [channelsLoaded, setChannelsLoaded] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/guild/${guildId}/discord-channels`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive) return;
+        if (d?.channels) setChannels(d.channels as { id: string; name: string; type: number; position: number }[]);
+        setChannelsLoaded(true);
+      })
+      .catch(() => { if (alive) setChannelsLoaded(true); });
+    return () => { alive = false; };
+  }, [guildId]);
+  /** Only channels the bot can post to: text (0) + announcement (5). */
+  const textChannels = channels.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => a.position - b.position);
+  const welcomeChannel = msgs.welcome_channel ?? '';
+
+  /** Premium-only template that can't be edited (or saved) without Premium. */
+  const isLocked = (f: { premium?: boolean }) => !!f.premium && !premium;
+
   const insertVar = (key: TemplateKey, token: string) => {
     const el = taRefs.current[key];
     const cur = drafts[key];
@@ -177,7 +243,8 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   const applyPreset = (values: Record<TemplateKey, string>) => {
     setDrafts((prev) => {
       const next = { ...prev };
-      for (const f of FIELDS) next[f.key] = values[f.key].slice(0, maxLen);
+      // Locked (Premium-only) fields stay untouched — they can't be saved anyway.
+      for (const f of FIELDS) { if (isLocked(f)) continue; next[f.key] = values[f.key].slice(0, maxLen); }
       return next;
     });
   };
@@ -207,7 +274,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   };
 
   const previewField = FIELDS.find((f) => f.key === previewKey) ?? FIELDS[0];
-  const anyDirty = FIELDS.some((f) => drafts[f.key] !== effective(f.key));
+  const anyDirty = FIELDS.some((f) => !isLocked(f) && drafts[f.key] !== effective(f.key));
 
   const chip = {
     padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'monospace',
@@ -255,16 +322,20 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
           {/* 2 · Templates */}
           <Card title="Templates">
             {FIELDS.map((f, i) => {
+              const locked = isLocked(f);
               const draft = drafts[f.key];
-              const dirty = draft !== effective(f.key);
+              const dirty = !locked && draft !== effective(f.key);
               const path = `messages.${f.key}`;
               const busy = saving === path;
               const hasCustom = !!(msgs[f.key] && msgs[f.key]!.trim());
               return (
                 <div key={f.key} style={{ marginTop: i === 0 ? 0 : 16, paddingTop: i === 0 ? 0 : 16, borderTop: i === 0 ? 'none' : '1px solid #1e1e22' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>{f.label}</span>
-                    {hasCustom && !dirty && (
+                    <span style={{ fontSize: 13, fontWeight: 600, color: locked ? '#949ba4' : '#f2f3f5' }}>{f.label}</span>
+                    {f.premium && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#96a4ff', background: 'rgba(88,101,242,0.14)', border: '1px solid rgba(88,101,242,0.3)', padding: '1px 7px', borderRadius: 99 }}>💎 Premium</span>
+                    )}
+                    {hasCustom && !dirty && !locked && (
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#23a55a', background: 'rgba(35,165,90,0.12)', padding: '1px 7px', borderRadius: 99 }}>custom</span>
                     )}
                     {dirty && (
@@ -278,19 +349,26 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                     value={draft}
                     rows={draft.split('\n').length > 2 ? Math.min(6, draft.split('\n').length) : 2}
                     maxLength={maxLen}
+                    disabled={locked}
                     onChange={(e) => { setDraft(f.key, e.target.value); setPreviewKey(f.key); }}
                     onFocus={() => setPreviewKey(f.key)}
-                    style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 56, borderColor: dirty ? '#f0b232' : undefined }}
+                    style={{ fontSize: 13, lineHeight: 1.5, resize: 'vertical', minHeight: 56, borderColor: dirty ? '#f0b232' : undefined, opacity: locked ? 0.55 : 1, cursor: locked ? 'not-allowed' : undefined }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 7 }}>
                     {f.vars.map((v) => (
-                      <button key={v} onClick={() => insertVar(f.key, v)} title={`Insert ${v}`} style={chip}>{v}</button>
+                      <button key={v} onClick={() => insertVar(f.key, v)} title={`Insert ${v}`} disabled={locked}
+                        style={{ ...chip, opacity: locked ? 0.5 : 1, cursor: locked ? 'not-allowed' : 'pointer' }}>{v}</button>
                     ))}
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: draft.length >= maxLen ? '#f23f43' : '#52535a', fontVariantNumeric: 'tabular-nums' }}>
                       {draft.length}/{maxLen}
                     </span>
                   </div>
-                  {(dirty || hasCustom) && (
+                  {locked && (
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#96a4ff', marginTop: 8 }}>
+                      <Gem size={11} style={{ flexShrink: 0 }} /> A Premium extra — upgrade on the Overview tab to unlock it.
+                    </p>
+                  )}
+                  {!locked && (dirty || hasCustom) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9 }}>
                       {dirty && (
                         <button onClick={() => patch(path, draft.slice(0, maxLen), f.label)} disabled={busy}
@@ -313,8 +391,40 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
             })}
           </Card>
 
-          {/* 3 · Embed accent — Premium */}
-          <Card title="Embed accent">
+          {/* 3 · Welcome channel — Premium */}
+          <Card title="Welcome channel">
+            {premium ? (
+              <>
+                <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
+                  Where the welcome and leave messages above are posted.
+                </p>
+                <select
+                  value={welcomeChannel}
+                  disabled={saving === 'messages.welcome_channel' || !channelsLoaded}
+                  onChange={(e) => patch('messages.welcome_channel', e.target.value, 'Welcome channel')}
+                  style={{ width: '100%', maxWidth: 320, padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, color: welcomeChannel ? '#f2f3f5' : '#6d6f78', outline: 'none', fontFamily: 'inherit', cursor: 'pointer', opacity: saving === 'messages.welcome_channel' ? 0.6 : 1 }}>
+                  <option value="">{channelsLoaded ? '— No channel selected —' : 'Loading channels…'}</option>
+                  {textChannels.map((c) => (
+                    <option key={c.id} value={c.id}>#{c.name}</option>
+                  ))}
+                  {/* Keep a saved channel visible even if it no longer exists. */}
+                  {welcomeChannel && !textChannels.some((c) => c.id === welcomeChannel) && channelsLoaded && (
+                    <option value={welcomeChannel}>#…{welcomeChannel.slice(-4)} (deleted?)</option>
+                  )}
+                </select>
+                {!welcomeChannel && (
+                  <p style={{ fontSize: 11.5, color: '#52535a', marginTop: 8 }}>
+                    Without a channel the welcome and leave messages stay silent.
+                  </p>
+                )}
+              </>
+            ) : (
+              <PremiumLockNote text="💎 Greet new members and note who left — welcome & leave messages in a channel of your choice are a Premium extra." />
+            )}
+          </Card>
+
+          {/* 4 · Embed accent + footer — Premium */}
+          <Card title="Embed accent & footer">
             {premium ? (
               <>
                 <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
@@ -336,10 +446,35 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                     </button>
                   )}
                 </div>
+
+                {/* Embed footer */}
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', marginBottom: 3 }}>Embed footer</div>
+                  <p style={{ fontSize: 12, color: '#52535a', marginBottom: 8 }}>
+                    The small line at the bottom of welcome, leave and verification embeds — leave empty for the default.
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      value={footerDraft}
+                      maxLength={80}
+                      placeholder={DEFAULT_FOOTER}
+                      onChange={(e) => setFooterDraft(e.target.value.slice(0, 80))}
+                      style={{ flex: 1, minWidth: 200, maxWidth: 320, padding: '9px 12px', fontSize: 13, background: '#18181b', border: `1px solid ${footerDirty ? '#f0b232' : '#2e2e36'}`, borderRadius: 8, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit' }} />
+                    <span style={{ fontSize: 11, color: footerDraft.length >= 80 ? '#f23f43' : '#52535a', fontVariantNumeric: 'tabular-nums' }}>
+                      {footerDraft.length}/80
+                    </span>
+                    {footerDirty && (
+                      <button onClick={() => patch('messages.footer_text', footerDraft.slice(0, 80), 'Embed footer')} disabled={saving === 'messages.footer_text'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving === 'messages.footer_text' ? 0.6 : 1 }}>
+                        {saving === 'messages.footer_text' ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
+                      </button>
+                    )}
+                  </div>
+                </div>
               </>
             ) : (
               <p style={{ fontSize: 12.5, color: '#949ba4', lineHeight: 1.6 }}>
-                Give every bot embed your server&apos;s own color — a <b style={{ color: '#96a4ff' }}>💎 Premium</b> perk.
+                Give every bot embed your server&apos;s own color and footer line — a <b style={{ color: '#96a4ff' }}>💎 Premium</b> perk.
                 Upgrade from the Overview tab to unlock it.
               </p>
             )}
@@ -379,7 +514,19 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                       <span style={{ fontSize: 10.5, color: '#949ba4' }}>Today at 12:00</span>
                     </div>
                     <div style={{ marginTop: 6, background: '#2b2d31', borderLeft: `4px solid ${previewAccent}`, borderRadius: 4, padding: '10px 12px', fontSize: 13, color: '#dbdee1', lineHeight: 1.5, wordBreak: 'break-word' }}>
-                      {renderMd(substitute(drafts[previewKey]))}
+                      {drafts[previewKey].trim()
+                        ? renderMd(substitute(drafts[previewKey], previewKey))
+                        : <span style={{ color: '#6d6f78', fontStyle: 'italic' }}>
+                            {previewKey === 'welcome' || previewKey === 'leave'
+                              ? 'No message set — this event is disabled.'
+                              : 'Empty — the default text will be used.'}
+                          </span>}
+                      {(previewKey === 'welcome' || previewKey === 'leave' || previewKey === 'verify_dm') && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 9, paddingTop: 7, borderTop: '1px solid #3f4147', fontSize: 10.5, color: '#949ba4' }}>
+                          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#5865f2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, flexShrink: 0 }} aria-hidden>🛡️</span>
+                          {premium && footerDraft.trim() ? footerDraft : 'Link Protect • link-protect.com'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

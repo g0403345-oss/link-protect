@@ -48,6 +48,8 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
   const [headline, setHeadline] = useState(page.headline ?? '');
   const [message, setMessage] = useState(page.message ?? '');
   const [accentDraft, setAccentDraft] = useState(accent);
+  /* Premium rules gate draft */
+  const [rulesDraft, setRulesDraft] = useState(page.rules ?? '');
   const pageDirty = headline !== (page.headline ?? '') || message !== (page.message ?? '') || accentDraft !== accent;
   const [pageSaving, setPageSaving] = useState(false);
 
@@ -620,6 +622,47 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
                   </a>
                 </p>
               )}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Premium: rules text + acceptance checkbox on the verify page */}
+      <Card title="Rules Gate">
+        {premium === false ? (
+          <PremiumLockNote text="💎 Show your server rules right on the verify page — optionally requiring members to accept them before they can verify. A Premium extra." />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#949ba4', marginBottom: 6 }}>Rules text</label>
+              <p style={{ fontSize: 11.5, color: '#52535a', marginBottom: 8, lineHeight: 1.5 }}>
+                Shown in a scrollable box above the verify button. Leave it empty to hide the box.
+              </p>
+              <textarea value={rulesDraft} maxLength={1500} rows={6}
+                onChange={(e) => setRulesDraft(e.target.value.slice(0, 1500))}
+                placeholder={'1. Be respectful.\n2. No advertising or scam links.\n3. Follow the Discord Terms of Service.'}
+                style={{ ...input, width: '100%', resize: 'vertical', lineHeight: 1.6, whiteSpace: 'pre-wrap' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                <span style={{ fontSize: 11, color: rulesDraft.length >= 1500 ? '#f23f43' : '#52535a', fontVariantNumeric: 'tabular-nums' }}>
+                  {rulesDraft.length}/1500
+                </span>
+                {rulesDraft !== (page.rules ?? '') && (
+                  <button onClick={() => patch('verify.page.rules', rulesDraft.slice(0, 1500), 'Rules text')}
+                    disabled={saving === 'verify.page.rules'}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving === 'verify.page.rules' ? 0.6 : 1 }}>
+                    {saving === 'verify.page.rules' ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />} Save
+                  </button>
+                )}
+              </div>
+            </div>
+            <div style={{ paddingTop: 14, borderTop: '1px solid #1e1e22' }}>
+              <ToggleSwitch
+                checked={!!page.require_accept}
+                onChange={(v) => patch('verify.page.require_accept', v, 'Rules acceptance')}
+                label="Require accepting the rules"
+                description="Members must tick “I have read and accept the rules” before the verify button unlocks."
+                disabled={saving === 'verify.page.require_accept'}
+              />
             </div>
           </div>
         )}

@@ -46,7 +46,8 @@ class VerifyGate(commands.Cog):
                                            link=link),
                 color=message_accent(settings),
             )
-            embed.set_footer(text="Link Protect • link-protect.com")
+            _foot = ((settings.get("messages") or {}).get("footer_text") or "").strip()[:80]
+            embed.set_footer(text=_foot or "Link Protect • link-protect.com")
             view = discord.ui.View(timeout=None)
             view.add_item(discord.ui.Button(label="Verify now", url=link))
             await member.send(embed=embed, view=view)
