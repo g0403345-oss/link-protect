@@ -129,7 +129,7 @@ function ServerSwitcher({ guildId, guildInfo }: {
         ) : (
           <div style={{ width: 20, height: 20, borderRadius: 6, background: '#5865f2', flexShrink: 0 }} />
         )}
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5' }}>
+        <span className="crumb-server-name" style={{ fontSize: 13, fontWeight: 600, color: '#f2f3f5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
           {guildInfo?.name ?? 'Server Settings'}
         </span>
         <ChevronDown size={13} color="#52535a" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
@@ -642,7 +642,7 @@ export default function GuildDashboard() {
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#52535a', textDecoration: 'none' }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#f2f3f5')}
           onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#52535a')}>
-          <ChevronLeft size={13} /> All servers
+          <ChevronLeft size={13} /> <span style={{ whiteSpace: 'nowrap' }}>All servers</span>
         </Link>
         <span style={{ color: '#2e2e36' }}>/</span>
         <ServerSwitcher guildId={guildId} guildInfo={guildInfo} />

@@ -191,7 +191,7 @@ export default function DashboardPage() {
               </div>
               <p style={{ fontSize: 13, color: '#52535a' }}>Select a server to manage Link Protect settings</p>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="dash-actions" style={{ display: 'flex', gap: 8 }}>
               <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2 }}>
                 {([['list', LayoutList], ['poster', LayoutGrid]] as const).map(([id, Icon]) => (
                   <button key={id} onClick={() => switchView(id)} title={id === 'list' ? 'List view' : 'Poster view'}
@@ -248,11 +248,13 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', background: '#111113', border: '1px solid #1e1e22', borderRadius: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 20, fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{totals.week.toLocaleString()}</div>
-                  <div style={{ fontSize: 10.5, color: '#52535a', fontWeight: 600 }}>
+                  <div style={{ fontSize: 10.5, color: '#52535a', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     Actions, 7 days{totals.busiest ? ` · most: ${totals.busiest.name}` : ''}
                   </div>
                 </div>
-                <Sparkline data={totals.last7} width={92} height={30} />
+                <span className="agg-spark" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                  <Sparkline data={totals.last7} width={92} height={30} />
+                </span>
               </div>
             </div>
           )}

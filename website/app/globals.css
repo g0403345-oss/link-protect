@@ -177,6 +177,11 @@ input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
 input[type='number'] { -moz-appearance: textfield; }
 
+/* Flex children default to min-width:auto and grow to their widest child —
+   the guild main column must be allowed to shrink or every tab overflows
+   the phone viewport (the classic flexbox min-content trap). */
+.guild-main { min-width: 0; }
+
 /* Sidebar active state */
 .sidebar-active {
   background: rgba(88, 101, 242, 0.15);
@@ -250,10 +255,22 @@ input[type='number'] { -moz-appearance: textfield; }
   .guild-hero-score { width: 100%; }
   .crumb-btn-label { display: none !important; }
 
-  /* Guild dashboard — grids */
-  .stats-3col-dashboard { grid-template-columns: 1fr 1fr !important; }
-  .stats-4col { grid-template-columns: 1fr 1fr !important; }
-  .thresholds-3col { grid-template-columns: 1fr !important; gap: 20px !important; }
+  /* Guild dashboard — grids. minmax(0,1fr): plain 1fr has a min-content
+     floor, so one long word inside a card widened the whole page. */
+  .stats-3col-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .stats-4col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .thresholds-3col { grid-template-columns: minmax(0, 1fr) !important; gap: 20px !important; }
+  .guild-main { padding: 14px 12px !important; }
+
+  /* Server list — aggregate tiles & toolbar */
+  .overview-panel { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .overview-panel > div { padding: 10px 12px !important; }
+  .agg-spark { display: none !important; }
+  .dash-actions { flex-wrap: wrap !important; }
+  .dash-actions a, .dash-actions > button { padding: 7px 12px !important; font-size: 12px !important; }
+
+  /* Breadcrumb: single-line, truncated server name */
+  .crumb-server-name { max-width: 124px; }
 }
 
 @media (max-width: 480px) {
