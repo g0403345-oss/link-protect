@@ -124,12 +124,12 @@ export default function AutomationCard({ guildId, onToast }: {
     finally { setEventBusy(false); }
   };
 
-  const select = { padding: '8px 10px', fontSize: 13, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' } as const;
+  const select = { padding: '8px 28px 8px 10px', fontSize: 13, background: "#18181b url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236d6f78' fill='none' stroke-width='1.5'/%3E%3C/svg%3E\") no-repeat right 10px center", border: '1px solid #2e2e36', borderRadius: 8, color: '#f2f3f5', outline: 'none', fontFamily: 'inherit', cursor: 'pointer', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' } as const;
 
   if (loading) return <p style={{ fontSize: 13, color: '#52535a' }}>Loading…</p>;
 
   if (data && !data.premium) {
-    return <PremiumLockNote text="🌙 Night schedule & event mode — automate your blockers, a 💎 Premium extra. Protection itself stays free." />;
+    return <PremiumLockNote text="Night schedule & event mode — automate your blockers, a Premium extra. Protection itself stays free." />;
   }
 
   return (

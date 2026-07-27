@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ guildId: string }> }
 ) {
   const { guildId } = await params;
-  if (!/^\d{5,25}$/.test(guildId)) {
+  if (!/^\d{5,25}$/.test(guildId) && !/^[a-z0-9-]{3,32}$/.test(guildId)) {
     return NextResponse.json({ error: 'Invalid server' }, { status: 400 });
   }
   try {

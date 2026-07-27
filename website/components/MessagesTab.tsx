@@ -313,10 +313,8 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
             })}
           </Card>
 
-        </div>
-
           {/* 3 · Embed accent — Premium */}
-          <Card title="Embed accent 💎">
+          <Card title="Embed accent">
             {premium ? (
               <>
                 <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
@@ -346,6 +344,8 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
               </p>
             )}
           </Card>
+        </div>
+
         {/* ── Right column: live preview (sticky on desktop) ── */}
         <div className="msgstudio-preview" style={{ position: 'sticky', top: 120 }}>
           <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10 }}>

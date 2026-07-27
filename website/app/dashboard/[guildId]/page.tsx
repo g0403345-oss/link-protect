@@ -38,7 +38,6 @@ import ActivityTimeline from '@/components/ActivityTimeline';
 import EmptyState from '@/components/EmptyState';
 import WatchlistCard from '@/components/WatchlistCard';
 import AutomationCard from '@/components/AutomationCard';
-import WeeklyReportCard from '@/components/WeeklyReportCard';
 
 import VotePromo from '@/components/VotePromo';
 import type { ServerData, GuildStats } from '@/lib/db';
@@ -634,7 +633,7 @@ export default function GuildDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <GuildHero guildId={guildId} name={guildInfo?.name ?? 'Your server'} icon={guildInfo?.icon}
                     data={data} stats={stats} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
-                  <PremiumCard guildId={guildId} onToast={addToast} />
+                  <PremiumCard guildId={guildId} onToast={addToast} onNavigate={(sec) => selectSection(sec as Section)} />
                   <div data-tour="overview-stats" className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" spark={trend14 ?? undefined} delta={weekDelta} />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
@@ -678,7 +677,7 @@ export default function GuildDashboard() {
                       onToggle={(key, v, label) => patch(`protect.${key}`, v, label)}
                     />
                   </Card>
-                  <Card title="Automation 🌙">
+                  <Card title="Automation">
                     <AutomationCard guildId={guildId} onToast={addToast} />
                   </Card>
                   <Card title="Silent Mode" tourId="silent">
@@ -934,7 +933,7 @@ export default function GuildDashboard() {
                     </p>
                     <MemberModeration guildId={guildId} onToast={addToast} onChanged={() => { fetchData(); fetchStats(); }} />
                   </Card>
-                  <Card title="Watchlist 👁">
+                  <Card title="Watchlist">
                     <WatchlistCard guildId={guildId} onToast={addToast} />
                   </Card>
                 </div>
@@ -1089,9 +1088,6 @@ export default function GuildDashboard() {
                         <StatCard label="Ban threshold" value={stats.banThreshold} icon={Ban} color="#f23f43" />
                       </div>
                       <TrendsChart guildId={guildId} />
-                      <Card title="Weekly report 📊">
-                        <WeeklyReportCard guildId={guildId} />
-                      </Card>
                       <Card title="Top Warned Users">
                         {stats.topWarned.length === 0 ? (
                           <div style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -1174,7 +1170,9 @@ export default function GuildDashboard() {
                             <div key={i} className="log-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 7, background: i % 2 === 0 ? '#111113' : 'transparent' }}>
                               <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#2e2e36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#6d6f78', flexShrink: 0, marginTop: 1 }}>{who.slice(0, 2).toUpperCase()}</div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: 13, color: '#f2f3f5', fontWeight: 500 }}>{e.description}</p>
+                                <p style={{ fontSize: 13, fontWeight: 500, color: e.path === 'lockdown' ? (/activated/i.test(e.description) ? '#f23f43' : '#23a55a') : '#f2f3f5' }}>
+                                  {e.description.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, '').trim()}
+                                </p>
                                 <p style={{ fontSize: 11, color: '#52535a', marginTop: 2 }}>{who} · {rel}</p>
                               </div>
                             </div>

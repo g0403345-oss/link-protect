@@ -17,9 +17,10 @@ const PERKS = [
   '💎 badge — and more perks every release, locked to this price',
 ];
 
-export default function PremiumCard({ guildId, onToast }: {
+export default function PremiumCard({ guildId, onToast, onNavigate }: {
   guildId: string;
   onToast: (type: 'success' | 'error', msg: string) => void;
+  onNavigate?: (section: string) => void;
 }) {
   const [status, setStatus] = useState<{ active: boolean; until?: number | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,8 @@ export default function PremiumCard({ guildId, onToast }: {
 
   if (status.active) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(88,101,242,0.1), rgba(235,69,158,0.06))', border: '1px solid rgba(88,101,242,0.35)' }}>
+      <div style={{ borderRadius: 12, background: 'linear-gradient(135deg, rgba(88,101,242,0.1), rgba(235,69,158,0.06))', border: '1px solid rgba(88,101,242,0.35)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
         <Gem size={17} color="#96a4ff" style={{ flexShrink: 0 }} />
         <span style={{ flex: 1, fontSize: 13, color: '#dbdee1' }}>
           <b style={{ color: '#f2f3f5' }}>Premium active</b>
@@ -62,6 +64,26 @@ export default function PremiumCard({ guildId, onToast }: {
         <button onClick={() => go('/api/stripe/portal', { guildId })} disabled={busy} className="btn-secondary btn-sm" style={{ fontSize: 12, opacity: busy ? 0.6 : 1 }}>
           <Settings2 size={13} /> Manage
         </button>
+      </div>
+
+      {/* Perk directory — no hunting for where the extras live */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 16px 12px' }}>
+        {[
+          { label: 'Embed color & long templates', sec: 'messages' },
+          { label: 'Verify logo & vanity link', sec: 'verification' },
+          { label: 'Automation & event mode', sec: 'blockers' },
+          { label: 'Watchlist', sec: 'warnings' },
+          { label: 'False-positive undo', sec: 'log' },
+        ].map((pk) => (
+          <button key={pk.sec + pk.label} onClick={() => onNavigate?.(pk.sec)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, color: '#96a4ff', background: 'rgba(88,101,242,0.08)', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 99, cursor: 'pointer', transition: 'background 0.13s' }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(88,101,242,0.16)')}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(88,101,242,0.08)')}>
+            {pk.label} <ArrowRight size={10} />
+          </button>
+        ))}
+        <span style={{ fontSize: 11.5, color: '#52535a', alignSelf: 'center' }}>· Sync lives on the server list</span>
+      </div>
       </div>
     );
   }

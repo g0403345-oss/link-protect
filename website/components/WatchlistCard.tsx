@@ -6,7 +6,7 @@
  * /api/guild/{id}/watchlist; names/avatars resolve via the members endpoint.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import PremiumLockNote from '@/components/PremiumLockNote';
 
@@ -42,6 +42,25 @@ export default function WatchlistCard({ guildId, onToast }: {
 
   /* add form */
   const [newId, setNewId] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<{ id: string; username: string; nick?: string | null; avatar?: string | null }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const search = (q: string) => {
+    setQuery(q);
+    setNewId(/^\d{5,25}$/.test(q.trim()) ? q.trim() : '');
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (q.trim().length < 2 || /^\d+$/.test(q.trim())) { setResults([]); return; }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/guild/${guildId}/discord-members/search?q=${encodeURIComponent(q.trim())}`);
+        const d = await res.json();
+        setResults((d.members ?? []).slice(0, 8));
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+  };
   const [newDays, setNewDays] = useState(7);
   const [newReason, setNewReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null); // 'add' | userId being removed
@@ -169,15 +188,38 @@ export default function WatchlistCard({ guildId, onToast }: {
       {/* Add form / lock note */}
       {premium === false ? (
         <div style={{ marginTop: 10 }}>
-          <PremiumLockNote text="👁 Watch suspicious members — a 💎 Premium extra. Protection itself stays free." />
+          <PremiumLockNote text="Watch suspicious members — a Premium extra. Protection itself stays free." />
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <input value={newId} onChange={(e) => setNewId(e.target.value.replace(/[^\d]/g, ''))}
-            placeholder="Discord user ID" maxLength={25}
-            style={{ ...input, flex: '1 1 160px', fontFamily: 'monospace' }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = '#2e2e36')} />
+          <div style={{ position: 'relative', flex: '1 1 200px' }}>
+            <input value={query} onChange={(e) => search(e.target.value)}
+              placeholder="Search member by name — or paste an ID" maxLength={60}
+              style={{ ...input, width: '100%' }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = '#5865f2')}
+              onBlur={(e) => setTimeout(() => (e.target.style.borderColor = '#2e2e36'), 150)} />
+            {(results.length > 0 || searching) && (
+              <div style={{ position: 'absolute', top: '105%', left: 0, right: 0, zIndex: 20, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 9, overflow: 'hidden', boxShadow: '0 14px 34px rgba(0,0,0,0.5)' }}>
+                {searching && <div style={{ padding: '9px 12px', fontSize: 12, color: '#6d6f78' }}>Searching…</div>}
+                {results.map((m) => (
+                  <button key={m.id}
+                    onMouseDown={(ev) => { ev.preventDefault(); setNewId(m.id); setQuery(m.nick ?? m.username); setResults([]); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.background = 'rgba(88,101,242,0.1)')}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.background = 'none')}>
+                    {m.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.webp?size=32`} alt="" style={{ width: 22, height: 22, borderRadius: '50%' }} />
+                    ) : (
+                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#2e2e36', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#949ba4' }}>{(m.username || '?').slice(0, 2).toUpperCase()}</span>
+                    )}
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#f2f3f5' }}>{m.nick ?? m.username}</span>
+                    <span style={{ fontSize: 10.5, color: '#52535a', fontFamily: 'monospace', marginLeft: 'auto' }}>…{m.id.slice(-4)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <select value={newDays} onChange={(e) => setNewDays(parseInt(e.target.value))}
             style={{ ...input, cursor: 'pointer' }}>
             {DAY_OPTIONS.map((d) => <option key={d} value={d}>{d} days</option>)}

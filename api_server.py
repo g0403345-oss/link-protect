@@ -1229,7 +1229,7 @@ async def admin_decide_appeal(request: Request, report_id: int, body: AppealDeci
     c.execute("UPDATE reports SET status=? WHERE id=?",
               ("resolved" if accept else "dismissed", int(report_id)))
     verdict = (
-        "✅ Appeal accepted — the flag on your account has been removed and the "
+        "Appeal accepted — the flag on your account has been removed and the "
         "automatic join check no longer applies to you. (Bans on individual "
         "servers are up to that server's staff.)"
         if accept else
@@ -2487,7 +2487,7 @@ async def v1_lockdown(request: Request, body: V1LockdownBody):
     actor = f"API · {key['label'] or key['prefix']}"
     result = await _apply_lockdown(key["guild_id"], bool(body.active), body.reason, actor)
     _audit_record(key["guild_id"], f"apikey:{key['id']}", actor, "lockdown",
-                  "🚨 Lockdown activated via API" if body.active else "✅ Lockdown lifted via API",
+                  "Lockdown activated via API" if body.active else "Lockdown lifted via API",
                   None, body.active)
     return result
 
@@ -3792,7 +3792,7 @@ _MESSAGE_DEFAULTS = {
     "warn_dm": "Your link in **{server}** was removed.\n**Reason:** {reason}",
     "action_dm": "You were **{action}** on **{server}** after reaching {warnings} warnings.",
     "verify_dm": "Welcome to **{server}**! Verify your account to unlock the server: {link}",
-    "lockdown_announce": "🚨 **Emergency lockdown active.** Links are blocked and invites are "
+    "lockdown_announce": "**Emergency lockdown active.** Links are blocked and invites are "
                          "paused while the moderators handle the situation.",
 }
 
@@ -3869,7 +3869,7 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
                       "footer": {"text": "Link Protect • link-protect.com"}})
         _link_btn("Verify now", verify_link)
     elif body.kind == "lockdown_announce":
-        embed.update({"title": "🚨 Server lockdown activated", "color": 0xF23F43,
+        embed.update({"title": "Server lockdown activated", "color": 0xF23F43,
                       "description": text + "\n\nSlowmode on 12 channels · invites paused · "
                                             "all links blocked.\nLift it with /unlock or the dashboard."})
 
@@ -3955,7 +3955,7 @@ async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str
                                          "prev": prev})
             _ginfo = await _bot_guilds_info()
             await _post_channel_embed(
-                gid, "🚨 Server lockdown activated",
+                gid, "Server lockdown activated",
                 _render_guild_message(data, "lockdown_announce",
                                       server=_ginfo.get(gid, {}).get("name") or "this server")
                 + "\n\n"
@@ -4001,7 +4001,7 @@ async def _apply_lockdown(gid: str, active: bool, reason: str | None, actor: str
             except Exception:
                 pass
             await _post_channel_embed(
-                gid, "✅ Lockdown lifted",
+                gid, "Lockdown lifted",
                 f"{'By **' + actor + '**. ' if actor else ''}"
                 "Slowmode, invites and link rules are back to normal.", 0x23A55A, kind="lockdown")
     _invalidate(gid)
@@ -4025,7 +4025,7 @@ async def set_lockdown(request: Request, guild_id: str, body: LockdownBody):
     aid, aname = _web_actor(request)
     result = await _apply_lockdown(guild_id, bool(body.active), body.reason, aname)
     _audit_record(guild_id, aid, aname, "lockdown",
-                  "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
+                  "Lockdown activated" if body.active else "Lockdown lifted",
                   None, body.active)
     return result
 
@@ -4042,7 +4042,7 @@ async def mobile_set_lockdown(request: Request, guild_id: str, body: LockdownBod
     aname = await _mobile_actor_name(request)
     result = await _apply_lockdown(guild_id, bool(body.active), body.reason, aname)
     _audit_record(guild_id, aid, aname, "lockdown",
-                  "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
+                  "Lockdown activated" if body.active else "Lockdown lifted",
                   None, body.active)
     return result
 
@@ -4156,7 +4156,7 @@ async def add_watchlist(request: Request, guild_id: str, body: WatchlistBody):
                             "added": int(time.time())}
     _kv_set(f"watchlist:{guild_id}", wl)
     _audit_record(guild_id, aid, aname, "watchlist.add",
-                  f"👁 Watchlisted user {body.userId} for {days}d", None, body.reason)
+                  f"Watchlisted user {body.userId} for {days}d", None, body.reason)
     return {"ok": True, "until": wl[str(body.userId)]["until"]}
 
 
@@ -4168,7 +4168,7 @@ async def remove_watchlist(request: Request, guild_id: str, user_id: str):
         _kv_set(f"watchlist:{guild_id}", wl)
         aid, aname = _web_actor(request)
         _audit_record(guild_id, aid, aname, "watchlist.remove",
-                      f"👁 Removed user {user_id} from the watchlist", None, None)
+                      f"Removed user {user_id} from the watchlist", None, None)
     return {"ok": True}
 
 
@@ -4212,7 +4212,7 @@ async def undo_action(request: Request, guild_id: str, body: UndoBody):
     except Exception:
         pass
     _audit_record(guild_id, aid, aname, "review.undo",
-                  f"↩️ False positive: warning removed for {body.userId}"
+                  f"False positive: warning removed for {body.userId}"
                   + (f", {dom} allowlisted" if dom else ""), None, dom or None)
     return {"ok": True, "warnings": new_count, "allowlisted": bool(dom)}
 
@@ -4251,7 +4251,7 @@ async def set_schedule(request: Request, guild_id: str, body: ScheduleBody):
     _kv_set(f"schedule:{guild_id}", sc)
     aid, aname = _web_actor(request)
     _audit_record(guild_id, aid, aname, "schedule.night",
-                  f"🌙 Night schedule {'on' if body.enabled else 'off'} ({f:02d}–{t:02d}h, {body.preset})",
+                  f"Night schedule {'on' if body.enabled else 'off'} ({f:02d}–{t:02d}h, {body.preset})",
                   None, body.enabled)
     return {"ok": True}
 
@@ -4274,7 +4274,7 @@ async def start_event_mode(request: Request, guild_id: str, body: EventModeBody)
     _kv_set(f"event:{guild_id}", {"until": int(time.time()) + hours * 3600, "prev_all": prev_all})
     aid, aname = _web_actor(request)
     _audit_record(guild_id, aid, aname, "eventmode",
-                  f"🎉 Event mode: all links blocked for {hours}h", None, hours)
+                  f"Event mode: all links blocked for {hours}h", None, hours)
     return {"ok": True, "until": int(time.time()) + hours * 3600}
 
 
@@ -4289,7 +4289,7 @@ async def stop_event_mode(request: Request, guild_id: str):
             _save_server(guild_id, data)
         _kv_set(f"event:{guild_id}", {})
         aid, aname = _web_actor(request)
-        _audit_record(guild_id, aid, aname, "eventmode", "🎉 Event mode ended early", None, None)
+        _audit_record(guild_id, aid, aname, "eventmode", "Event mode ended early", None, None)
     return {"ok": True}
 
 
@@ -4336,10 +4336,10 @@ async def sync_settings(request: Request, body: SyncBody):
                     data[sec] = json.loads(json.dumps(src[sec]))
         _save_server(gid, data)
         _audit_record(gid, aid, aname, "sync",
-                      f"⇄ Settings synced from another server ({', '.join(sections)})", None, None)
+                      f"Settings synced from another server ({', '.join(sections)})", None, None)
         synced.append(gid)
     _audit_record(body.sourceGuildId, aid, aname, "sync",
-                  f"⇄ Synced {', '.join(sections)} to {len(synced)} server(s)", None, None)
+                  f"Synced {', '.join(sections)} to {len(synced)} server(s)", None, None)
     return {"ok": True, "synced": synced}
 
 
@@ -4510,7 +4510,7 @@ async def verify_complete(request: Request, guild_id: str, body: VerifyCompleteB
         c.commit()
     except Exception:
         pass
-    await _post_channel_embed(guild_id, "✅ Member verified",
+    await _post_channel_embed(guild_id, "Member verified",
                               f"<@{uid}> passed the verification gate.", 0x23A55A, kind="verify")
     return {"ok": True}
 
@@ -4744,7 +4744,7 @@ async def set_verify_background(request: Request, guild_id: str):
               (str(guild_id), raw, mime, now))
     c.commit()
     aid, aname = _web_actor(request)
-    _audit_record(guild_id, aid, aname, "verify.background", "🖼️ Verification page background updated", None, None)
+    _audit_record(guild_id, aid, aname, "verify.background", "Verification page background updated", None, None)
     return {"ok": True, "version": now}
 
 
@@ -4755,7 +4755,7 @@ async def delete_verify_background(request: Request, guild_id: str):
     c.execute("DELETE FROM verify_backgrounds WHERE guild_id=?", (str(guild_id),))
     c.commit()
     aid, aname = _web_actor(request)
-    _audit_record(guild_id, aid, aname, "verify.background", "🖼️ Verification page background removed", None, None)
+    _audit_record(guild_id, aid, aname, "verify.background", "Verification page background removed", None, None)
     return {"ok": True}
 
 
@@ -4804,7 +4804,7 @@ async def set_verify_logo(request: Request, guild_id: str):
               (str(guild_id), raw, mime, now))
     c.commit()
     aid, aname = _web_actor(request)
-    _audit_record(guild_id, aid, aname, "verify.logo", "💎 Verification page logo updated", None, None)
+    _audit_record(guild_id, aid, aname, "verify.logo", "Verification page logo updated", None, None)
     return {"ok": True, "version": now}
 
 
@@ -4844,7 +4844,7 @@ async def set_verify_slug(request: Request, guild_id: str, body: SlugBody):
     _kv_set(f"vslug:{slug}", str(guild_id))
     _kv_set(f"vslugof:{guild_id}", slug)
     _audit_record(guild_id, aid, aname, "verify.slug",
-                  f"💎 Vanity verify link set: /verify/{slug}", None, slug)
+                  f"Vanity verify link set: /verify/{slug}", None, slug)
     return {"ok": True, "slug": slug}
 
 

@@ -552,7 +552,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       </Card>
 
       {/* Premium branding: custom logo + vanity link */}
-      <Card title="Premium Branding 💎">
+      <Card title="Premium Branding">
         {premium === false ? (
           <PremiumLockNote text="💎 Your own logo on the verify page and a memorable vanity link — Premium extras. Protection itself stays free." />
         ) : (
