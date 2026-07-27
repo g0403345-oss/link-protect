@@ -695,6 +695,20 @@ async def _push_guild_alert(guild_id, title: str, body: str, *, user_id=None, us
         pass
 
 
+def _watchlist_entry_sync(guild_id: str, user_id: str) -> dict | None:
+    """Premium watchlist (kv watchlist:<gid>) — entry if the user is on it."""
+    try:
+        row = _get_conn().execute("SELECT value FROM kv WHERE path=?",
+                                  (f"watchlist:{guild_id}",)).fetchone()
+        wl = json.loads(row[0]) if row else {}
+        e = wl.get(str(user_id))
+        if isinstance(e, dict) and int(e.get("until", 0) or 0) > time.time():
+            return e
+    except Exception:
+        pass
+    return None
+
+
 async def notify_action_failure(bot, guild, settings, *, feature: str, action: str, member) -> None:
     """A protection cog's kick/ban/timeout was refused by Discord. Make it
     visible: log-channel embed + dashboard record + push. Never raises."""
@@ -1348,6 +1362,15 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
         log_channel_id = 0
     if settings.get("log", {}).get("digest"):
         log_channel_id = 0  # daily digest replaces the per-action log posts
+    # Premium watchlist: a watched member triggering ANY action alerts the mods
+    # immediately and is marked in the log.
+    _watch = await asyncio.to_thread(_watchlist_entry_sync, guild_id, user_id)
+    if _watch:
+        await _push_guild_alert(
+            guild_id, f"👁 Watchlisted member: {username}",
+            f"{reason[:120]} — warning #{warn_count}.",
+            user_id=user_id, username=username)
+
     log_channel = bot.get_channel(int(log_channel_id)) if log_channel_id else None
     if log_channel:
         log_embed = discord.Embed(
@@ -1369,6 +1392,9 @@ async def apply_warn_member(bot, member, channel, settings: dict, reason: str,
         if content:
             log_embed.add_field(name="Content", value=f"```{content[:900]}```", inline=False)
         log_embed.add_field(name="Total Warnings", value=str(warn_count))
+        if _watch:
+            log_embed.add_field(name="👁 Watchlist",
+                                value=(_watch.get("reason") or "Under observation"), inline=False)
         if action_succeeded:
             log_embed.add_field(
                 name="Action",

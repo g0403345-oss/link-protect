@@ -2620,10 +2620,53 @@ async def _daily_digest():
             continue
 
 
+@_tasks.loop(time=_dt.time(hour=16, minute=0, tzinfo=_dt.timezone.utc))
+async def _weekly_report():
+    """Premium: Sunday 18:00 Berlin — one report embed per premium server."""
+    if _dt.datetime.now(_dt.timezone.utc).weekday() != 6:
+        return
+    from cogs.shared import _get_conn as _sc, get_settings as _gs
+    try:
+        prem = [r[0].split(":", 1)[1] for r in _sc().execute(
+            "SELECT path, value FROM kv WHERE path LIKE 'premium:%'").fetchall()
+            if '"active": true' in r[1]]
+    except Exception:
+        return
+    now = int(time.time())
+    for gid in prem:
+        try:
+            settings = await _gs(gid)
+            ch = bot.get_channel(int((settings.get("log") or {}).get("log-channel") or 0))
+            if ch is None:
+                continue
+            rows = _sc().execute(
+                "SELECT action, COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? GROUP BY action",
+                (int(gid), now - 7 * 86400)).fetchall()
+            prev = _sc().execute(
+                "SELECT COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? AND timestamp<=?",
+                (int(gid), now - 14 * 86400, now - 7 * 86400)).fetchone()["n"]
+            totals = {r["action"]: r["n"] for r in rows}
+            total = sum(totals.values())
+            delta = total - prev
+            summary = " · ".join(f"**{n}** {a}" for a, n in sorted(totals.items(), key=lambda x: -x[1])) or "no actions"
+            e = brand_embed(
+                "📊 Your weekly protection report",
+                f"Last 7 days: {summary}\n"
+                f"vs. previous week: **{'+' if delta >= 0 else ''}{delta}**\n\n"
+                f"Full report with charts: https://link-protect.com/dashboard/{gid}")
+            e.timestamp = discord.utils.utcnow()
+            e.set_footer(text="Link Protect Premium • weekly report")
+            await ch.send(embed=e)
+        except Exception:
+            continue
+
+
 @bot.listen("on_ready")
 async def _start_digest_loop():
     if not _daily_digest.is_running():
         _daily_digest.start()
+    if not _weekly_report.is_running():
+        _weekly_report.start()
 
 
 bot.run(os.environ["BOT_TOKEN"])
