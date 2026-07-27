@@ -1,0 +1,12 @@
+{
+  "name": "@linkprotect/sdk",
+  "version": "0.1.0",
+  "description": "Official Link Protect API client — server protection stats, link checks, moderation and live events for Discord servers.",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "homepage": "https://link-protect.com/developers",
+  "keywords": ["discord", "moderation", "security", "linkprotect"],
+  "engines": { "node": ">=18" }
+}

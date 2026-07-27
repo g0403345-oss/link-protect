@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   KeyRound, Webhook, Plus, Trash2, Copy, Check, RefreshCw, Send, Eye, EyeOff,
   Download, FlaskConical, BookOpen, ExternalLink, Image as ImageIcon, AlertTriangle,
+  ChevronDown, History,
 } from 'lucide-react';
 import Link from 'next/link';
 import BadgeCard from '@/components/BadgeCard';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
-import type { DevKey, DevWebhook, DevStatus, WebhookEvent } from '@/lib/db';
+import type { DevKey, DevKeyScope, DevWebhook, DevStatus, WebhookEvent, WebhookDelivery } from '@/lib/db';
 
 const EVENT_META: Record<string, { label: string; desc: string }> = {
   link_blocked: { label: 'Link blocked', desc: 'A link was blocked and the member warned' },
@@ -17,6 +18,16 @@ const EVENT_META: Record<string, { label: string; desc: string }> = {
   member_timeout: { label: 'Member timeout', desc: 'Warn threshold escalated to a timeout' },
   scamshield_catch: { label: 'Scam Shield catch', desc: 'Cross-channel scam spam was caught' },
   raid_detected: { label: 'Raid detected', desc: 'A link raid was auto-defended' },
+};
+
+const SCOPE_META: { id: DevKeyScope; label: string; desc: string; always?: boolean }[] = [
+  { id: 'read', label: 'Read', desc: 'stats, trends & link checks', always: true },
+  { id: 'moderate', label: 'Moderate', desc: 'warn, timeout, kick & ban via API' },
+  { id: 'config', label: 'Config', desc: 'toggle blockers, blacklist, lockdown' },
+];
+
+const SCOPE_COLORS: Record<DevKeyScope, string> = {
+  read: '#949ba4', moderate: '#f0b232', config: '#23a55a',
 };
 
 function relTime(ts: number) {
@@ -57,6 +68,7 @@ export default function DeveloperPanel({ guildId, onToast }: {
   /* ── API keys ── */
   const [keys, setKeys] = useState<DevKey[]>([]);
   const [newLabel, setNewLabel] = useState('');
+  const [newScopes, setNewScopes] = useState<DevKeyScope[]>(['read']);
   const [creating, setCreating] = useState(false);
   const [freshKey, setFreshKey] = useState<DevKey | null>(null); // shown once
 
@@ -67,6 +79,12 @@ export default function DeveloperPanel({ guildId, onToast }: {
   const [whCreating, setWhCreating] = useState(false);
   const [whBusy, setWhBusy] = useState<number | null>(null);
   const [secretShown, setSecretShown] = useState<number | null>(null);
+
+  /* ── Webhook delivery log ── */
+  const [delivOpen, setDelivOpen] = useState<number[]>([]);
+  const [deliveries, setDeliveries] = useState<Record<number, WebhookDelivery[]>>({});
+  const [delivLoading, setDelivLoading] = useState<number | null>(null);
+  const [testEvent, setTestEvent] = useState<Record<number, string>>({});
 
   /* ── Early access ── */
   const [dev, setDev] = useState<DevStatus | null>(null);
@@ -94,12 +112,13 @@ export default function DeveloperPanel({ guildId, onToast }: {
     try {
       const res = await fetch(`/api/guild/${guildId}/dev/keys`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: newLabel.trim() || undefined }),
+        body: JSON.stringify({ label: newLabel.trim() || undefined, scopes: newScopes }),
       });
       const d = await res.json();
       if (!res.ok) { onToast('error', d.error ?? 'Could not create key'); return; }
       setFreshKey(d as DevKey);
       setNewLabel('');
+      setNewScopes(['read']);
       setKeys((prev) => [{ ...(d as DevKey), key: undefined }, ...prev]);
     } catch { onToast('error', 'Could not reach the server'); }
     finally { setCreating(false); }
@@ -153,14 +172,36 @@ export default function DeveloperPanel({ guildId, onToast }: {
     finally { setWhBusy(null); }
   };
 
-  const testHook = async (id: number) => {
+  const loadDeliveries = async (id: number) => {
+    setDelivLoading(id);
+    try {
+      const res = await fetch(`/api/guild/${guildId}/dev/webhooks/${id}/deliveries`);
+      const d = await res.json();
+      if (res.ok) setDeliveries((prev) => ({ ...prev, [id]: d.deliveries ?? [] }));
+      else onToast('error', d.error ?? 'Could not load deliveries');
+    } catch { onToast('error', 'Could not reach the server'); }
+    finally { setDelivLoading(null); }
+  };
+
+  const toggleDeliveries = (id: number) => {
+    const opening = !delivOpen.includes(id);
+    setDelivOpen((prev) => (opening ? [...prev, id] : prev.filter((x) => x !== id)));
+    if (opening && !deliveries[id]) loadDeliveries(id);
+  };
+
+  const testHook = async (id: number, event = 'test') => {
     setWhBusy(id);
     try {
-      const res = await fetch(`/api/guild/${guildId}/dev/webhooks/${id}/test`, { method: 'POST' });
+      const res = await fetch(`/api/guild/${guildId}/dev/webhooks/${id}/test`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event }),
+      });
       const d = await res.json();
-      if (d.ok) onToast('success', `Test delivered — HTTP ${d.status}`);
-      else onToast('error', `Test failed — ${d.status ? `HTTP ${d.status}` : 'endpoint unreachable'}`);
+      const ms = typeof d.durationMs === 'number' ? ` · ${d.durationMs}ms` : '';
+      if (d.ok) onToast('success', `${d.event ?? event} delivered — HTTP ${d.status}${ms}`);
+      else onToast('error', `${d.event ?? event} failed — ${d.status ? `HTTP ${d.status}` : 'endpoint unreachable'}${ms}`);
       load();
+      if (delivOpen.includes(id)) loadDeliveries(id);
     } catch { onToast('error', 'Could not reach the server'); }
     finally { setWhBusy(null); }
   };
@@ -220,8 +261,9 @@ export default function DeveloperPanel({ guildId, onToast }: {
       {/* ── API keys ── */}
       <Card title={`API Keys (${keys.length}/5)`} icon={KeyRound}>
         <p style={{ fontSize: 12.5, color: '#6d6f78', lineHeight: 1.55, marginBottom: 14 }}>
-          Read-only access to this server&rsquo;s stats and trends plus the threat lookup —
-          base URL <code style={{ color: '#949ba4', fontFamily: 'monospace' }}>https://link-protect.com/api/v1</code>,
+          Scoped access to this server&rsquo;s API — stats, trends and threat lookups always, plus
+          moderation and config endpoints if you grant those scopes below.
+          Base URL <code style={{ color: '#949ba4', fontFamily: 'monospace' }}>https://link-protect.com/api/v1</code>,
           auth via <code style={{ color: '#949ba4', fontFamily: 'monospace' }}>X-Api-Key</code> header, 60 requests/min per key.
           {' '}<Link href="/developers" style={{ color: '#5865f2' }}>Read the docs →</Link>
         </p>
@@ -244,14 +286,31 @@ export default function DeveloperPanel({ guildId, onToast }: {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: keys.length ? 14 : 0 }}>
-          <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} maxLength={60}
-            placeholder="Label (e.g. website widget)" style={{ ...input, flex: 1 }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !creating && keys.length < 5) createKey(); }} />
-          <button onClick={createKey} disabled={creating || keys.length >= 5}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: creating || keys.length >= 5 ? 0.5 : 1 }}>
-            {creating ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Create key
-          </button>
+        <div style={{ marginBottom: keys.length ? 14 : 0 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} maxLength={60}
+              placeholder="Label (e.g. website widget)" style={{ ...input, flex: 1 }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !creating && keys.length < 5) createKey(); }} />
+            <button onClick={createKey} disabled={creating || keys.length >= 5}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', fontSize: 13, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: creating || keys.length >= 5 ? 0.5 : 1 }}>
+              {creating ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={13} />} Create key
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
+            {SCOPE_META.map((s) => {
+              const on = s.always || newScopes.includes(s.id);
+              return (
+                <label key={s.id} title={s.desc}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, cursor: s.always ? 'default' : 'pointer', opacity: s.always ? 0.65 : 1, userSelect: 'none' }}>
+                  <input type="checkbox" checked={on} disabled={s.always}
+                    onChange={() => setNewScopes((p) => (p.includes(s.id) ? p.filter((x) => x !== s.id) : [...p, s.id]))}
+                    style={{ accentColor: '#5865f2', width: 13, height: 13, cursor: s.always ? 'default' : 'pointer' }} />
+                  <span style={{ fontWeight: 700, color: '#f2f3f5' }}>{s.label}</span>
+                  <span style={{ color: '#6d6f78' }}>{s.desc}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         {keys.map((k) => (
@@ -259,6 +318,13 @@ export default function DeveloperPanel({ guildId, onToast }: {
             <code style={{ fontSize: 12, color: '#949ba4', fontFamily: 'monospace', flexShrink: 0 }}>{k.prefix}…</code>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#f2f3f5', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {k.label ?? <span style={{ color: '#52535a', fontStyle: 'italic' }}>unnamed</span>}
+            </span>
+            <span style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+              {(k.scopes ?? ['read']).map((s) => (
+                <span key={s} style={{ padding: '1px 7px', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', color: SCOPE_COLORS[s] ?? '#949ba4', background: '#111113', border: '1px solid #2e2e36', borderRadius: 99 }}>
+                  {s}
+                </span>
+              ))}
             </span>
             <span style={{ fontSize: 11, color: '#52535a', flexShrink: 0 }}>
               {k.totalRequests.toLocaleString()} req · used {relTime(k.lastUsed)}
@@ -343,6 +409,58 @@ export default function DeveloperPanel({ guildId, onToast }: {
                 {secretShown === h.id ? <EyeOff size={12} /> : <Eye size={12} />}
               </button>
               <CopyBtn text={h.secret} small />
+            </div>
+
+            {/* ── Delivery log ── */}
+            <div style={{ marginTop: 9, borderTop: '1px solid #232329', paddingTop: 8 }}>
+              <button onClick={() => toggleDeliveries(h.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#949ba4', fontSize: 11.5, fontWeight: 700, padding: 0 }}>
+                <History size={11} /> Deliveries
+                <ChevronDown size={11} style={{ transform: delivOpen.includes(h.id) ? 'none' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+              </button>
+
+              {delivOpen.includes(h.id) && (
+                <div style={{ marginTop: 8 }}>
+                  {/* Send test event */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <select value={testEvent[h.id] ?? 'test'}
+                      onChange={(e) => setTestEvent((p) => ({ ...p, [h.id]: e.target.value }))}
+                      style={{ padding: '5px 8px', fontSize: 11.5, background: '#111113', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', outline: 'none', fontFamily: 'monospace', cursor: 'pointer' }}>
+                      <option value="test">test</option>
+                      {Object.keys(EVENT_META).map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+                    </select>
+                    <button onClick={() => testHook(h.id, testEvent[h.id] ?? 'test')} disabled={whBusy !== null}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#fff', background: '#5865f2', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: whBusy !== null ? 0.5 : 1 }}>
+                      {whBusy === h.id ? <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={11} />} Send test event
+                    </button>
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => loadDeliveries(h.id)} disabled={delivLoading !== null} title="Refresh deliveries"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px', fontSize: 11, fontWeight: 600, color: '#949ba4', background: '#111113', border: '1px solid #2e2e36', borderRadius: 7, cursor: 'pointer' }}>
+                      <RefreshCw size={11} style={delivLoading === h.id ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh
+                    </button>
+                  </div>
+
+                  {(deliveries[h.id] ?? []).length === 0 ? (
+                    <div style={{ fontSize: 11.5, color: '#52535a', padding: '2px 0' }}>
+                      {delivLoading === h.id ? 'Loading…' : 'No deliveries yet — send a test event above.'}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 240, overflowY: 'auto' }}>
+                      {(deliveries[h.id] ?? []).map((d) => (
+                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 9px', background: '#111113', border: '1px solid #232329', borderRadius: 6, fontSize: 11 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: d.status >= 200 && d.status < 300 ? '#23a55a' : '#f23f43' }} />
+                          <code style={{ flex: 1, minWidth: 0, fontFamily: 'monospace', color: '#96a4ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.event}</code>
+                          <span style={{ flexShrink: 0, fontWeight: 600, color: d.status >= 200 && d.status < 300 ? '#23a55a' : '#f23f43' }}>
+                            {d.status === 0 ? 'network error' : `HTTP ${d.status}`}
+                          </span>
+                          <span style={{ flexShrink: 0, color: '#6d6f78', width: 52, textAlign: 'right' }}>{d.durationMs}ms</span>
+                          <span style={{ flexShrink: 0, color: '#52535a', width: 64, textAlign: 'right' }}>{relTime(d.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}

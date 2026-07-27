@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canAccessGuild } from '@/lib/access';
-import { listDevKeys, createDevKey } from '@/lib/db';
+import { listDevKeys, createDevKey, type DevKeyScope } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,10 +26,10 @@ export async function POST(
   const { id } = await params;
   const access = await canAccessGuild(id);
   if (!access.ok) return NextResponse.json({ error: 'Forbidden' }, { status: access.status });
-  let body: { label?: string } = {};
+  let body: { label?: string; scopes?: DevKeyScope[] } = {};
   try { body = await req.json(); } catch { /* empty is fine */ }
   try {
-    return NextResponse.json(await createDevKey(id, body.label));
+    return NextResponse.json(await createDevKey(id, body.label, body.scopes));
   } catch (e) {
     const m = e instanceof Error ? e.message : '';
     if (m.includes('409')) return NextResponse.json({ error: 'Key limit reached (5 per server)' }, { status: 409 });

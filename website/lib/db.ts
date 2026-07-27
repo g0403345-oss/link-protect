@@ -569,6 +569,8 @@ export async function setDevBeta(userId: string, enabled: boolean): Promise<DevS
 
 // ── Developer platform: per-server API keys + webhooks ───────────────────────
 
+export type DevKeyScope = "read" | "moderate" | "config";
+
 export interface DevKey {
   id: number;
   label: string | null;
@@ -576,6 +578,8 @@ export interface DevKey {
   createdAt: number;
   lastUsed: number;
   totalRequests: number;
+  /** Granted scopes — 'read' is always included server-side. */
+  scopes: DevKeyScope[];
   /** Present only in the create response — shown once, never stored. */
   key?: string;
 }
@@ -600,10 +604,10 @@ export async function listDevKeys(guildId: string): Promise<{ keys: DevKey[] }> 
   return apiFetch(`/api/guild/${guildId}/dev/keys`);
 }
 
-export async function createDevKey(guildId: string, label?: string): Promise<DevKey> {
+export async function createDevKey(guildId: string, label?: string, scopes?: DevKeyScope[]): Promise<DevKey> {
   return apiFetch(`/api/guild/${guildId}/dev/keys`, {
     method: "POST",
-    body: JSON.stringify({ label: label ?? null }),
+    body: JSON.stringify({ label: label ?? null, scopes: scopes ?? ["read"] }),
   });
 }
 
@@ -637,8 +641,34 @@ export async function deleteDevWebhook(guildId: string, webhookId: number): Prom
   await apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}`, { method: "DELETE" });
 }
 
-export async function testDevWebhook(guildId: string, webhookId: number): Promise<{ ok: boolean; status: number }> {
-  return apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}/test`, { method: "POST" });
+export async function testDevWebhook(
+  guildId: string,
+  webhookId: number,
+  event?: WebhookEvent | "test"
+): Promise<{ ok: boolean; status: number; durationMs: number; event: string }> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}/test`, {
+    method: "POST",
+    body: JSON.stringify({ event: event ?? "test" }),
+  });
+}
+
+// ── Webhook delivery log (last 50, newest first) ─────────────────────────────
+
+export interface WebhookDelivery {
+  id: number;
+  event: string;
+  /** Upstream HTTP status; 0 = network error / endpoint unreachable. */
+  status: number;
+  ok: boolean;
+  durationMs: number;
+  createdAt: number;
+}
+
+export async function getDevWebhookDeliveries(
+  guildId: string,
+  webhookId: number
+): Promise<{ deliveries: WebhookDelivery[] }> {
+  return apiFetch(`/api/guild/${guildId}/dev/webhooks/${webhookId}/deliveries`);
 }
 
 export async function setUserFlags(

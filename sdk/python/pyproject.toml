@@ -1,0 +1,10 @@
+[project]
+name = "linkprotect"
+version = "0.1.0"
+description = "Official Link Protect API client — protection stats, link checks, moderation and live events for Discord servers."
+requires-python = ">=3.10"
+dependencies = ["requests>=2.28"]
+license = { text = "MIT" }
+
+[project.urls]
+Documentation = "https://link-protect.com/developers"

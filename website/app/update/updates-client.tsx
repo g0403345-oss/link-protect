@@ -30,6 +30,17 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 3,
+    title: 'Developer platform 2.0',
+    items: [
+      'Write API: keys now carry scopes (read / moderate / config) — warn, timeout, kick or ban via POST /api/v1/moderate, toggle blockers, manage the blacklist and even trigger the lockdown programmatically. Every write lands in the audit log with the key as actor.',
+      'Webhook inspector: a Stripe-style delivery log per webhook (status, latency, event, last 50 attempts) plus one-click test events for all six event types.',
+      'Batch link checks (up to 25 URLs per call) with threat-DB reputation, and a realtime SSE event stream for live dashboards and overlays.',
+      'Public sandbox: the key lp_sandbox works for everyone against synthetic data — and powers the new interactive API playground on /developers.',
+      'Official SDKs for JavaScript and Python as direct downloads, both with webhook signature verification built in — plus a machine-readable OpenAPI spec at /api/v1/openapi.json.',
+    ],
+  },
+  {
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 2,
     title: 'A notification centre you can actually use',
     items: [

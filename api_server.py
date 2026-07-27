@@ -23,6 +23,8 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
+import datetime as _dt
+
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -1878,6 +1880,23 @@ def _ensure_dev_tables():
         failure_count INTEGER NOT NULL DEFAULT 0
     )""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_dev_webhooks_guild ON dev_webhooks (guild_id)")
+    # Key scopes (v1 writes): 'read' | 'moderate' | 'config', comma-joined.
+    try:
+        c.execute("ALTER TABLE dev_api_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT 'read'")
+    except sqlite3.OperationalError:
+        pass
+    # Webhook delivery log — the Stripe-style inspector (last 50 per webhook).
+    c.execute("""CREATE TABLE IF NOT EXISTS dev_webhook_deliveries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        webhook_id INTEGER NOT NULL,
+        guild_id TEXT NOT NULL,
+        event TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        ok INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_devwd ON dev_webhook_deliveries (webhook_id, id DESC)")
     c.commit()
 
 _ensure_dev_tables()
@@ -1900,10 +1919,21 @@ def _require_dev_actor(request: Request) -> tuple[str, str | None]:
     return str(aid), aname
 
 
+_KEY_SCOPES = ("read", "moderate", "config")
+
+
+def _row_scopes(r) -> set:
+    try:
+        raw = r["scopes"] or "read"
+    except (KeyError, IndexError):
+        raw = "read"
+    return {x for x in raw.split(",") if x in _KEY_SCOPES} or {"read"}
+
+
 def _key_row_payload(r) -> dict:
     return {"id": r["id"], "label": r["label"], "prefix": r["prefix"],
             "createdAt": r["created_at"], "lastUsed": r["last_used"] or 0,
-            "totalRequests": r["total_requests"]}
+            "totalRequests": r["total_requests"], "scopes": sorted(_row_scopes(r))}
 
 
 def _webhook_row_payload(r) -> dict:
@@ -1919,6 +1949,7 @@ def _webhook_row_payload(r) -> dict:
 
 class DevKeyBody(BaseModel):
     label: str | None = None
+    scopes: list[str] | None = None  # subset of read|moderate|config
 
 
 class DevWebhookBody(BaseModel):
@@ -1954,10 +1985,11 @@ async def dev_create_key(request: Request, guild_id: str, body: DevKeyBody):
     key = "lp_" + secrets.token_hex(20)
     prefix = key[:11]  # "lp_" + 8 hex chars — enough to identify, useless to guess
     label = (body.label or "").strip()[:60] or None
+    scopes = ",".join(sorted({x for x in (body.scopes or ["read"]) if x in _KEY_SCOPES} | {"read"}))
     c.execute(
-        "INSERT INTO dev_api_keys(key_hash, prefix, guild_id, user_id, label, created_at) "
-        "VALUES(?,?,?,?,?,?)",
-        (_hash_key(key), prefix, str(guild_id), aid, label, int(time.time())))
+        "INSERT INTO dev_api_keys(key_hash, prefix, guild_id, user_id, label, created_at, scopes) "
+        "VALUES(?,?,?,?,?,?,?)",
+        (_hash_key(key), prefix, str(guild_id), aid, label, int(time.time()), scopes))
     c.commit()
     row = c.execute("SELECT * FROM dev_api_keys WHERE key_hash=?", (_hash_key(key),)).fetchone()
     # The full key is returned exactly once — only its hash is stored.
@@ -2053,16 +2085,17 @@ async def dev_delete_webhook(request: Request, guild_id: str, wh_id: int):
     return {"ok": True}
 
 
-async def _deliver_webhook(wh: dict, event: str, data: dict) -> int:
-    """POST one signed event. Returns the HTTP status (0 = network/SSRF failure)."""
+async def _deliver_webhook(wh: dict, event: str, data: dict) -> tuple[int, int]:
+    """POST one signed event. Returns (status, duration_ms); status 0 = network/SSRF failure."""
     body = json.dumps({"event": event, "guildId": str(wh["guild_id"]), "data": data,
                        "sentAt": int(time.time())}, separators=(",", ":")).encode()
     sig = hmac.new(wh["secret"].encode(), body, hashlib.sha256).hexdigest()
+    t0 = time.monotonic()
     try:
         parsed = urlparse(wh["url"])
         if parsed.scheme != "https" or not parsed.hostname or \
                 await asyncio.to_thread(_host_is_private, parsed.hostname):
-            return 0
+            return 0, 0
         async with httpx.AsyncClient(timeout=6) as client:
             resp = await client.post(wh["url"], content=body, headers={
                 "Content-Type": "application/json",
@@ -2070,15 +2103,23 @@ async def _deliver_webhook(wh: dict, event: str, data: dict) -> int:
                 "X-LinkProtect-Event": event,
                 "X-LinkProtect-Signature": f"sha256={sig}",
             })
-            return resp.status_code
+            return resp.status_code, int((time.monotonic() - t0) * 1000)
     except Exception:
-        return 0
+        return 0, int((time.monotonic() - t0) * 1000)
 
 
-def _record_delivery(wh_id: int, status: int) -> None:
+def _record_delivery(wh_id: int, status: int, guild_id: str = "", event: str = "",
+                     duration_ms: int = 0) -> None:
     try:
         c = _get_conn()
         ok = 200 <= status < 300
+        # Inspector log: every attempt, last 50 kept per webhook.
+        c.execute("INSERT INTO dev_webhook_deliveries(webhook_id, guild_id, event, status, ok, "
+                  "duration_ms, created_at) VALUES(?,?,?,?,?,?,?)",
+                  (wh_id, str(guild_id), event, status, 1 if ok else 0, duration_ms, int(time.time())))
+        c.execute("DELETE FROM dev_webhook_deliveries WHERE webhook_id=? AND id NOT IN "
+                  "(SELECT id FROM dev_webhook_deliveries WHERE webhook_id=? ORDER BY id DESC LIMIT 50)",
+                  (wh_id, wh_id))
         if ok:
             c.execute("UPDATE dev_webhooks SET last_status=?, last_delivery_at=?, failure_count=0 WHERE id=?",
                       (status, int(time.time()), wh_id))
@@ -2101,13 +2142,40 @@ async def dev_test_webhook(request: Request, guild_id: str, wh_id: int):
                               (int(wh_id), str(guild_id))).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    status = await _deliver_webhook(dict(row), "test", {
+    event = "test"
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict) and payload.get("event") in _WEBHOOK_EVENTS:
+            event = payload["event"]
+    except Exception:
+        pass
+    samples = {
+        "link_blocked": {"action": "warned", "reason": "Fake Nitro scam link (test event)", "warn_count": 2},
+        "member_kicked": {"action": "kicked", "reason": "Auto-kick: reached 5 warnings (test event)", "warn_count": 5},
+        "member_banned": {"action": "banned", "reason": "Auto-ban: reached 8 warnings (test event)", "warn_count": 8},
+        "member_timeout": {"action": "timeout", "reason": "Auto-timeout: reached 3 warnings (test event)", "warn_count": 3},
+        "scamshield_catch": {"action": "banned", "reason": "Scam Shield: same message in 4 channels (test event)", "warn_count": 0},
+        "raid_detected": {"action": "timeout", "reason": "Raid defense: mass-posted scam.example (test event)", "warn_count": 0},
+        "test": {"action": "warned", "reason": "Test event from the Developer tab", "warn_count": 0},
+    }
+    status, ms = await _deliver_webhook(dict(row), event, {
         "user_id": "0", "username": "Link Protect", "channel_id": "0",
-        "action": "warned", "reason": "Test event from the Developer tab", "warn_count": 0,
-        "timestamp": int(time.time()),
+        **samples[event], "timestamp": int(time.time()),
     })
-    _record_delivery(row["id"], status)
-    return {"ok": 200 <= status < 300, "status": status}
+    _record_delivery(row["id"], status, guild_id, event, ms)
+    return {"ok": 200 <= status < 300, "status": status, "durationMs": ms, "event": event}
+
+
+@app.get("/api/guild/{guild_id}/dev/webhooks/{wh_id}/deliveries")
+@require_auth
+async def dev_webhook_deliveries(request: Request, guild_id: str, wh_id: int):
+    _require_dev_actor(request)
+    rows = _get_conn().execute(
+        "SELECT * FROM dev_webhook_deliveries WHERE webhook_id=? AND guild_id=? "
+        "ORDER BY id DESC LIMIT 50", (int(wh_id), str(guild_id))).fetchall()
+    return {"deliveries": [{"id": r["id"], "event": r["event"], "status": r["status"],
+                            "ok": bool(r["ok"]), "durationMs": r["duration_ms"],
+                            "createdAt": r["created_at"]} for r in rows]}
 
 
 def _classify_action_event(action: str, reason: str) -> str:
@@ -2152,13 +2220,13 @@ async def _webhook_dispatch_loop():
                         continue
                     if event not in subscribed:
                         continue
-                    status = await _deliver_webhook(dict(h), event, {
+                    status, ms = await _deliver_webhook(dict(h), event, {
                         "user_id": str(r["user_id"]), "username": r["username"],
                         "channel_id": str(r["channel_id"]), "action": r["action"],
                         "reason": r["reason"], "warn_count": r["warn_count"],
                         "timestamp": r["timestamp"],
                     })
-                    _record_delivery(h["id"], status)
+                    _record_delivery(h["id"], status, str(r["guild_id"]), event, ms)
         except Exception:
             pass
 
@@ -2169,19 +2237,45 @@ _v1_buckets: dict[int, dict] = {}
 _V1_RATE = 60  # requests per minute per key
 
 
-def _v1_auth(request: Request):
+# Public sandbox: a fixed key everyone may use against synthetic data — lets
+# developers try the API (and the docs playground) without owning a server.
+SANDBOX_KEY = "lp_sandbox"
+_SANDBOX_ROW = {"id": 0, "guild_id": "sandbox", "label": "Sandbox", "scopes": "read",
+                "user_id": "0", "prefix": "lp_sandbox"}
+
+
+def _v1_auth(request: Request, need: str = "read"):
     key = (request.headers.get("x-api-key") or "").strip()
     if not key:
         auth = request.headers.get("authorization") or ""
         if auth.lower().startswith("bearer "):
             key = auth[7:].strip()
+    if not key:
+        # EventSource can't set headers — the stream endpoint may pass ?key=.
+        key = (request.query_params.get("key") or "").strip()
     if not key.startswith("lp_"):
         raise HTTPException(status_code=401, detail="Missing API key (X-Api-Key header)")
+    now = time.time()
+    if key == SANDBOX_KEY:
+        ip = (request.client.host if request.client else "?")
+        bkey = f"sb:{ip}"
+        b = _v1_buckets.get(bkey)
+        if not b or now > b["reset"]:
+            _v1_buckets[bkey] = {"n": 1, "reset": now + 60}
+        elif b["n"] >= _V1_RATE:
+            raise HTTPException(status_code=429, detail="Sandbox rate limit exceeded")
+        else:
+            b["n"] += 1
+        if need != "read":
+            raise HTTPException(status_code=403, detail="The sandbox key is read-only")
+        return dict(_SANDBOX_ROW)
     row = _get_conn().execute(
         "SELECT * FROM dev_api_keys WHERE key_hash=? AND revoked=0", (_hash_key(key),)).fetchone()
     if not row:
         raise HTTPException(status_code=401, detail="Invalid or revoked API key")
-    now = time.time()
+    if need not in _row_scopes(row):
+        raise HTTPException(status_code=403,
+                            detail=f"This key lacks the '{need}' scope — create one with it in the Developer tab")
     b = _v1_buckets.get(row["id"])
     if not b or now > b["reset"]:
         _v1_buckets[row["id"]] = {"n": 1, "reset": now + 60}
@@ -2199,10 +2293,33 @@ def _v1_auth(request: Request):
     return row
 
 
+def _sandbox_trends(days: int) -> dict:
+    import math
+    days = max(1, min(int(days or 14), 30))
+    per_day = []
+    for i in range(days):
+        c = 3 + round(3 * math.sin(i / 2.4)) + (i % 3)
+        d = _dt.date.today() - _dt.timedelta(days=days - 1 - i)
+        per_day.append({"date": d.isoformat(), "warned": max(0, c - 2), "kicked": 1 if c > 5 else 0,
+                        "banned": 1 if c > 6 else 0, "timeout": 1 if c > 4 else 0, "count": c,
+                        "scamshield": 1 if i % 4 == 0 else 0, "raid": 1 if i % 9 == 0 else 0})
+    return {"days": days, "total": sum(x["count"] for x in per_day), "perDay": per_day,
+            "topReasons": [{"reason": "Fake Nitro scam links", "count": 12},
+                           {"reason": "Scam Shield: cross-channel spam", "count": 8},
+                           {"reason": "bit.ly / shortener links", "count": 5}]}
+
+
 @app.get("/api/v1/stats")
 async def v1_stats(request: Request):
     key = _v1_auth(request)
     gid = key["guild_id"]
+    if gid == "sandbox":
+        return {"guildId": "sandbox", "totalWarnings": 348, "warnedUsers": 57,
+                "activeBlockers": 6,
+                "blockers": {"malware": True, "nitro": True, "bit": True, "nsfw": True,
+                             "invite": True, "gif": False, "youtube": False, "google": False,
+                             "twitch": False, "steam": False, "all": False},
+                "thresholds": {"kick": 5, "ban": 8, "timeout": 3}}
     data = _get_server(gid)
     if data is None:
         raise HTTPException(status_code=404, detail="Server not found (bot removed?)")
@@ -2229,6 +2346,8 @@ async def v1_stats(request: Request):
 @app.get("/api/v1/trends")
 async def v1_trends(request: Request, days: int = 14):
     key = _v1_auth(request)
+    if key["guild_id"] == "sandbox":
+        return _sandbox_trends(days)
     return _trends_payload(key["guild_id"], days)
 
 
@@ -2236,6 +2355,231 @@ async def v1_trends(request: Request, days: int = 14):
 async def v1_check(request: Request, url: str = Query(default=""), deep: int = Query(default=0)):
     _v1_auth(request)
     return await _check_verdict(url, deep)
+
+
+
+
+class V1BatchBody(BaseModel):
+    urls: list[str]
+
+
+@app.post("/api/v1/check/batch")
+async def v1_check_batch(request: Request, body: V1BatchBody):
+    """Up to 25 URLs per call, threat-DB + cached Safe Browsing (no deep resolve)."""
+    _v1_auth(request)
+    urls = [u for u in (body.urls or []) if isinstance(u, str) and u.strip()][:25]
+    if not urls:
+        raise HTTPException(status_code=400, detail="Provide urls: [] (max 25)")
+    results = []
+    for u in urls:
+        try:
+            results.append(await _check_verdict(u, 0))
+        except HTTPException as e:
+            results.append({"url": u, "error": e.detail})
+    return {"count": len(results), "results": results}
+
+
+class V1ModerateBody(BaseModel):
+    userId: str
+    action: str                    # warn | timeout | untimeout | kick | ban | unban
+    reason: str | None = None
+    minutes: int | None = None
+
+
+@app.post("/api/v1/moderate")
+async def v1_moderate(request: Request, body: V1ModerateBody):
+    """Scope 'moderate': run a moderation action exactly like the dashboard does."""
+    key = _v1_auth(request, need="moderate")
+    gid = key["guild_id"]
+    actor = f"API · {key['label'] or key['prefix']}"
+    mb = ModerateBody(user_id=body.userId, action=body.action,
+                      reason=(body.reason or "").strip()[:300] or None, minutes=body.minutes)
+    result = await _do_moderate(gid, mb, actor_id=f"apikey:{key['id']}", actor_name=actor)
+    _audit_record(gid, f"apikey:{key['id']}", actor, f"api.moderate.{body.action}",
+                  f"{body.action} via API for user {body.userId}", None, body.reason)
+    return result
+
+
+@app.get("/api/v1/warns/{user_id}")
+async def v1_user_warns(request: Request, user_id: str):
+    key = _v1_auth(request)
+    if key["guild_id"] == "sandbox":
+        return {"userId": user_id, "warnings": 2,
+                "reasons": ["Fake Nitro scam link", "bit.ly shortener link"], "timestamps": []}
+    data = _get_server(key["guild_id"]) or {}
+    u = (data.get("warn") or {}).get(str(user_id))
+    if not isinstance(u, dict):
+        return {"userId": str(user_id), "warnings": 0, "reasons": [], "timestamps": []}
+    return {"userId": str(user_id), "warnings": int(u.get("Warn", 0) or 0),
+            "reasons": u.get("reason") or [], "timestamps": u.get("ts") or []}
+
+
+_V1_BLOCKERS = {"all", "google", "youtube", "nsfw", "gif", "invite",
+                "twitch", "bit", "nitro", "steam", "malware"}
+
+
+class V1BlockerBody(BaseModel):
+    blocker: str
+    enabled: bool
+
+
+@app.post("/api/v1/blocker")
+async def v1_blocker(request: Request, body: V1BlockerBody):
+    """Scope 'config': toggle one link blocker."""
+    key = _v1_auth(request, need="config")
+    if body.blocker not in _V1_BLOCKERS:
+        raise HTTPException(status_code=400, detail=f"Unknown blocker (one of {sorted(_V1_BLOCKERS)})")
+    gid = key["guild_id"]
+    data = _get_server(gid)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Server not found")
+    _deep_set(data, f"protect.{body.blocker}", bool(body.enabled))
+    _save_server(gid, data)
+    actor = f"API · {key['label'] or key['prefix']}"
+    _audit_record(gid, f"apikey:{key['id']}", actor, f"protect.{body.blocker}",
+                  f"{'Enabled' if body.enabled else 'Disabled'} {body.blocker} blocker via API",
+                  None, body.enabled)
+    return {"ok": True, "blocker": body.blocker, "enabled": bool(body.enabled)}
+
+
+class V1BlacklistBody(BaseModel):
+    action: str  # add | remove
+    link: str
+
+
+@app.post("/api/v1/blacklist")
+async def v1_blacklist(request: Request, body: V1BlacklistBody):
+    """Scope 'config': manage the server's custom blocked links."""
+    key = _v1_auth(request, need="config")
+    gid = key["guild_id"]
+    data = _get_server(gid)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Server not found")
+    link = (body.link or "").strip()[:300]
+    if not link or body.action not in ("add", "remove"):
+        raise HTTPException(status_code=400, detail="action must be add|remove with a link")
+    links = data.setdefault("link", {}).setdefault("links", [])
+    if not isinstance(links, list):
+        links = data["link"]["links"] = []
+    if body.action == "add" and link not in links:
+        links.append(link)
+    if body.action == "remove" and link in links:
+        links.remove(link)
+    _save_server(gid, data)
+    actor = f"API · {key['label'] or key['prefix']}"
+    _audit_record(gid, f"apikey:{key['id']}", actor, f"blacklist.{body.action}",
+                  f"{'Added' if body.action == 'add' else 'Removed'} blacklist via API: {link}",
+                  None, link)
+    return {"ok": True, "links": links}
+
+
+class V1LockdownBody(BaseModel):
+    active: bool
+    reason: str | None = None
+
+
+@app.post("/api/v1/lockdown")
+async def v1_lockdown(request: Request, body: V1LockdownBody):
+    """Scope 'config': trigger or lift the emergency lockdown."""
+    key = _v1_auth(request, need="config")
+    actor = f"API · {key['label'] or key['prefix']}"
+    result = await _apply_lockdown(key["guild_id"], bool(body.active), body.reason, actor)
+    _audit_record(key["guild_id"], f"apikey:{key['id']}", actor, "lockdown",
+                  "🚨 Lockdown activated via API" if body.active else "✅ Lockdown lifted via API",
+                  None, body.active)
+    return result
+
+
+_sse_conns: dict = {}
+
+
+@app.get("/api/v1/events/stream")
+async def v1_events_stream(request: Request):
+    """SSE feed of moderation actions (auth via X-Api-Key or ?key=). Max 2
+    concurrent streams per key, auto-closes after 30 minutes — reconnect."""
+    key = _v1_auth(request)
+    kid = key["id"]
+    if _sse_conns.get(kid, 0) >= 2:
+        raise HTTPException(status_code=429, detail="Max 2 concurrent streams per key")
+    _sse_conns[kid] = _sse_conns.get(kid, 0) + 1
+    gid = key["guild_id"]
+
+    async def gen():
+        try:
+            started = time.monotonic()
+            yield ": connected\n\n"
+            if gid == "sandbox":
+                i = 0
+                while time.monotonic() - started < 1800:
+                    await asyncio.sleep(8)
+                    i += 1
+                    ev = ["link_blocked", "scamshield_catch", "member_timeout"][i % 3]
+                    data = {"user_id": "0", "username": "sandbox_user", "channel_id": "0",
+                            "action": "warned", "reason": "Sandbox event", "warn_count": i % 6,
+                            "timestamp": int(time.time())}
+                    yield f"event: {ev}\ndata: {json.dumps(data)}\n\n"
+                return
+            row = _get_conn().execute(
+                "SELECT MAX(id) AS m FROM actions WHERE guild_id=?", (int(gid),)).fetchone()
+            last = row["m"] or 0
+            beat = time.monotonic()
+            while time.monotonic() - started < 1800:
+                await asyncio.sleep(3)
+                rows = _get_conn().execute(
+                    "SELECT * FROM actions WHERE guild_id=? AND id>? ORDER BY id ASC LIMIT 50",
+                    (int(gid), last)).fetchall()
+                for r in rows:
+                    last = r["id"]
+                    ev = _classify_action_event(r["action"], r["reason"])
+                    data = {"user_id": str(r["user_id"]), "username": r["username"],
+                            "channel_id": str(r["channel_id"]), "action": r["action"],
+                            "reason": r["reason"], "warn_count": r["warn_count"],
+                            "timestamp": r["timestamp"]}
+                    yield f"event: {ev}\ndata: {json.dumps(data)}\n\n"
+                if time.monotonic() - beat > 15:
+                    beat = time.monotonic()
+                    yield ": ping\n\n"
+        finally:
+            _sse_conns[kid] = max(0, _sse_conns.get(kid, 1) - 1)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/v1/openapi.json")
+async def v1_openapi():
+    """Hand-written spec for the public v1 surface (the docs playground uses it)."""
+    def op(summary, scope="read", params=None, body=None):
+        o = {"summary": summary, "security": [{"ApiKey": []}],
+             "description": f"Requires scope: {scope}."}
+        if params: o["parameters"] = params
+        if body: o["requestBody"] = {"content": {"application/json": {"schema": body}}}
+        return o
+    q = lambda n, d, t="string": {"name": n, "in": "query", "description": d, "schema": {"type": t}}
+    return {
+        "openapi": "3.0.3",
+        "info": {"title": "Link Protect API", "version": "1.1",
+                 "description": "Read + write API for your server's protection. Auth: X-Api-Key. "
+                                "Try it with the public sandbox key `lp_sandbox` (read-only)."},
+        "servers": [{"url": "https://link-protect.com"}],
+        "components": {"securitySchemes": {"ApiKey": {"type": "apiKey", "in": "header", "name": "X-Api-Key"}}},
+        "paths": {
+            "/api/v1/stats": {"get": op("Server protection stats")},
+            "/api/v1/trends": {"get": op("Actions per day", params=[q("days", "1-30", "integer")])},
+            "/api/v1/check": {"get": op("Check one URL", params=[q("url", "URL to check"), q("deep", "1 = follow redirects", "integer")])},
+            "/api/v1/check/batch": {"post": op("Check up to 25 URLs", body={"type": "object", "properties": {"urls": {"type": "array", "items": {"type": "string"}}}})},
+            "/api/v1/warns/{userId}": {"get": op("A member's warning record")},
+            "/api/v1/moderate": {"post": op("Warn / timeout / kick / ban a member", scope="moderate",
+                body={"type": "object", "properties": {"userId": {"type": "string"}, "action": {"type": "string", "enum": ["warn", "timeout", "untimeout", "kick", "ban", "unban"]}, "reason": {"type": "string"}, "minutes": {"type": "integer"}}})},
+            "/api/v1/blocker": {"post": op("Toggle a link blocker", scope="config",
+                body={"type": "object", "properties": {"blocker": {"type": "string"}, "enabled": {"type": "boolean"}}})},
+            "/api/v1/blacklist": {"post": op("Add/remove a custom blocked link", scope="config",
+                body={"type": "object", "properties": {"action": {"type": "string", "enum": ["add", "remove"]}, "link": {"type": "string"}}})},
+            "/api/v1/lockdown": {"post": op("Trigger or lift the emergency lockdown", scope="config",
+                body={"type": "object", "properties": {"active": {"type": "boolean"}, "reason": {"type": "string"}}})},
+            "/api/v1/events/stream": {"get": op("SSE stream of live moderation events (also accepts ?key=)")},
+        },
+    }
 
 
 @app.get("/api/mobile/admin/config")
