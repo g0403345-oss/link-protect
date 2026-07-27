@@ -3655,6 +3655,12 @@ def _ensure_verify_table():
         mime TEXT NOT NULL,
         updated INTEGER NOT NULL
     )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS verify_logos (
+        guild_id TEXT PRIMARY KEY,
+        data BLOB NOT NULL,
+        mime TEXT NOT NULL,
+        updated INTEGER NOT NULL
+    )""")
     c.commit()
 
 _ensure_verify_table()
@@ -4095,6 +4101,280 @@ async def get_premium(request: Request, guild_id: str):
             "customerId": st.get("customerId")}
 
 
+def _kv_json(path: str):
+    row = _get_conn().execute("SELECT value FROM kv WHERE path=?", (path,)).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["value"])
+    except Exception:
+        return None
+
+
+def _require_premium(gid: str):
+    if not _is_premium(str(gid)):
+        raise HTTPException(status_code=403, detail="This is a Premium feature")
+
+
+# ── Premium: watchlist ───────────────────────────────────────────────────────
+
+def _watchlist(gid: str) -> dict:
+    wl = _kv_json(f"watchlist:{gid}") or {}
+    now = int(time.time())
+    fresh = {u: e for u, e in wl.items() if isinstance(e, dict) and int(e.get("until", 0)) > now}
+    if len(fresh) != len(wl):
+        _kv_set(f"watchlist:{gid}", fresh)
+    return fresh
+
+
+class WatchlistBody(BaseModel):
+    userId: str
+    days: int = 7
+    reason: str | None = None
+
+
+@app.get("/api/guild/{guild_id}/watchlist")
+@require_auth
+async def get_watchlist(request: Request, guild_id: str):
+    wl = _watchlist(guild_id)
+    return {"entries": [{"userId": u, **e} for u, e in
+                        sorted(wl.items(), key=lambda x: -int(x[1].get("added", 0)))],
+            "premium": _is_premium(guild_id)}
+
+
+@app.post("/api/guild/{guild_id}/watchlist")
+@require_auth
+async def add_watchlist(request: Request, guild_id: str, body: WatchlistBody):
+    _require_premium(guild_id)
+    if not body.userId.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid user id")
+    days = max(1, min(int(body.days or 7), 30))
+    aid, aname = _web_actor(request)
+    wl = _watchlist(guild_id)
+    wl[str(body.userId)] = {"until": int(time.time()) + days * 86400, "by": aname or "admin",
+                            "reason": (body.reason or "").strip()[:200] or None,
+                            "added": int(time.time())}
+    _kv_set(f"watchlist:{guild_id}", wl)
+    _audit_record(guild_id, aid, aname, "watchlist.add",
+                  f"👁 Watchlisted user {body.userId} for {days}d", None, body.reason)
+    return {"ok": True, "until": wl[str(body.userId)]["until"]}
+
+
+@app.delete("/api/guild/{guild_id}/watchlist/{user_id}")
+@require_auth
+async def remove_watchlist(request: Request, guild_id: str, user_id: str):
+    wl = _watchlist(guild_id)
+    if wl.pop(str(user_id), None) is not None:
+        _kv_set(f"watchlist:{guild_id}", wl)
+        aid, aname = _web_actor(request)
+        _audit_record(guild_id, aid, aname, "watchlist.remove",
+                      f"👁 Removed user {user_id} from the watchlist", None, None)
+    return {"ok": True}
+
+
+# ── Premium: review / one-click false-positive undo ──────────────────────────
+
+class UndoBody(BaseModel):
+    userId: str
+    domain: str | None = None   # also allowlist this domain
+
+
+@app.post("/api/guild/{guild_id}/actions/undo")
+@require_auth
+async def undo_action(request: Request, guild_id: str, body: UndoBody):
+    _require_premium(guild_id)
+    data = _get_server(guild_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    u = (data.get("warn") or {}).get(str(body.userId))
+    new_count = 0
+    if isinstance(u, dict) and int(u.get("Warn", 0) or 0) > 0:
+        u["Warn"] = int(u["Warn"]) - 1
+        for k in ("reason", "ts"):
+            if isinstance(u.get(k), list) and u[k]:
+                u[k] = u[k][:-1]
+        new_count = u["Warn"]
+    dom = (body.domain or "").strip().lower()[:120]
+    if dom:
+        allow = data.setdefault("link", {}).setdefault("allow", [])
+        if isinstance(allow, list) and dom not in allow:
+            allow.append(dom)
+    _save_server(guild_id, data)
+    aid, aname = _web_actor(request)
+    try:
+        c = _get_conn()
+        c.execute("INSERT INTO actions(guild_id, user_id, username, channel_id, action, reason, "
+                  "warn_count, timestamp) VALUES(?,?,?,?,?,?,?,?)",
+                  (int(guild_id), str(body.userId), f"…{str(body.userId)[-4:]}", "0", "unwarned",
+                   f"False positive review by {aname or 'admin'}"
+                   + (f" · {dom} allowlisted" if dom else ""), new_count, int(time.time())))
+        c.commit()
+    except Exception:
+        pass
+    _audit_record(guild_id, aid, aname, "review.undo",
+                  f"↩️ False positive: warning removed for {body.userId}"
+                  + (f", {dom} allowlisted" if dom else ""), None, dom or None)
+    return {"ok": True, "warnings": new_count, "allowlisted": bool(dom)}
+
+
+# ── Premium: night schedule + event mode ─────────────────────────────────────
+
+class ScheduleBody(BaseModel):
+    enabled: bool
+    fromHour: int = 0
+    toHour: int = 8
+    preset: str = "strict"   # strict | balanced
+
+
+@app.get("/api/guild/{guild_id}/schedule")
+@require_auth
+async def get_schedule(request: Request, guild_id: str):
+    sc = _kv_json(f"schedule:{guild_id}") or {}
+    ev = _kv_json(f"event:{guild_id}") or {}
+    return {"night": sc.get("night") or {"enabled": False, "fromHour": 0, "toHour": 8, "preset": "strict"},
+            "nightActive": bool(sc.get("applied")),
+            "eventUntil": int(ev.get("until", 0) or 0),
+            "premium": _is_premium(guild_id)}
+
+
+@app.post("/api/guild/{guild_id}/schedule")
+@require_auth
+async def set_schedule(request: Request, guild_id: str, body: ScheduleBody):
+    _require_premium(guild_id)
+    if body.preset not in ("strict", "balanced"):
+        raise HTTPException(status_code=400, detail="preset must be strict|balanced")
+    f, t = int(body.fromHour) % 24, int(body.toHour) % 24
+    if f == t:
+        raise HTTPException(status_code=400, detail="from and to must differ")
+    sc = _kv_json(f"schedule:{guild_id}") or {}
+    sc["night"] = {"enabled": bool(body.enabled), "fromHour": f, "toHour": t, "preset": body.preset}
+    _kv_set(f"schedule:{guild_id}", sc)
+    aid, aname = _web_actor(request)
+    _audit_record(guild_id, aid, aname, "schedule.night",
+                  f"🌙 Night schedule {'on' if body.enabled else 'off'} ({f:02d}–{t:02d}h, {body.preset})",
+                  None, body.enabled)
+    return {"ok": True}
+
+
+class EventModeBody(BaseModel):
+    hours: int = 2
+
+
+@app.post("/api/guild/{guild_id}/eventmode")
+@require_auth
+async def start_event_mode(request: Request, guild_id: str, body: EventModeBody):
+    _require_premium(guild_id)
+    hours = max(1, min(int(body.hours or 2), 12))
+    data = _get_server(guild_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    prev_all = bool(_deep_get(data, "protect.all"))
+    _deep_set(data, "protect.all", True)
+    _save_server(guild_id, data)
+    _kv_set(f"event:{guild_id}", {"until": int(time.time()) + hours * 3600, "prev_all": prev_all})
+    aid, aname = _web_actor(request)
+    _audit_record(guild_id, aid, aname, "eventmode",
+                  f"🎉 Event mode: all links blocked for {hours}h", None, hours)
+    return {"ok": True, "until": int(time.time()) + hours * 3600}
+
+
+@app.delete("/api/guild/{guild_id}/eventmode")
+@require_auth
+async def stop_event_mode(request: Request, guild_id: str):
+    ev = _kv_json(f"event:{guild_id}") or {}
+    if ev:
+        data = _get_server(guild_id)
+        if data is not None:
+            _deep_set(data, "protect.all", bool(ev.get("prev_all")))
+            _save_server(guild_id, data)
+        _kv_set(f"event:{guild_id}", {})
+        aid, aname = _web_actor(request)
+        _audit_record(guild_id, aid, aname, "eventmode", "🎉 Event mode ended early", None, None)
+    return {"ok": True}
+
+
+# ── Premium: multi-server settings sync ──────────────────────────────────────
+
+_SYNC_SECTIONS = {"protect", "warn", "messages", "scamguard", "raid", "decay", "blacklist"}
+
+
+class SyncBody(BaseModel):
+    sourceGuildId: str
+    targetGuildIds: list[str]
+    sections: list[str]
+
+
+@app.post("/api/sync")
+@require_auth
+async def sync_settings(request: Request, body: SyncBody):
+    _require_premium(body.sourceGuildId)
+    sections = [x for x in body.sections if x in _SYNC_SECTIONS]
+    targets = [t for t in dict.fromkeys(body.targetGuildIds) if t != body.sourceGuildId][:25]
+    if not sections or not targets:
+        raise HTTPException(status_code=400, detail="Pick at least one section and target")
+    src = _get_server(body.sourceGuildId)
+    if src is None:
+        raise HTTPException(status_code=404, detail="Source guild not found")
+    aid, aname = _web_actor(request)
+    synced = []
+    for gid in targets:
+        data = _get_server(gid)
+        if data is None:
+            continue
+        for sec in sections:
+            if sec == "warn":
+                w = data.setdefault("warn", {})
+                sw = src.get("warn") or {}
+                for k in ("kick", "ban", "timeout"):
+                    if k in sw:
+                        w[k] = sw[k]
+            elif sec == "blacklist":
+                data.setdefault("link", {})["links"] = list((src.get("link") or {}).get("links") or [])
+                data["link"]["allow"] = list((src.get("link") or {}).get("allow") or [])
+            else:
+                if sec in src:
+                    data[sec] = json.loads(json.dumps(src[sec]))
+        _save_server(gid, data)
+        _audit_record(gid, aid, aname, "sync",
+                      f"⇄ Settings synced from another server ({', '.join(sections)})", None, None)
+        synced.append(gid)
+    _audit_record(body.sourceGuildId, aid, aname, "sync",
+                  f"⇄ Synced {', '.join(sections)} to {len(synced)} server(s)", None, None)
+    return {"ok": True, "synced": synced}
+
+
+# ── Premium: weekly report data ──────────────────────────────────────────────
+
+@app.get("/api/guild/{guild_id}/report/weekly")
+@require_auth
+async def weekly_report(request: Request, guild_id: str):
+    _require_premium(guild_id)
+    now = int(time.time())
+    week, prev = now - 7 * 86400, now - 14 * 86400
+    c = _get_conn()
+    cur = {r["action"]: r["n"] for r in c.execute(
+        "SELECT action, COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? GROUP BY action",
+        (int(guild_id), week)).fetchall()}
+    before = {r["action"]: r["n"] for r in c.execute(
+        "SELECT action, COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? AND timestamp<=? GROUP BY action",
+        (int(guild_id), prev, week)).fetchall()}
+    top_users = [{"userId": r["user_id"], "username": r["username"], "count": r["n"]}
+                 for r in c.execute(
+        "SELECT user_id, username, COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? "
+        "GROUP BY user_id ORDER BY n DESC LIMIT 5", (int(guild_id), week)).fetchall()]
+    top_reasons = [{"reason": r["reason"][:120], "count": r["n"]} for r in c.execute(
+        "SELECT reason, COUNT(*) AS n FROM actions WHERE guild_id=? AND timestamp>? "
+        "GROUP BY reason ORDER BY n DESC LIMIT 5", (int(guild_id), week)).fetchall()]
+    per_day = [{"date": r["d"], "count": r["n"]} for r in c.execute(
+        "SELECT date(timestamp,'unixepoch') AS d, COUNT(*) AS n FROM actions "
+        "WHERE guild_id=? AND timestamp>? GROUP BY d ORDER BY d", (int(guild_id), week)).fetchall()]
+    return {"generatedAt": now, "totals": cur, "previousTotals": before,
+            "total": sum(cur.values()), "previousTotal": sum(before.values()),
+            "topUsers": top_users, "topReasons": top_reasons, "perDay": per_day}
+
+
+
+
 # ── Permission-failure alerts ────────────────────────────────────────────────
 # The bot records refused kick/ban/timeout attempts in kv permfail:<gid>
 # (see cogs/shared.py notify_action_failure). The dashboard shows a banner for
@@ -4157,6 +4437,7 @@ async def mobile_dismiss_permfails(request: Request, guild_id: str):
 @require_auth
 async def verify_public(request: Request, guild_id: str):
     """Everything the public /verify/<id> page needs — no member data."""
+    guild_id = _resolve_verify_gid(guild_id)
     data = _get_server(guild_id)
     cfg = _verify_cfg(data)
     info = (await _bot_guilds_info()).get(str(guild_id), {})
@@ -4167,7 +4448,10 @@ async def verify_public(request: Request, guild_id: str):
             "minAccountAgeDays": cfg["min_account_age_days"],
             "page": cfg["page"],
             "background": has_bg, "backgroundVersion": bg_ver,
-            "premium": _is_premium(str(guild_id))}
+            "premium": _is_premium(str(guild_id)),
+            "logo": bool(_get_conn().execute(
+                "SELECT 1 FROM verify_logos WHERE guild_id=?", (str(guild_id),)).fetchone()),
+            "slug": _kv_json(f"vslugof:{guild_id}")}
 
 
 class VerifyCompleteBody(BaseModel):
@@ -4436,6 +4720,7 @@ async def mobile_verify_setup_role(request: Request, guild_id: str, body: Verify
 @app.get("/api/guild/{guild_id}/verify/background")
 @require_auth
 async def get_verify_background(request: Request, guild_id: str):
+    guild_id = _resolve_verify_gid(guild_id)
     row = _get_conn().execute(
         "SELECT data, mime FROM verify_backgrounds WHERE guild_id=?", (str(guild_id),)).fetchone()
     if not row:
@@ -4472,6 +4757,95 @@ async def delete_verify_background(request: Request, guild_id: str):
     aid, aname = _web_actor(request)
     _audit_record(guild_id, aid, aname, "verify.background", "🖼️ Verification page background removed", None, None)
     return {"ok": True}
+
+
+# ── Premium: verify-page logo + vanity slug ──────────────────────────────────
+
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,31}$")
+_SLUG_RESERVED = {"sandbox", "api", "admin", "verify", "dashboard", "premium", "www"}
+
+
+def _resolve_verify_gid(g: str) -> str:
+    """Public verify endpoints accept a numeric guild id OR a premium vanity slug."""
+    g = str(g).strip()
+    if g.isdigit():
+        return g
+    gid = _kv_json(f"vslug:{g.lower()}")
+    if not gid:
+        raise HTTPException(status_code=404, detail="Unknown verify link")
+    return str(gid)
+
+
+@app.get("/api/guild/{guild_id}/verify/logo")
+@require_auth
+async def get_verify_logo(request: Request, guild_id: str):
+    gid = _resolve_verify_gid(guild_id)
+    row = _get_conn().execute(
+        "SELECT data, mime FROM verify_logos WHERE guild_id=?", (gid,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="No logo")
+    return Response(content=row["data"], media_type=row["mime"])
+
+
+@app.put("/api/guild/{guild_id}/verify/logo")
+@require_auth
+async def set_verify_logo(request: Request, guild_id: str):
+    _require_premium(guild_id)
+    raw = await request.body()
+    if len(raw) > 512 * 1024:
+        raise HTTPException(status_code=413, detail="Logo too large (max 512 KB)")
+    mime = _sniff_image(raw)
+    if not mime:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG or WebP images")
+    now = int(time.time())
+    c = _get_conn()
+    c.execute("INSERT INTO verify_logos(guild_id, data, mime, updated) VALUES(?,?,?,?) "
+              "ON CONFLICT(guild_id) DO UPDATE SET data=excluded.data, mime=excluded.mime, updated=excluded.updated",
+              (str(guild_id), raw, mime, now))
+    c.commit()
+    aid, aname = _web_actor(request)
+    _audit_record(guild_id, aid, aname, "verify.logo", "💎 Verification page logo updated", None, None)
+    return {"ok": True, "version": now}
+
+
+@app.delete("/api/guild/{guild_id}/verify/logo")
+@require_auth
+async def delete_verify_logo(request: Request, guild_id: str):
+    c = _get_conn()
+    c.execute("DELETE FROM verify_logos WHERE guild_id=?", (str(guild_id),))
+    c.commit()
+    return {"ok": True}
+
+
+class SlugBody(BaseModel):
+    slug: str | None = None   # None/empty = remove
+
+
+@app.post("/api/guild/{guild_id}/verify/slug")
+@require_auth
+async def set_verify_slug(request: Request, guild_id: str, body: SlugBody):
+    _require_premium(guild_id)
+    aid, aname = _web_actor(request)
+    old = _kv_json(f"vslugof:{guild_id}")
+    slug = (body.slug or "").strip().lower()
+    if not slug:
+        if old:
+            _kv_set(f"vslug:{old}", None)
+            _kv_set(f"vslugof:{guild_id}", None)
+            _audit_record(guild_id, aid, aname, "verify.slug", "Vanity link removed", None, None)
+        return {"ok": True, "slug": None}
+    if not _SLUG_RE.match(slug) or slug in _SLUG_RESERVED:
+        raise HTTPException(status_code=400, detail="3-32 chars: a-z, 0-9 and dashes")
+    taken = _kv_json(f"vslug:{slug}")
+    if taken and str(taken) != str(guild_id):
+        raise HTTPException(status_code=409, detail="This link is already taken")
+    if old and old != slug:
+        _kv_set(f"vslug:{old}", None)
+    _kv_set(f"vslug:{slug}", str(guild_id))
+    _kv_set(f"vslugof:{guild_id}", slug)
+    _audit_record(guild_id, aid, aname, "verify.slug",
+                  f"💎 Vanity verify link set: /verify/{slug}", None, slug)
+    return {"ok": True, "slug": slug}
 
 
 @app.get("/api/actions")
