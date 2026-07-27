@@ -30,6 +30,29 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 27, 2026', ts: d('2026-07-27') + 8, version: '2.6.3',
+    title: 'The big audit release',
+    items: [
+      'Re-inviting the bot no longer resets your settings — everything survives a kick + re-add.',
+      'Every path that creates a new server now ships with malware & nitro-scam protection on.',
+      'New /premium command; /check-link now checks the Link Protect threat database first and says so honestly when the external scanner is unavailable.',
+      'Clearer command descriptions (whitelist/blacklist add vs. remove), admin commands hidden from members without Manage Server, /help covers everything.',
+      'Premium made honest: the verify DM uses your vanity link, digest & alarms carry your custom footer, and watchlist/automation pause when a subscription lapses. The iOS app now enforces the same Premium checks as the web.',
+    ],
+  },
+  {
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 7,
+    title: 'A funnel that holds your hand',
+    items: [
+      'New /welcome setup guide (you land there after inviting): 3 steps, full command reference, permissions explainer and FAQ.',
+      'Public /premium pricing page with the free-forever pledge — linked from the navbar and footer.',
+      'Landing cleaned up: clear "this is a Discord bot" line, one checker teaser instead of a duplicate section, current version badge, leaderboard context, honest out-of-the-box copy.',
+      'Dashboard first-run: hero shows "Setup incomplete" instead of a false all-clear, 1-click preset right on the Overview, Security Score shows your top 3 next steps.',
+      'Stats tab deduplicated, Blacklist became Custom Links (blocked + allowed domains together), timeout duration merged into thresholds, destructive actions ask twice, channel rules no longer switch protection off on add.',
+      'The tour tells the truth again and covers Scam Shield & Messages; premium lock notes now open the offer directly.',
+    ],
+  },
+  {
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 7,
     title: 'Settings is now a full account centre',
     items: [

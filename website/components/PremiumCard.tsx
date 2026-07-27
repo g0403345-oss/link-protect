@@ -11,12 +11,12 @@ import { Gem, ArrowRight, Settings2, ChevronDown, ShieldCheck } from 'lucide-rea
 
 const PERK_GROUPS: { title: string; items: string[] }[] = [
   { title: 'Personalize', items: [
-    'Embed color & custom footer',
+    'Embed color — welcome, verify & info embeds',
     'Welcome & leave messages',
     'Templates up to 1,500 characters',
     'Verify page: your logo & rules gate',
     'Vanity link — /verify/your-server',
-    'White-label (no Link Protect branding)',
+    'White-label verify page & custom footer',
   ]},
   { title: 'Moderate', items: [
     'Watchlist with instant alerts',
@@ -45,7 +45,20 @@ export default function PremiumCard({ guildId, onToast, onNavigate }: {
     let alive = true;
     fetch(`/api/guild/${guildId}/premium`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d) setStatus(d); })
+      .then((d: { active: boolean; until?: number | null } | null) => {
+        if (!alive || !d) return;
+        setStatus(d);
+        // A lock note's "Upgrade" button flags this — auto-expand the offer
+        // once, then clear the flag.
+        if (!d.active) {
+          try {
+            if (sessionStorage.getItem('lp_open_premium') === '1') {
+              sessionStorage.removeItem('lp_open_premium');
+              setOpen(true);
+            }
+          } catch { /* ignore */ }
+        }
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, [guildId]);

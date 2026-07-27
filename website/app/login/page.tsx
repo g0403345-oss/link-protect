@@ -42,7 +42,7 @@ function LoginContent() {
             <img src="/logo.webp" alt="Link Protect" width={56} height={56} style={{ borderRadius: 14, boxShadow: '0 8px 32px rgba(88,101,242,0.35)' }} />
           </div>
 
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 6, letterSpacing: '-0.02em' }}>Sign in to LinkProtect</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 6, letterSpacing: '-0.02em' }}>Sign in to Link Protect</h1>
           <p style={{ fontSize: 13, color: '#52535a', textAlign: 'center', marginBottom: 24 }}>Manage your server&apos;s protection settings</p>
 
           {/* Error */}
@@ -64,8 +64,8 @@ function LoginContent() {
           </button>
 
           <p style={{ fontSize: 12, color: '#52535a', textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
-            We only request <span style={{ color: '#949ba4' }}>identify</span> and <span style={{ color: '#949ba4' }}>guilds</span> scopes.<br />
-            We never store messages or personal data.
+            We only see who you are and which servers you manage —<br />
+            never your messages or email.
           </p>
         </div>
 

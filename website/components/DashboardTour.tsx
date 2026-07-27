@@ -31,7 +31,7 @@ interface TourStep {
 const STEPS: TourStep[] = [
   {
     title: 'Welcome to Link Protect 👋',
-    body: "Let's take a quick tour of your dashboard — about 60 seconds. Every change here saves automatically; there's no Save button to hunt for. You can skip anytime and re-open this from the “Tour” button at the top.",
+    body: "Let's take a quick tour of your dashboard — about 60 seconds. Toggles apply instantly; text fields have a Save button. You can skip anytime and re-open this from the “Tour” button at the top.",
   },
   {
     selector: 'nav',
@@ -43,7 +43,7 @@ const STEPS: TourStep[] = [
     section: 'overview',
     selector: 'overview-stats',
     title: 'Overview — the big picture',
-    body: 'See warnings issued, how many members were warned, and how many blockers are active right now. The chips below show exactly which protections are live on your server.',
+    body: 'See warnings issued, how many members were warned, and how many link blockers are active right now. The status chips up in the hero show your server’s state at a glance — all calm, setup incomplete, recent threat, or lockdown.',
   },
   {
     section: 'overview',
@@ -81,6 +81,12 @@ const STEPS: TourStep[] = [
     body: 'If many members suddenly post the same link in seconds — a raid or hijacked accounts — the bot deletes the messages and times out the accounts automatically, with one alarm instead of dozens of warnings. Off by default; tune the trigger to your server.',
   },
   {
+    section: 'scamshield',
+    selector: 'scamshield',
+    title: 'Scam Shield',
+    body: 'Stops hijacked accounts and scam bots — the ones that paste the same scam into every channel. It also checks new joins against accounts already caught scamming on other servers, and you can scan existing members anytime.',
+  },
+  {
     section: 'verification',
     selector: 'verification',
     title: 'Verification Gate',
@@ -111,22 +117,22 @@ const STEPS: TourStep[] = [
     body: 'Your whitelist: channels, categories, members, or roles that bypass all link checks. You can also grant trusted people dashboard access here — without giving them admin rights in Discord.',
   },
   {
-    section: 'access',
-    selector: 'allowlist',
-    title: 'Trusted domains',
-    body: 'Allowlist specific domains you trust — they bypass blocking, including the malware/phishing scanner. Perfect for killing false positives on a site your community uses a lot.',
+    section: 'messages',
+    selector: 'messages',
+    title: 'Messages',
+    body: 'Customize how Link Protect talks to your members — the warning text, DM templates and more. Text fields here have a Save button; nothing changes until you hit it.',
   },
   {
     section: 'blacklist',
     selector: 'blacklist',
-    title: 'Custom Blacklist',
-    body: 'Add any domain or URL here and it’s blocked instantly, on top of the built-in threat feeds. Type it in and press Enter (or Add).',
+    title: 'Custom Links',
+    body: 'Add any domain or URL and it’s blocked instantly, on top of the built-in threat feeds. Below it, allowlist domains you trust — they bypass blocking, including the malware/phishing scanner, which kills false positives.',
   },
   {
     section: 'stats',
     selector: 'stats',
     title: 'Statistics',
-    body: 'Your moderation history — total warnings, your most-warned members, and trend charts over time. Hit the refresh icon to pull the latest numbers.',
+    body: 'Your moderation history — warning trends over time and your most-warned members. Hit the refresh icon to pull the latest numbers.',
   },
   {
     section: 'log',
@@ -142,7 +148,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "That's the tour! 🎉",
-    body: 'Everything saves automatically. You can re-open this walkthrough anytime from the “Tour” button at the top. Happy moderating!',
+    body: 'Remember: toggles apply instantly, text fields have a Save button. You can re-open this walkthrough anytime from the “Tour” button at the top. Happy moderating!',
   },
 ];
 

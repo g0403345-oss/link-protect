@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import LinkChecker from '@/components/LinkChecker';
+import { useRouter } from 'next/navigation';
 import Leaderboard from '@/components/Leaderboard';
 import SupporterWall from '@/components/SupporterWall';
 
@@ -67,7 +67,7 @@ function AppShowcase() {
 
 function AppSection() {
   const features = [
-    { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 16 shields, apply presets, set warning thresholds and blacklists — right from your phone.' },
+    { icon: Smartphone, title: 'Full control on mobile', desc: 'Toggle all 16 link blockers, apply presets, set warning thresholds and blacklists — right from your phone.' },
     { icon: Bell, title: 'Instant push alerts', desc: 'Know the moment the bot goes offline or a protection rule fires in one of your servers.' },
     { icon: Lock, title: 'Face ID locked, Watch included', desc: 'Private behind Face ID — with Home & Lock Screen widgets and a full Apple Watch app, emergency lockdown included.' },
   ];
@@ -595,6 +595,15 @@ const BLOCKERS: { name: string; icon: LucideIcon }[] = [
 /* ── Main ─────────────────────────────────────────────────────── */
 export default function LandingClient() {
   const statsRef = useRef(null);
+  const router = useRouter();
+
+  // Invite opens in a new tab while this tab moves to the /welcome bridge
+  // page — the user comes back from Discord's OAuth flow to a setup guide.
+  const handleInvite = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    window.open(BOT_INVITE, '_blank', 'noopener,noreferrer');
+    router.push('/welcome');
+  };
 
   return (
     <div style={{ background: 'transparent', minHeight: '100vh', color: '#f2f3f5' }}>
@@ -612,7 +621,7 @@ export default function LandingClient() {
             <Link href="/update"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#949ba4', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 99, padding: '5px 12px', textDecoration: 'none', marginBottom: 28 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
-              v2.5.0 — Lockdown &amp; verification gate are live
+              v2.6.2 — Right-click moderation is live
               <ArrowRight size={12} />
             </Link>
 
@@ -620,18 +629,21 @@ export default function LandingClient() {
               Stop every<br /><span style={{ color: '#5865f2' }}>bad link.</span><br />Automatically.
             </h1>
 
+            <p style={{ fontSize: 15.5, fontWeight: 600, color: '#96a4ff', lineHeight: 1.5, maxWidth: 420, marginBottom: 12 }}>
+              A Discord bot that removes scam links before anyone can click.
+            </p>
+
             <p style={{ fontSize: 18, color: '#6d6f78', lineHeight: 1.6, maxWidth: 420, marginBottom: 32 }}>
-              16 independent shields blocking phishing, NSFW, scam spam and hijacked accounts — before they ever appear in your server.
+              16 independent link blockers stopping phishing, NSFW, scam spam and hijacked accounts — before they ever appear in your server.
             </p>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <a href={BOT_INVITE} target="_blank" rel="noreferrer"
+              <a href={BOT_INVITE} onClick={handleInvite}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', transition: 'background 0.15s' }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = '#4752c4')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>
                 Add to Discord — Free <ArrowRight size={15} />
               </a>
-              <AppStoreBadge />
               <Link href="/dashboard"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 600, color: '#949ba4', borderRadius: 10, textDecoration: 'none', border: '1px solid #2e2e36', transition: 'border-color 0.15s, color 0.15s' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#52535a'; (e.currentTarget as HTMLElement).style.color = '#f2f3f5'; }}
@@ -659,28 +671,25 @@ export default function LandingClient() {
         <LiveStats />
       </section>
 
-      {/* LINK CHECKER */}
-      <section style={{ padding: '80px 24px', borderBottom: '1px solid #18181b' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center' }}>
-          <div className="eyebrow" style={{ marginBottom: 22 }}>
-            <Shield size={12} /> Free URL Checker
+      {/* LINK CHECKER — slim teaser (full tool lives at /check) */}
+      <section style={{ padding: '32px 24px', borderBottom: '1px solid #18181b' }}>
+        <Link href="/check"
+          style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: '#111113', border: '1px solid #1e1e22', borderRadius: 14, padding: '16px 22px', textDecoration: 'none', transition: 'border-color 0.15s' }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(88,101,242,0.45)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = '#1e1e22')}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Shield size={17} color="#96a4ff" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 2 }}>Not sure about a link? Check it for free.</div>
+              <p style={{ fontSize: 13, color: '#6d6f78', lineHeight: 1.5 }}>Live threat database + Google Safe Browsing — no account needed.</p>
+            </div>
           </div>
-          <h2 className="cta-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
-            Is this link safe?
-          </h2>
-          <p style={{ fontSize: 16, color: '#6d6f78', maxWidth: 440, margin: '0 auto 30px', lineHeight: 1.6 }}>
-            Paste any link to check it against our live threat database — built from real scams blocked
-            across thousands of Discord servers — plus Google Safe Browsing.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <LinkChecker />
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <Link href="/check" style={{ fontSize: 13, fontWeight: 600, color: '#96a4ff', textDecoration: 'none' }}>
-              Open the full checker →
-            </Link>
-          </div>
-        </div>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 600, color: '#96a4ff', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            Open the checker <ArrowRight size={14} />
+          </span>
+        </Link>
       </section>
 
       {/* FEATURES — bento grid */}
@@ -733,8 +742,8 @@ export default function LandingClient() {
       <section id="blockers" className="noise" style={{ padding: '80px 24px', background: '#111113', borderTop: '1px solid #18181b', borderBottom: '1px solid #18181b', position: 'relative' }}>
         <div style={{ maxWidth: 880, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>16 shields. Every threat covered.</h2>
-            <p style={{ fontSize: 15, color: '#52535a' }}>Toggle each protection on or off — per server, per channel.</p>
+            <h2 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', color: '#f2f3f5', marginBottom: 10 }}>16 link blockers. Every threat covered.</h2>
+            <p style={{ fontSize: 15, color: '#52535a' }}>Toggle each link blocker on or off — per server, per channel.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
             {BLOCKERS.map(({ name, icon }) => (
@@ -749,6 +758,9 @@ export default function LandingClient() {
 
       {/* LEADERBOARD — vote reward */}
       <section style={{ padding: '96px 24px', borderTop: '1px solid #18181b' }}>
+        <p style={{ textAlign: 'center', fontSize: 14.5, color: '#6d6f78', maxWidth: 560, margin: '0 auto 44px', lineHeight: 1.6 }}>
+          Our community keeps Link Protect free — voting on top.gg supports development and earns perks.
+        </p>
         <Leaderboard />
         <SupporterWall />
       </section>
@@ -763,10 +775,10 @@ export default function LandingClient() {
             Your server deserves<br />real protection.
           </h2>
           <p style={{ fontSize: 16, color: '#52535a', marginBottom: 36, maxWidth: 400, margin: '0 auto 36px' }}>
-            Add Link Protect in 30 seconds. Works out of the box — no setup required.
+            Add Link Protect in 30 seconds. Core protection is on from the first second — presets take you further in one click.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href={BOT_INVITE} target="_blank" rel="noreferrer"
+            <a href={BOT_INVITE} onClick={handleInvite}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '13px 26px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none', transition: 'background 0.15s' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#4752c4')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#5865f2')}>

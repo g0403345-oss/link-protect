@@ -60,6 +60,18 @@ export default function ActivityTimeline({ guildId, actions, onNavigate, onToast
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const [undoBusy, setUndoBusy] = useState(false);
   const [allowDomain, setAllowDomain] = useState(false);
+  // Premium status decides whether "Undo" is clickable — pre-fetched once so
+  // non-premium users see a quiet locked hint instead of a button that 403s.
+  const [premium, setPremium] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/guild/${guildId}/premium`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setPremium(!!d.active); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [guildId]);
 
   // Review-Undo (Premium): revert a false-positive warning straight from the log.
   const undo = async (a: TimelineAction, domain: string | null) => {
@@ -194,20 +206,29 @@ export default function ActivityTimeline({ guildId, actions, onNavigate, onToast
                             <span>{new Date(a.timestamp * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                           {a.action === 'warned' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
-                              <button onClick={() => undo(a, domain)} disabled={undoBusy}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: 0, fontSize: 11.5, fontWeight: 600, color: '#23a55a', background: 'none', border: 'none', cursor: 'pointer', opacity: undoBusy ? 0.5 : 1 }}>
-                                {undoBusy ? <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Undo2 size={11} />}
-                                False positive? Undo
-                              </button>
-                              {domain && (
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6d6f78', cursor: 'pointer', userSelect: 'none' }}>
-                                  <input type="checkbox" checked={allowDomain} onChange={(e) => setAllowDomain(e.target.checked)}
-                                    style={{ accentColor: '#23a55a', width: 12, height: 12, cursor: 'pointer' }} />
-                                  also allow <span style={{ fontFamily: 'monospace', color: '#949ba4' }}>{domain}</span>
-                                </label>
-                              )}
-                            </div>
+                            premium === false ? (
+                              <div style={{ marginTop: 2 }}>
+                                <span title="Undoing a warning straight from the log is a Premium extra"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#52535a', cursor: 'default', userSelect: 'none' }}>
+                                  <Undo2 size={11} /> Undo — Premium
+                                </span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
+                                <button onClick={() => undo(a, domain)} disabled={undoBusy}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: 0, fontSize: 11.5, fontWeight: 600, color: '#23a55a', background: 'none', border: 'none', cursor: 'pointer', opacity: undoBusy ? 0.5 : 1 }}>
+                                  {undoBusy ? <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Undo2 size={11} />}
+                                  False positive? Undo
+                                </button>
+                                {domain && (
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6d6f78', cursor: 'pointer', userSelect: 'none' }}>
+                                    <input type="checkbox" checked={allowDomain} onChange={(e) => setAllowDomain(e.target.checked)}
+                                      style={{ accentColor: '#23a55a', width: 12, height: 12, cursor: 'pointer' }} />
+                                    also allow <span style={{ fontFamily: 'monospace', color: '#949ba4' }}>{domain}</span>
+                                  </label>
+                                )}
+                              </div>
+                            )
                           )}
                         </div>
                       );

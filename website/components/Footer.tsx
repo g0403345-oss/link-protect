@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { BOT_INVITE, SUPPORT_SERVER, APP_STORE_URL } from '@/lib/discord';
 
 type FLink = { label: string; href: string };
@@ -13,8 +14,17 @@ const COLUMNS: { title: string; links: FLink[] }[] = [
       { label: 'Features', href: '/#features' },
       { label: 'What we block', href: '/#blockers' },
       { label: 'Link checker', href: '/check' },
+      { label: 'Premium', href: '/premium' },
       { label: 'Dashboard', href: '/dashboard' },
       { label: 'Changelog', href: '/update' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { label: 'Intro', href: '/intro' },
+      { label: 'Setup guide', href: '/welcome' },
+      { label: 'Developers', href: '/developers' },
     ],
   },
   {
@@ -50,15 +60,20 @@ function FooterLink({ label, href }: FLink) {
 }
 
 export default function Footer() {
+  // The verify gate and the cinematic intro are full-screen experiences —
+  // the marketing footer would break their framing.
+  const pathname = usePathname();
+  if (pathname?.startsWith('/verify/') || pathname?.startsWith('/intro')) return null;
+
   return (
     <footer style={{ borderTop: '1px solid #18181b', background: 'rgba(10,10,12,0.4)', marginTop: 'auto' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '48px 24px 28px' }}>
-        <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 32, marginBottom: 36 }}>
+        <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', gap: 32, marginBottom: 36 }}>
           {/* Brand */}
           <div>
             <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', marginBottom: 12 }}>
-              <Image src="/logo.webp" alt="LinkProtect" width={26} height={26} style={{ borderRadius: 7 }} />
-              <span style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>LinkProtect</span>
+              <Image src="/logo.webp" alt="Link Protect" width={26} height={26} style={{ borderRadius: 7 }} />
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#f2f3f5', letterSpacing: '-0.01em' }}>Link Protect</span>
             </Link>
             <p style={{ fontSize: 13, color: '#52535a', lineHeight: 1.6, maxWidth: 260 }}>
               Automatic link protection for Discord — phishing, scams, malware and raids, blocked before they spread.

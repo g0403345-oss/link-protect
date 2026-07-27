@@ -28,6 +28,7 @@ export default function Navbar() {
         { label: 'Features', href: '/#features' },
         { label: 'What we block', href: '/#blockers' },
         { label: 'Link checker', href: '/check' },
+        { label: 'Premium', href: '/premium' },
         { label: 'Support', href: SUPPORT_SERVER },
       ];
   const [scrolled, setScrolled] = useState(false);

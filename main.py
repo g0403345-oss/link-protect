@@ -327,7 +327,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.6.2"
+BOT_VERSION = "2.6.3"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -829,6 +829,19 @@ async def nootification_error(ctx, error):
         await ctx.respond(embed=embed, ephemeral=True)
 
 _CHANGELOG = [
+    {
+        "version": "2.6.3",
+        "date": "27.07.2026",
+        "fields": [
+            ("🧰 Audit release",
+             " • Re-inviting the bot keeps ALL your settings now.\n"
+             " • Every new-server path ships with malware & nitro-scam\n"
+             "   protection already on.\n"
+             " • /check-link uses the Link Protect threat DB first.\n"
+             " • New /premium command · clearer command descriptions ·\n"
+             "   admin commands hidden from members."),
+        ],
+    },
     {
         "version": "2.6.2",
         "date": "25.07.2026",

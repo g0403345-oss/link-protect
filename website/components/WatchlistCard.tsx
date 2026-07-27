@@ -31,9 +31,10 @@ function daysLeft(until: number): string {
 
 const shortId = (id: string) => `…${id.slice(-4)}`;
 
-export default function WatchlistCard({ guildId, onToast }: {
+export default function WatchlistCard({ guildId, onToast, onNavigate }: {
   guildId: string;
   onToast: (type: 'success' | 'error', message: string) => void;
+  onNavigate?: (section: string) => void;
 }) {
   const [entries, setEntries] = useState<WatchEntry[]>([]);
   const [premium, setPremium] = useState<boolean | null>(null);
@@ -188,7 +189,7 @@ export default function WatchlistCard({ guildId, onToast }: {
       {/* Add form / lock note */}
       {premium === false ? (
         <div style={{ marginTop: 10 }}>
-          <PremiumLockNote text="Watch suspicious members — a Premium extra. Protection itself stays free." />
+          <PremiumLockNote text="Watch suspicious members — a Premium extra. Protection itself stays free." onNavigate={onNavigate} />
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>

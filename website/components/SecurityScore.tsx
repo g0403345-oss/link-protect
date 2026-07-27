@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronRight, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, ShieldCheck, Zap } from 'lucide-react';
 import { Celebration } from '@/components/fx';
 import type { ServerData } from '@/lib/db';
 
@@ -49,8 +49,14 @@ export default function SecurityScore({ data, onNavigate, guildId }: {
   const items = scoreItems(data);
   const score = items.reduce((s, i) => s + (i.met ? i.points : 0), 0);
   const level = LEVELS.find((l) => score >= l.min)!;
-  const todo = items.filter((i) => !i.met);
+  const todo = [...items.filter((i) => !i.met)].sort((a, b) => b.points - a.points);
   const done = items.filter((i) => i.met);
+
+  // Long todo lists read like homework — show the 3 biggest wins, tuck the rest
+  // behind a toggle.
+  const [showAll, setShowAll] = useState(false);
+  const visibleTodo = showAll ? todo : todo.slice(0, 3);
+  const hiddenCount = todo.length - 3;
 
   // Celebrate a perfect score — once per server per browser, not on every visit.
   const [celebrate, setCelebrate] = useState(false);
@@ -104,8 +110,16 @@ export default function SecurityScore({ data, onNavigate, guildId }: {
               <p style={{ fontSize: 12, color: '#52535a', marginBottom: 8 }}>
                 Boost your score — each recommendation takes under a minute:
               </p>
+              {todo.length >= 3 && (
+                <button onClick={() => onNavigate('blockers')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', marginBottom: 8, fontSize: 11.5, fontWeight: 700, color: '#96a4ff', background: 'rgba(88,101,242,0.08)', border: '1px solid rgba(88,101,242,0.25)', borderRadius: 99, cursor: 'pointer', transition: 'background 0.13s' }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(88,101,242,0.16)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(88,101,242,0.08)')}>
+                  <Zap size={11} /> Fastest fix: apply the Balanced preset in Link Blockers
+                </button>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {todo.map((i) => (
+                {visibleTodo.map((i) => (
                   <button key={i.key} onClick={() => onNavigate(i.section)} title={i.hint}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'border-color 0.15s' }}
                     onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = '#5865f2')}
@@ -121,6 +135,15 @@ export default function SecurityScore({ data, onNavigate, guildId }: {
                   </button>
                 ))}
               </div>
+              {hiddenCount > 0 && (
+                <button onClick={() => setShowAll((v) => !v)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 2px', fontSize: 12, fontWeight: 600, color: '#6d6f78', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.13s' }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#b5bac1')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#6d6f78')}>
+                  <ChevronDown size={12} style={{ transform: showAll ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+                </button>
+              )}
             </>
           )}
           {done.length > 0 && todo.length > 0 && (

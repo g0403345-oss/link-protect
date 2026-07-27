@@ -13,9 +13,9 @@ import Link from 'next/link';
 import {
   ShieldAlert, Siren, UserCheck, Radar, RotateCcw, X, Gift, Bug, Link2,
 } from 'lucide-react';
+import { BOT_INVITE } from '@/lib/discord';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-const BOT_INVITE = 'https://discord.com/oauth2/authorize?client_id=888390889892892684&permissions=1376805547126&integration_type=0&scope=bot';
 
 /* scene durations in ms — cuts first, then room to breathe */
 const SCENES = [2700, 2400, 3400, 5400, 4800, 3400, 3000, 3000] as const;

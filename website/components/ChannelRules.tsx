@@ -43,6 +43,9 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
+  // Channel just created from the add-search — scroll its editor into view
+  // once the refreshed overrides contain it.
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/guild/${guildId}/discord-channels`)
@@ -63,12 +66,12 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
   const available = textChannels.filter((c) => !ruledIds.includes(c.id) && c.name.toLowerCase().includes(search.toLowerCase()));
 
   const callApi = useCallback(
-    async (channelId: string, init: RequestInit) => {
+    async (channelId: string, init: RequestInit, successMsg = 'Channel rule saved') => {
       setBusy(channelId);
       try {
         const res = await fetch(`/api/guild/${guildId}/override/${channelId}`, init);
         if (!res.ok) throw new Error();
-        addToast('success', 'Channel rule saved');
+        addToast('success', successMsg);
         onSaved();
       } catch {
         addToast('error', 'Failed to save channel rule');
@@ -78,6 +81,24 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
     },
     [guildId, onSaved, addToast]
   );
+
+  // A fresh rule starts in 'custom' mode (nothing blocked until you pick) —
+  // never 'off', which silently disabled Link Protect in that channel.
+  const addRule = useCallback(async (channelId: string) => {
+    const body: ChannelOverride = { mode: 'custom', protect: {} };
+    await callApi(channelId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      'Rule created — pick what changes below');
+    setJustAdded(channelId);
+  }, [callApi]);
+
+  useEffect(() => {
+    if (!justAdded || !(justAdded in (overrides ?? {}))) return;
+    const el = document.getElementById(`channel-rule-${justAdded}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setJustAdded(null);
+    }
+  }, [justAdded, overrides]);
 
   const setMode = (channelId: string, mode: Mode, current?: ChannelOverride) => {
     if (mode === 'default') return callApi(channelId, { method: 'DELETE' });
@@ -154,7 +175,7 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
                 available.slice(0, 50).map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => { setMode(c.id, 'off'); setAdding(false); setSearch(''); }}
+                    onClick={() => { addRule(c.id); setAdding(false); setSearch(''); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#b5bac1', fontSize: 13, textAlign: 'left' }}
                     onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = '#232329')}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'none')}
@@ -179,7 +200,7 @@ export default function ChannelRules({ guildId, overrides, onSaved, addToast }: 
           const ov = overrides[cid];
           const mode: Mode = ov?.mode ?? 'default';
           return (
-            <div key={cid} style={{ ...card(), overflow: 'hidden' }}>
+            <div key={cid} id={`channel-rule-${cid}`} style={{ ...card(), overflow: 'hidden' }}>
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid #1e1e22' }}>
                 <Hash size={15} color="#5865f2" />

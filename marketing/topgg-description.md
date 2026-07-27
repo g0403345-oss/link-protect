@@ -9,13 +9,14 @@ can manage everything from anywhere.
 
 **Trusted by 10,000+ servers.**
 
-## ⚡ Set Up in 30 Seconds
-Run **`/setup-preset`** and pick a protection level — **Minimal, Balanced or
-Strict**. One command configures every security shield to a sensible level.
-Fine-tune everything later on the dashboard, where a **Security Score (0–100)**
-shows exactly how locked-down your server is and what to improve.
+## ⚡ Protected From the First Second
+The moment Link Protect joins, the **malware/phishing and Nitro-scam blockers
+are already on** — zero setup required. Then run **`/setup-preset`** and pick
+**Minimal, Balanced or Strict** to add raid protection, Scam Shield and more
+with one command. Fine-tune everything on the dashboard, where a
+**Security Score (0–100)** shows exactly how locked-down your server is.
 
-## Link & Content Filtering — 16 Shields
+## Link & Content Filtering — 16 Link Blockers
 Real-time detection and instant deletion of:
 - Phishing & malware links (live threat database + Google Safe Browsing)
 - Fake Discord Nitro scams and look-alike domains (homoglyph detection)
@@ -26,6 +27,16 @@ Real-time detection and instant deletion of:
 - YouTube, Twitch, Google, Steam and GIF links
 - Any domain you add to your custom blacklist
 - Or block every link at once with a single toggle
+
+## 🖱️ Moderation Where You Are
+- **Right-click any message** → Apps → *Warn for this message* (the message
+  becomes reason + evidence) or *Check links in message* — zero typing.
+- **18 clean slash commands** — `/blocker`, `/warn add·list·remove·kick-at·
+  ban-at·timeout·decay·log`, `/whitelist`, `/blacklist`, `/lockdown` and more.
+- **Message Studio** — customize every text the bot sends (warnings, DMs,
+  verification, welcome & leave) with variables, live preview and tone presets.
+- Buttons on every log embed: remove a warning or open the dashboard directly
+  from Discord.
 
 ## 🛡️ Scam Shield
 You've seen it: a hijacked account pastes the same crypto giveaway or fake Nitro
@@ -86,19 +97,16 @@ app — even straight from a push notification.
   Ban a caught scammer straight from the notification.
 - **Team Access** — delegate dashboard control to specific people without giving
   them Discord admin
-- **Developer platform** — read-only REST API, signed webhooks for moderation
-  events, and live SVG embeds (protection badge, stats card) for your website
+- **Developer platform** — REST API (read + scoped writes), signed webhooks
+  with a delivery inspector, a live event stream, official JS/Python SDKs and a
+  public sandbox key — try it at link-protect.com/developers
+- **Premium (optional, 3.49 €/mo)** — personalization extras only: custom
+  embed colors, welcome/leave messages, verify-page branding & vanity link,
+  watchlist, night automation, multi-server sync. **Every security feature is
+  and stays free — forever.**
 
 ## Getting Started
-1. Invite Link Protect and let it manage messages in the channels you want protected
-2. Run `/setup-preset` — or open the dashboard / iOS app to fine-tune everything
-3. Optionally pick a log channel and enable the Verification Gate
-
-**Permissions:** Link Protect needs *Manage Messages* to delete links, plus
-*Kick*/*Ban Members* for automatic sanctions and Scam Shield. The Verification
-Gate and Lockdown additionally use *Manage Roles*, *Manage Channels* and
-*Manage Server* — the dashboard shows you a live permission check. Unsure? Try
-it on a test server first — this bot is built to protect, never to disrupt
-your server.
-
-Questions or feedback? Reach out on Discord.
+1. Invite Link Protect — core protection is active immediately
+2. Run `/setup-preset` (Balanced recommended) to add raid & scam defense
+3. Set a log channel with `/warn log` and open the dashboard at
+   link-protect.com/dashboard to fine-tune everything

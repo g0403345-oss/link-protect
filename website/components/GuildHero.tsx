@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, ShieldAlert, Siren, Radar, ArrowRight } from 'lucide-react';
+import { Shield, ShieldAlert, Siren, Radar, ArrowRight, Activity } from 'lucide-react';
 import { scoreItems } from '@/components/SecurityScore';
 import type { ServerData, GuildStats } from '@/lib/db';
 
@@ -86,14 +86,16 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
   // their settings, so a configured server climbs fast. Labeled as estimate.
   const percentile = Math.min(99, Math.max(8, Math.round(score * 0.9 + 6)));
 
-  // Mood: lockdown → red · threat caught in the last 24 h → orange · else green.
+  // Mood: lockdown → red · threat caught in the last 24 h → orange ·
+  // barely-configured server → amber "Setup incomplete" · else green.
   const now = Math.floor(Date.now() / 1000);
   const recentThreat = actions.some((a) =>
     a.timestamp > now - 86400 &&
     (a.action === 'banned' || /scam shield|raid/i.test(a.reason ?? '')));
-  const mood = lockdown ? '#f23f43' : recentThreat ? '#f0b232' : '#23a55a';
-  const moodLabel = lockdown ? 'Lockdown active' : recentThreat ? 'Threat handled in the last 24h' : 'All calm';
-  const MoodIcon = lockdown ? Siren : recentThreat ? ShieldAlert : Shield;
+  const setupIncomplete = !lockdown && !recentThreat && score < 40;
+  const mood = lockdown ? '#f23f43' : recentThreat ? '#f0b232' : setupIncomplete ? '#f0b232' : '#23a55a';
+  const moodLabel = lockdown ? 'Lockdown active' : recentThreat ? 'Threat handled in the last 24h' : setupIncomplete ? 'Setup incomplete' : 'All calm';
+  const MoodIcon = lockdown ? Siren : (recentThreat || setupIncomplete) ? ShieldAlert : Shield;
 
   const iconUrl = icon ? `https://cdn.discordapp.com/icons/${guildId}/${icon}.webp?size=256` : null;
 
@@ -137,7 +139,11 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
           </div>
           {/* One clear next step — everything else lives in its own tab */}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            {firstTodo ? (
+            {score < 50 ? (
+              <button onClick={() => onNavigate('blockers')} className="btn-primary btn-sm" style={{ fontSize: 12.5 }}>
+                Finish setup — 1-click preset <ArrowRight size={12} />
+              </button>
+            ) : firstTodo ? (
               <button onClick={() => onNavigate(firstTodo.section)} className="btn-primary btn-sm" style={{ fontSize: 12.5 }}>
                 {firstTodo.label} <span style={{ opacity: 0.75 }}>+{firstTodo.points}</span> <ArrowRight size={12} />
               </button>
@@ -146,10 +152,18 @@ export default function GuildHero({ guildId, name, icon, data, stats, actions, o
                 <Radar size={13} /> Scan members
               </button>
             )}
+            {/* Secondary action: member scan only once Scam Shield is on —
+                otherwise the most useful quick win is picking a log channel. */}
             {firstTodo && (
-              <button onClick={() => onNavigate('scamshield')} className="btn-secondary btn-sm" style={{ fontSize: 12.5 }}>
-                <Radar size={13} /> Scan members
-              </button>
+              data.scamguard?.enabled ? (
+                <button onClick={() => onNavigate('scamshield')} className="btn-secondary btn-sm" style={{ fontSize: 12.5 }}>
+                  <Radar size={13} /> Scan members
+                </button>
+              ) : !data.log?.['log-channel'] ? (
+                <button onClick={() => onNavigate('log')} className="btn-secondary btn-sm" style={{ fontSize: 12.5 }}>
+                  <Activity size={13} /> Set a log channel
+                </button>
+              ) : null
             )}
           </div>
         </div>

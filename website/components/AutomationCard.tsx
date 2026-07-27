@@ -29,9 +29,10 @@ function remaining(until: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export default function AutomationCard({ guildId, onToast }: {
+export default function AutomationCard({ guildId, onToast, onNavigate }: {
   guildId: string;
   onToast: (type: 'success' | 'error', message: string) => void;
+  onNavigate?: (section: string) => void;
 }) {
   const [data, setData] = useState<Schedule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,7 +130,7 @@ export default function AutomationCard({ guildId, onToast }: {
   if (loading) return <p style={{ fontSize: 13, color: '#52535a' }}>Loading…</p>;
 
   if (data && !data.premium) {
-    return <PremiumLockNote text="Night schedule & event mode — automate your blockers, a Premium extra. Protection itself stays free." />;
+    return <PremiumLockNote text="Night schedule & event mode — automate your blockers, a Premium extra. Protection itself stays free." onNavigate={onNavigate} />;
   }
 
   return (
