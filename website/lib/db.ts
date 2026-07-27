@@ -529,6 +529,100 @@ export interface UserFlags {
   votePromptSeen: boolean;
 }
 
+// ── Account centre (/settings) ───────────────────────────────────────────────
+
+/** Extended voter profile for the account centre. The bot API may add fields
+ *  over time — pass through whatever comes. */
+export interface VoterProfile {
+  hasVoted: boolean;
+  lastVoted: number;
+  canVoteAt: number;
+  total: number;
+  monthly: number;
+  rank: number | null;
+  streak?: number;
+  bestStreak?: number;
+  supporter?: boolean;
+  synced?: boolean;
+  [key: string]: unknown;
+}
+
+export async function getMyVoter(): Promise<VoterProfile> {
+  return apiFetch(`/api/me/voter`);
+}
+
+export interface PremiumBatchEntry { active: boolean; until?: number | null }
+
+export async function getPremiumBatch(ids: string[]): Promise<{ statuses: Record<string, PremiumBatchEntry> }> {
+  return apiFetch(`/api/premium/batch`, { method: "POST", body: JSON.stringify({ ids }) });
+}
+
+export interface NotifPrefs {
+  reports: boolean;
+  developer: boolean;
+  warnings: boolean;
+  settings: boolean;
+}
+
+export async function getNotifPrefs(): Promise<NotifPrefs> {
+  return apiFetch(`/api/me/notifprefs`);
+}
+
+export async function setNotifPrefs(prefs: Partial<NotifPrefs>): Promise<NotifPrefs> {
+  return apiFetch(`/api/me/notifprefs`, { method: "POST", body: JSON.stringify(prefs) });
+}
+
+export interface DevicePrefs {
+  bot_offline: boolean;
+  rule_triggered: boolean;
+  settings_changed: boolean;
+  scam_shield: boolean;
+}
+
+export interface ConnectedDevice {
+  tail: string;
+  platform: string;
+  updatedAt: number;
+  guildCount: number;
+  prefs: DevicePrefs;
+}
+
+export async function getMyDevices(): Promise<{ devices: ConnectedDevice[] }> {
+  return apiFetch(`/api/me/devices`);
+}
+
+export async function setDevicePref(tail: string, key: keyof DevicePrefs, value: boolean): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/me/devices/prefs`, { method: "POST", body: JSON.stringify({ tail, key, value }) });
+}
+
+export async function removeDevice(tail: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/me/devices/${encodeURIComponent(tail)}`, { method: "DELETE" });
+}
+
+/** Ticket rows in the account centre — note snake_case created_at from the bot API. */
+export interface AccountReport {
+  id: number;
+  type: string;
+  url: string | null;
+  category: string | null;
+  message: string | null;
+  status: string;
+  created_at: number;
+}
+
+export async function getMyAccountReports(): Promise<{ reports: AccountReport[] }> {
+  return apiFetch(`/api/me/reports`);
+}
+
+/** Full account data export (GDPR-style) — shape is defined by the bot API. */
+export async function getMyExport(): Promise<unknown> {
+  return apiFetch(`/api/me/export`, undefined, 25_000);
+}
+
+export async function deleteMyData(): Promise<{ ok: boolean; deletedReports: number }> {
+  return apiFetch(`/api/me/data`, { method: "DELETE" }, 25_000);
+}
+
 export async function getLeaderboard(limit = 10): Promise<{ month: string; leaderboard: LeaderboardEntry[] }> {
   return apiFetch(`/api/leaderboard?limit=${limit}`);
 }

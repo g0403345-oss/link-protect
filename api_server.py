@@ -1058,6 +1058,10 @@ def _notify(scope: str, scope_id, ntype: str, title: str, body: str | None = Non
     if not scope_id:
         return
     try:
+        if scope == "user":
+            pref = _NOTIF_TYPE_TO_PREF.get(ntype)
+            if pref and not _notif_prefs(str(scope_id)).get(pref, True):
+                return
         c = _get_conn()
         c.execute(
             "INSERT INTO web_notifications(scope, scope_id, type, title, body, report_id, created_at) "
@@ -4381,6 +4385,176 @@ async def weekly_report(request: Request, guild_id: str):
             "topUsers": top_users, "topReasons": top_reasons, "perDay": per_day}
 
 
+
+
+
+
+# ── Account centre (/api/me/*) ───────────────────────────────────────────────
+
+def _require_actor_id(request: Request) -> str:
+    aid, _ = _web_actor(request)
+    if not aid:
+        raise HTTPException(status_code=401, detail="No Discord account in session")
+    return str(aid)
+
+
+@app.get("/api/me/voter")
+@require_auth
+async def me_voter(request: Request):
+    aid = _require_actor_id(request)
+    st = _vote_status(aid)
+    rank = None
+    try:
+        rows = _get_conn().execute(
+            "SELECT user_id FROM votes WHERE month=? AND monthly>0 ORDER BY monthly DESC, last_voted ASC LIMIT 100",
+            (_month_key(),)).fetchall()
+        for i, r in enumerate(rows):
+            if str(r["user_id"]) == aid:
+                rank = i + 1
+                break
+    except Exception:
+        pass
+    return {**st, "rank": rank}
+
+
+class PremiumBatchBody(BaseModel):
+    ids: list[str]
+
+
+@app.post("/api/premium/batch")
+@require_auth
+async def premium_batch(request: Request, body: PremiumBatchBody):
+    out = {}
+    for gid in [str(g) for g in body.ids][:50]:
+        st = _premium_state(gid)
+        out[gid] = {"active": _is_premium(gid), "until": st.get("until")}
+    return {"statuses": out}
+
+
+_NOTIF_PREF_KEYS = ("reports", "developer", "warnings", "settings")
+_NOTIF_TYPE_TO_PREF = {"report_new": "reports", "report_reply": "reports", "report_status": "reports",
+                       "dev_request": "developer", "dev_decision": "developer",
+                       "warn": "warnings", "settings": "settings"}
+
+
+def _notif_prefs(aid: str) -> dict:
+    p = _kv_json(f"notifprefs:{aid}") or {}
+    return {k: bool(p.get(k, True)) for k in _NOTIF_PREF_KEYS}
+
+
+class NotifPrefsBody(BaseModel):
+    reports: bool = True
+    developer: bool = True
+    warnings: bool = True
+    settings: bool = True
+
+
+@app.get("/api/me/notifprefs")
+@require_auth
+async def get_notifprefs(request: Request):
+    return _notif_prefs(_require_actor_id(request))
+
+
+@app.post("/api/me/notifprefs")
+@require_auth
+async def set_notifprefs(request: Request, body: NotifPrefsBody):
+    aid = _require_actor_id(request)
+    _kv_set(f"notifprefs:{aid}", {k: bool(getattr(body, k)) for k in _NOTIF_PREF_KEYS})
+    return {"ok": True}
+
+
+@app.get("/api/me/devices")
+@require_auth
+async def me_devices(request: Request):
+    aid = _require_actor_id(request)
+    rows = _get_conn().execute(
+        "SELECT * FROM device_tokens WHERE user_id=? ORDER BY updated_at DESC", (aid,)).fetchall()
+    return {"devices": [{
+        "tail": r["device_token"][-6:], "platform": r["platform"],
+        "updatedAt": r["updated_at"], "guildCount": len(json.loads(r["guild_ids"] or "[]")),
+        "prefs": {"bot_offline": bool(r["bot_offline"]), "rule_triggered": bool(r["rule_triggered"]),
+                  "settings_changed": bool(r["settings_changed"]),
+                  "scam_shield": bool(r["scam_shield"] if "scam_shield" in r.keys() else 1)},
+    } for r in rows]}
+
+
+class DevicePrefBody(BaseModel):
+    tail: str
+    key: str
+    value: bool
+
+
+@app.post("/api/me/devices/prefs")
+@require_auth
+async def me_device_pref(request: Request, body: DevicePrefBody):
+    aid = _require_actor_id(request)
+    if body.key not in ("bot_offline", "rule_triggered", "settings_changed", "scam_shield"):
+        raise HTTPException(status_code=400, detail="Unknown preference")
+    c = _get_conn()
+    c.execute(f"UPDATE device_tokens SET {body.key}=? WHERE user_id=? AND device_token LIKE ?",
+              (1 if body.value else 0, aid, "%" + body.tail[-6:]))
+    c.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/me/devices/{tail}")
+@require_auth
+async def me_device_delete(request: Request, tail: str):
+    aid = _require_actor_id(request)
+    c = _get_conn()
+    c.execute("DELETE FROM device_tokens WHERE user_id=? AND device_token LIKE ?",
+              (aid, "%" + tail[-6:]))
+    c.commit()
+    return {"ok": True}
+
+
+@app.get("/api/me/reports")
+@require_auth
+async def me_reports(request: Request):
+    aid = _require_actor_id(request)
+    rows = _get_conn().execute(
+        "SELECT id, type, url, category, message, status, created_at FROM reports "
+        "WHERE user_id=? ORDER BY id DESC LIMIT 50", (aid,)).fetchall()
+    return {"reports": [dict(r) for r in rows]}
+
+
+@app.get("/api/me/export")
+@require_auth
+async def me_export(request: Request):
+    aid = _require_actor_id(request)
+    c = _get_conn()
+    votes = c.execute("SELECT * FROM votes WHERE user_id=?", (aid,)).fetchone()
+    reports = [dict(r) for r in c.execute(
+        "SELECT * FROM reports WHERE user_id=? ORDER BY id", (aid,)).fetchall()]
+    notifs = [dict(r) for r in c.execute(
+        "SELECT * FROM web_notifications WHERE scope='user' AND scope_id=? ORDER BY id", (aid,)).fetchall()]
+    devices = [{"platform": r["platform"], "updatedAt": r["updated_at"]} for r in c.execute(
+        "SELECT * FROM device_tokens WHERE user_id=?", (aid,)).fetchall()]
+    return {"exportedAt": int(time.time()), "userId": aid,
+            "votes": dict(votes) if votes else None,
+            "developer": _dev_get(aid), "reports": reports,
+            "notifications": notifs, "devices": devices,
+            "notificationPrefs": _notif_prefs(aid)}
+
+
+@app.delete("/api/me/data")
+@require_auth
+async def me_delete_data(request: Request):
+    """Deletes the user's personal data: votes, reports (+ messages), web
+    notifications, devices, notification prefs and developer access."""
+    aid = _require_actor_id(request)
+    c = _get_conn()
+    ids = [r["id"] for r in c.execute("SELECT id FROM reports WHERE user_id=?", (aid,)).fetchall()]
+    for rid in ids:
+        c.execute("DELETE FROM report_messages WHERE report_id=?", (rid,))
+    c.execute("DELETE FROM reports WHERE user_id=?", (aid,))
+    c.execute("DELETE FROM votes WHERE user_id=?", (aid,))
+    c.execute("DELETE FROM web_notifications WHERE scope='user' AND scope_id=?", (aid,))
+    c.execute("DELETE FROM device_tokens WHERE user_id=?", (aid,))
+    c.execute("DELETE FROM kv WHERE path IN (?, ?, ?)",
+              (f"notifprefs:{aid}", f"user:{aid}:dev", f"notif_seen:{aid}"))
+    c.commit()
+    return {"ok": True, "deletedReports": len(ids)}
 
 
 # ── Permission-failure alerts ────────────────────────────────────────────────

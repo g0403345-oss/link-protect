@@ -30,6 +30,18 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 7,
+    title: 'Settings is now a full account centre',
+    items: [
+      'Voter profile: your level with XP bar, 🔥 streak (with an expiry countdown), monthly votes, leaderboard rank and all four milestone badges — plus a vote button that knows your cooldown.',
+      'Premium overview: every server with Premium in one list, renewal dates included, with one-click access to the Stripe portal.',
+      'Notification preferences: choose exactly what reaches you — ticket replies, developer news, warnings, settings changes.',
+      'Connected devices: see every phone running the Link Protect app, tune its push alerts per device, or disconnect it.',
+      'My tickets & reports: all your reports with live status — click any to reopen the conversation with support.',
+      'Data & privacy: download everything we store about you as JSON, or delete it all with one (double-confirmed) click. Server settings stay untouched.',
+    ],
+  },
+  {
     product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 6,
     title: 'Server switcher, Message Studio 2.0 & a rules gate',
     items: [

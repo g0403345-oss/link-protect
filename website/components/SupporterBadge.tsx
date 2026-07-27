@@ -32,7 +32,8 @@ export interface MilestoneMeta {
   next: number | null; // votes needed for the next tier (null = maxed out)
 }
 
-const MILESTONES: MilestoneMeta[] = [
+/** All milestone tiers, highest first (Diamond → Bronze). */
+export const MILESTONES: MilestoneMeta[] = [
   { tier: 'Diamond', color: '#7fd8ff', bg: 'rgba(127,216,255,0.14)', at: 500, next: null },
   { tier: 'Gold',    color: '#FFD700', bg: 'rgba(255,215,0,0.13)',   at: 100, next: 500 },
   { tier: 'Silver',  color: '#C8CCD4', bg: 'rgba(200,204,212,0.13)', at: 50,  next: 100 },
