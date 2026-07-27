@@ -76,7 +76,9 @@ function trends(days: number) {
       count: c, scamshield: c > 6 ? 1 : 0, raid: c > 8 ? 1 : 0,
     };
   });
+  const tot = (k: 'warned' | 'kicked' | 'banned' | 'timeout') => perDay.reduce((s, x) => s + x[k], 0);
   return { days, total: perDay.reduce((s, x) => s + x.count, 0), perDay,
+    totals: { warned: tot('warned'), kicked: tot('kicked'), banned: tot('banned'), timeout: tot('timeout') },
     topReasons: [
       { reason: 'Scam Shield: cross-channel spam', count: 14 },
       { reason: 'Fake Nitro giveaway links', count: 11 },
@@ -111,7 +113,7 @@ const ROUTES: [RegExp, (u: string, init?: RequestInit) => unknown][] = [
     { id: 'rank', ok: true, label: 'Bot role above quarantine role', detail: '' },
     { id: 'perm', ok: false, label: 'Manage Roles permission', detail: 'Grant it in Server Settings → Roles' },
   ] })],
-  [/\/verify\/stats/, () => ({ total: 128, today: 6, pending: 2 })],
+  [/\/verify\/stats/, () => ({ total: 128, last7: 23 })],
   [/\/discord-members\/resolve/, (u) => ({ members: (u.match(/ids=([\d,]+)/)?.[1] ?? '').split(',').filter(Boolean)
     .map((id) => ({ id, username: USERS[id] ?? `User …${id.slice(-4)}`, nick: null, avatar: null })) })],
   [/\/discord-channels/, () => ({ channels: [

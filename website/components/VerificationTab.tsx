@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import ToggleSwitch from '@/components/ToggleSwitch';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
+import PremiumTag from '@/components/PremiumTag';
 import PremiumLockNote from '@/components/PremiumLockNote';
 import type { ServerData, VerifyHealth } from '@/lib/db';
 
@@ -15,9 +16,10 @@ interface Role { id: string; name: string; color: number; position: number; }
 const ACCENT_PRESETS = ['#5865f2', '#23a55a', '#f0b232', '#eb459e'];
 const roleColor = (c: number) => (c ? `#${c.toString(16).padStart(6, '0')}` : '#949ba4');
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, premium }: { title: string; children: React.ReactNode; premium?: boolean }) {
   return (
-    <CollapsibleCard title={title} storageKey={cardKey('verify', title)}>
+    <CollapsibleCard storageKey={cardKey('verify', title)}
+      title={premium ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{title}<PremiumTag /></span> : title}>
       {children}
     </CollapsibleCard>
   );
@@ -290,7 +292,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
           {[{ label: 'Members verified (total)', value: stats.total, color: '#23a55a' },
             { label: 'Verified — last 7 days', value: stats.last7, color: '#5865f2' }].map((s) => (
             <div key={s.label} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10, padding: '14px 16px' }}>
-              <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: '-0.02em' }}>{s.value.toLocaleString()}</div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: '-0.02em' }}>{(s.value ?? 0).toLocaleString()}</div>
               <div style={{ fontSize: 11.5, color: '#52535a', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
@@ -554,7 +556,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       </Card>
 
       {/* Premium branding: custom logo + vanity link */}
-      <Card title="Premium Branding">
+      <Card title="Branding" premium>
         {premium === false ? (
           <PremiumLockNote text="💎 Your own logo on the verify page and a memorable vanity link — Premium extras. Protection itself stays free." />
         ) : (
@@ -628,7 +630,7 @@ export default function VerificationTab({ guildId, data, patch, saving, guildIco
       </Card>
 
       {/* Premium: rules text + acceptance checkbox on the verify page */}
-      <Card title="Rules Gate">
+      <Card title="Rules Gate" premium>
         {premium === false ? (
           <PremiumLockNote text="💎 Show your server rules right on the verify page — optionally requiring members to accept them before they can verify. A Premium extra." />
         ) : (

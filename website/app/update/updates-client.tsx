@@ -50,6 +50,8 @@ const ENTRIES: Entry[] = [
       'Dashboard first-run: hero shows "Setup incomplete" instead of a false all-clear, 1-click preset right on the Overview, Security Score shows your top 3 next steps.',
       'Stats tab deduplicated, Blacklist became Custom Links (blocked + allowed domains together), timeout duration merged into thresholds, destructive actions ask twice, channel rules no longer switch protection off on add.',
       'The tour tells the truth again and covers Scam Shield & Messages; premium lock notes now open the offer directly.',
+      'Fixed: sticky elements (sidebar, breadcrumb, Message Studio live preview) stopped following the page — a stray scroll container on <body> broke them site-wide.',
+      'Premium cards (Watchlist, Automation, Branding, Rules Gate, accent & welcome) now carry a quiet Premium tag — also while a subscription is active.',
     ],
   },
   {

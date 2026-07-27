@@ -31,6 +31,7 @@ import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import PermFailBanner from '@/components/PermFailBanner';
 import PremiumCard from '@/components/PremiumCard';
+import PremiumTag from '@/components/PremiumTag';
 import GuildHero from '@/components/GuildHero';
 import PulseStrip from '@/components/PulseStrip';
 import BlockerWall from '@/components/BlockerWall';
@@ -176,9 +177,10 @@ function ServerSwitcher({ guildId, guildInfo }: {
   );
 }
 
-function Card({ title, children, tourId }: { title: string; children: React.ReactNode; tourId?: string }) {
+function Card({ title, children, tourId, premium }: { title: string; children: React.ReactNode; tourId?: string; premium?: boolean }) {
   return (
-    <CollapsibleCard title={title} tourId={tourId} storageKey={cardKey('guild', title)}>
+    <CollapsibleCard tourId={tourId} storageKey={cardKey('guild', title)}
+      title={premium ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{title}<PremiumTag /></span> : title}>
       {children}
     </CollapsibleCard>
   );
@@ -792,7 +794,7 @@ export default function GuildDashboard() {
                       onToggle={(key, v, label) => patch(`protect.${key}`, v, label)}
                     />
                   </Card>
-                  <Card title="Automation">
+                  <Card title="Automation" premium>
                     <AutomationCard guildId={guildId} onToast={addToast} onNavigate={(sec) => selectSection(sec as Section)} />
                   </Card>
                   <Card title="Silent Mode" tourId="silent">
@@ -1044,7 +1046,7 @@ export default function GuildDashboard() {
                     </p>
                     <MemberModeration guildId={guildId} onToast={addToast} onChanged={() => { fetchData(); fetchStats(); }} />
                   </Card>
-                  <Card title="Watchlist">
+                  <Card title="Watchlist" premium>
                     <WatchlistCard guildId={guildId} onToast={addToast} onNavigate={(sec) => selectSection(sec as Section)} />
                   </Card>
                 </div>

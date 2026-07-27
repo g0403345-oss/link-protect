@@ -63,7 +63,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* Tabular numerals: live counters and stats don't wobble while counting */
   font-variant-numeric: tabular-nums;
-  overflow-x: hidden;
+  /* No overflow here: html{overflow-x:clip} guards the viewport. Anything
+     other than `visible` turns body into a scroll container, which silently
+     breaks every position:sticky element on the site. */
 }
 
 ::selection {

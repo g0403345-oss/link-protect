@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Heart, Minus, Gavel, Languages, Gem, RefreshCw, Save, Send, RotateCcw, Info } from 'lucide-react';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
+import PremiumTag from '@/components/PremiumTag';
 import PremiumLockNote from '@/components/PremiumLockNote';
 import type { ServerData } from '@/lib/db';
 
@@ -141,9 +142,10 @@ function renderMd(text: string): React.ReactNode {
   ));
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, premium }: { title: string; children: React.ReactNode; premium?: boolean }) {
   return (
-    <CollapsibleCard title={title} storageKey={cardKey('messages', title)}>
+    <CollapsibleCard storageKey={cardKey('messages', title)}
+      title={premium ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{title}<PremiumTag /></span> : title}>
       {children}
     </CollapsibleCard>
   );
@@ -332,9 +334,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
                 <div key={f.key} style={{ marginTop: i === 0 ? 0 : 16, paddingTop: i === 0 ? 0 : 16, borderTop: i === 0 ? 'none' : '1px solid #1e1e22' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: locked ? '#949ba4' : '#f2f3f5' }}>{f.label}</span>
-                    {f.premium && (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#96a4ff', background: 'rgba(88,101,242,0.14)', border: '1px solid rgba(88,101,242,0.3)', padding: '1px 7px', borderRadius: 99 }}>💎 Premium</span>
-                    )}
+                    {f.premium && <PremiumTag />}
                     {hasCustom && !dirty && !locked && (
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#23a55a', background: 'rgba(35,165,90,0.12)', padding: '1px 7px', borderRadius: 99 }}>custom</span>
                     )}
@@ -392,7 +392,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
           </Card>
 
           {/* 3 · Welcome channel — Premium */}
-          <Card title="Welcome channel">
+          <Card title="Welcome channel" premium>
             {premium ? (
               <>
                 <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
@@ -424,7 +424,7 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
           </Card>
 
           {/* 4 · Embed accent + footer — Premium */}
-          <Card title="Embed accent & footer">
+          <Card title="Embed accent & footer" premium>
             {premium ? (
               <>
                 <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
