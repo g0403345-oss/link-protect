@@ -222,6 +222,21 @@ export async function setLockdown(guildId: string, active: boolean, reason?: str
   }, 180_000);
 }
 
+export interface PremiumStatus { active: boolean; until?: number | null; customerId?: string | null }
+
+export async function getPremium(guildId: string): Promise<PremiumStatus> {
+  return apiFetch(`/api/guild/${guildId}/premium`);
+}
+
+/** Stripe webhook → bot DB (internal secret auth). */
+export async function setPremium(guildId: string, active: boolean, customerId: string | null,
+  subscriptionId: string | null, until: number | null): Promise<void> {
+  await apiFetch(`/api/internal/premium`, {
+    method: "POST",
+    body: JSON.stringify({ guildId, active, customerId, subscriptionId, until }),
+  });
+}
+
 export interface PermFailure {
   feature: string;    // "Scam Shield" | "Raid Shield" | "Warn escalation"
   action: string;     // "ban" | "kick" | "timeout"

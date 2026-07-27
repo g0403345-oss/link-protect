@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Heart, Minus, Gavel, RefreshCw, Save, Send, RotateCcw, Info } from 'lucide-react';
 import CollapsibleCard, { cardKey } from '@/components/CollapsibleCard';
 import type { ServerData } from '@/lib/db';
@@ -140,8 +140,22 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
   const [testBusy, setTestBusy] = useState(false);
   const taRefs = useRef<Partial<Record<TemplateKey, HTMLTextAreaElement | null>>>({});
 
-  /* Embeds always use the brand color — a per-server accent proved pointless. */
-  const previewAccent = DEFAULT_ACCENT;
+  /* Embed accent is a Premium perk: editable when the server has Premium,
+     brand color otherwise (the API enforces this server-side too). */
+  const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+  const [premium, setPremium] = useState(false);
+  const savedAccent = HEX_RE.test(msgs.accent ?? '') ? (msgs.accent as string) : DEFAULT_ACCENT;
+  const [accentDraft, setAccentDraft] = useState(savedAccent);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/guild/${guildId}/premium`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setPremium(!!d.active); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [guildId]);
+  useEffect(() => { setAccentDraft(savedAccent); }, [savedAccent]);
+  const previewAccent = premium && HEX_RE.test(accentDraft) ? accentDraft : (premium ? savedAccent : DEFAULT_ACCENT);
 
   const insertVar = (key: TemplateKey, token: string) => {
     const el = taRefs.current[key];
@@ -299,6 +313,37 @@ export default function MessagesTab({ guildId, data, patch, saving, onToast }: {
 
         </div>
 
+          {/* 3 · Embed accent — Premium */}
+          <Card title="Embed accent 💎">
+            {premium ? (
+              <>
+                <p style={{ fontSize: 12, color: '#52535a', marginBottom: 10 }}>
+                  The color stripe on the left edge of every embed the bot sends.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {['#5B6CFF', '#5865f2', '#23a55a', '#f0b232', '#eb459e', '#f23f43'].map((c) => (
+                    <button key={c} title={c}
+                      onClick={() => { setAccentDraft(c); patch('messages.accent', c, 'Embed accent'); }}
+                      disabled={saving === 'messages.accent'}
+                      style={{ width: 26, height: 26, borderRadius: 8, background: c, border: previewAccent.toLowerCase() === c.toLowerCase() ? '2px solid #f2f3f5' : '2px solid transparent', cursor: 'pointer' }} />
+                  ))}
+                  <input value={accentDraft} onChange={(e) => setAccentDraft(e.target.value)} maxLength={7} spellCheck={false}
+                    style={{ width: 90, padding: '6px 9px', fontSize: 13, background: '#18181b', border: '1px solid #2e2e36', borderRadius: 7, color: '#f2f3f5', outline: 'none', fontFamily: 'monospace' }} />
+                  {HEX_RE.test(accentDraft) && accentDraft.toLowerCase() !== savedAccent.toLowerCase() && (
+                    <button onClick={() => patch('messages.accent', accentDraft, 'Embed accent')} disabled={saving === 'messages.accent'}
+                      style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, background: '#5865f2', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: saving === 'messages.accent' ? 0.6 : 1 }}>
+                      Save
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 12.5, color: '#949ba4', lineHeight: 1.6 }}>
+                Give every bot embed your server&apos;s own color — a <b style={{ color: '#96a4ff' }}>💎 Premium</b> perk.
+                Upgrade from the Overview tab to unlock it.
+              </p>
+            )}
+          </Card>
         {/* ── Right column: live preview (sticky on desktop) ── */}
         <div className="msgstudio-preview" style={{ position: 'sticky', top: 120 }}>
           <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 10 }}>

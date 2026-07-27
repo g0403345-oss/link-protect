@@ -1980,8 +1980,9 @@ async def dev_create_key(request: Request, guild_id: str, body: DevKeyBody):
     c = _get_conn()
     n = c.execute("SELECT COUNT(*) AS n FROM dev_api_keys WHERE guild_id=? AND revoked=0",
                   (str(guild_id),)).fetchone()["n"]
-    if n >= _MAX_KEYS_PER_GUILD:
-        raise HTTPException(status_code=409, detail=f"Limit of {_MAX_KEYS_PER_GUILD} active keys per server")
+    key_cap = 20 if _is_premium(str(guild_id)) else _MAX_KEYS_PER_GUILD
+    if n >= key_cap:
+        raise HTTPException(status_code=409, detail=f"Limit of {key_cap} active keys per server")
     key = "lp_" + secrets.token_hex(20)
     prefix = key[:11]  # "lp_" + 8 hex chars — enough to identify, useless to guess
     label = (body.label or "").strip()[:60] or None
@@ -2042,7 +2043,7 @@ async def dev_create_webhook(request: Request, guild_id: str, body: DevWebhookBo
     c = _get_conn()
     n = c.execute("SELECT COUNT(*) AS n FROM dev_webhooks WHERE guild_id=?",
                   (str(guild_id),)).fetchone()["n"]
-    if n >= _MAX_WEBHOOKS_PER_GUILD:
+    if n >= (10 if _is_premium(str(guild_id)) else _MAX_WEBHOOKS_PER_GUILD):
         raise HTTPException(status_code=409, detail=f"Limit of {_MAX_WEBHOOKS_PER_GUILD} webhooks per server")
     secret = "whsec_" + secrets.token_hex(24)
     c.execute(
@@ -2276,13 +2277,14 @@ def _v1_auth(request: Request, need: str = "read"):
     if need not in _row_scopes(row):
         raise HTTPException(status_code=403,
                             detail=f"This key lacks the '{need}' scope — create one with it in the Developer tab")
+    limit = _V1_RATE * 10 if _is_premium(str(row["guild_id"])) else _V1_RATE
     b = _v1_buckets.get(row["id"])
     if not b or now > b["reset"]:
         _v1_buckets[row["id"]] = {"n": 1, "reset": now + 60}
     else:
         b["n"] += 1
-        if b["n"] > _V1_RATE:
-            raise HTTPException(status_code=429, detail=f"Rate limit exceeded ({_V1_RATE} requests/minute)")
+        if b["n"] > limit:
+            raise HTTPException(status_code=429, detail=f"Rate limit exceeded ({limit} requests/minute)")
     try:
         c = _get_conn()
         c.execute("UPDATE dev_api_keys SET last_used=?, total_requests=total_requests+1 WHERE id=?",
@@ -2683,9 +2685,12 @@ async def patch_guild(request: Request, guild_id: str, body: PatchBody):
         "log.digest",
         "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
         "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
+        "messages.accent",  # premium-gated below
     }
     if body.path not in ALLOWED_PATHS:
         raise HTTPException(status_code=400, detail=f"Path '{body.path}' is not allowed")
+    if body.path == "messages.accent" and not _is_premium(guild_id):
+        raise HTTPException(status_code=403, detail="Custom embed colors are a Premium feature")
 
     data = _get_server(guild_id)
     if data is None:
@@ -3826,7 +3831,7 @@ async def messages_test(request: Request, guild_id: str, body: MessageTestBody):
 
     # Mirror the REAL embed the bot sends — title, fields, footer and buttons —
     # so the test never looks like the bot would drop parts of the message.
-    embed: dict = {"description": text, "color": 0x5B6CFF}
+    embed: dict = {"description": text, "color": _guild_accent(data)}
     components: list = []
 
     def _link_btn(label: str, url: str):
@@ -4029,6 +4034,60 @@ async def mobile_set_lockdown(request: Request, guild_id: str, body: LockdownBod
                   "🚨 Lockdown activated" if body.active else "✅ Lockdown lifted",
                   None, body.active)
     return result
+
+
+# ── Link Protect Premium (Stripe) ────────────────────────────────────────────
+# The website's Stripe webhook writes the state here; everything else only
+# reads. kv premium:<gid> = {active, customerId, subscriptionId, until}.
+
+_premium_cache: dict[str, tuple[float, bool]] = {}
+
+
+def _premium_state(gid: str) -> dict:
+    row = _get_conn().execute("SELECT value FROM kv WHERE path=?", (f"premium:{gid}",)).fetchone()
+    try:
+        d = json.loads(row["value"]) if row else {}
+    except Exception:
+        d = {}
+    return d if isinstance(d, dict) else {}
+
+
+def _is_premium(gid: str) -> bool:
+    now = time.monotonic()
+    hit = _premium_cache.get(str(gid))
+    if hit and now - hit[0] < 60:
+        return hit[1]
+    st = _premium_state(str(gid))
+    active = bool(st.get("active")) and (not st.get("until") or int(st["until"]) > time.time() - 86400)
+    _premium_cache[str(gid)] = (now, active)
+    return active
+
+
+class PremiumSetBody(BaseModel):
+    guildId: str
+    active: bool
+    customerId: str | None = None
+    subscriptionId: str | None = None
+    until: int | None = None
+
+
+@app.post("/api/internal/premium")
+@require_auth
+async def internal_set_premium(request: Request, body: PremiumSetBody):
+    _kv_set(f"premium:{body.guildId}", {"active": bool(body.active),
+                                        "customerId": body.customerId,
+                                        "subscriptionId": body.subscriptionId,
+                                        "until": body.until, "updatedAt": int(time.time())})
+    _premium_cache.pop(str(body.guildId), None)
+    return {"ok": True}
+
+
+@app.get("/api/guild/{guild_id}/premium")
+@require_auth
+async def get_premium(request: Request, guild_id: str):
+    st = _premium_state(guild_id)
+    return {"active": _is_premium(guild_id), "until": st.get("until"),
+            "customerId": st.get("customerId")}
 
 
 # ── Permission-failure alerts ────────────────────────────────────────────────
@@ -4588,6 +4647,7 @@ MOBILE_ALLOWED_PATHS = {
     "verify.page.headline", "verify.page.message", "verify.page.accent",    "log.digest",
     "messages.warn_channel", "messages.warn_manual", "messages.warn_dm",
     "messages.action_dm", "messages.verify_dm", "messages.lockdown_announce",
+    "messages.accent",
 }
 
 

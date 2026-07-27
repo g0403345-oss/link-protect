@@ -30,6 +30,7 @@ import { useGuildTint } from '@/components/fx';
 import ReportForm from '@/components/ReportForm';
 import VoteBanner from '@/components/VoteBanner';
 import PermFailBanner from '@/components/PermFailBanner';
+import PremiumCard from '@/components/PremiumCard';
 import GuildHero from '@/components/GuildHero';
 import PulseStrip from '@/components/PulseStrip';
 import BlockerWall from '@/components/BlockerWall';
@@ -630,6 +631,7 @@ export default function GuildDashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <GuildHero guildId={guildId} name={guildInfo?.name ?? 'Your server'} icon={guildInfo?.icon}
                     data={data} stats={stats} actions={actions} onNavigate={(sec) => selectSection(sec as Section)} />
+                  <PremiumCard guildId={guildId} onToast={addToast} />
                   <div data-tour="overview-stats" className="stats-3col-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <StatCard label="Warnings issued" value={stats?.totalWarnings ?? '—'} icon={AlertTriangle} color="#f0b232" spark={trend14 ?? undefined} delta={weekDelta} />
                     <StatCard label="Users warned" value={stats?.warnedUsers ?? '—'} icon={Users} color="#5865f2" />
