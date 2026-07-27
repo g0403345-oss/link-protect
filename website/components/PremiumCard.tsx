@@ -7,14 +7,22 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Gem, ArrowRight, Settings2, ChevronDown, ShieldCheck } from 'lucide-react';
+import {
+  Gem, ArrowRight, Settings2, ChevronDown, ShieldCheck, Palette, MessageSquare,
+  Sparkles, Image as ImageIcon, Link2, Eye, Moon, Undo2, ArrowLeftRight, Zap,
+} from 'lucide-react';
 
-const PERKS = [
-  'Custom embed color for every bot message',
-  'Message templates up to 1,500 characters',
-  'White-label verify page (no “Protected by” line)',
-  '10× API rate limit · 20 keys · 10 webhooks',
-  '💎 badge — and more perks every release, locked to this price',
+const PERK_TILES = [
+  { icon: Palette, title: 'Embed color', sub: 'Every bot message in your color' },
+  { icon: MessageSquare, title: 'Long templates', sub: 'Up to 1,500 characters' },
+  { icon: Sparkles, title: 'White-label verify', sub: 'No Link Protect branding' },
+  { icon: ImageIcon, title: 'Your logo', sub: 'On the verification page' },
+  { icon: Link2, title: 'Vanity link', sub: '/verify/your-server' },
+  { icon: Eye, title: 'Watchlist', sub: 'Observe members, instant alerts' },
+  { icon: Moon, title: 'Automation', sub: 'Night schedule & event mode' },
+  { icon: Undo2, title: 'One-click undo', sub: 'Fix false positives instantly' },
+  { icon: ArrowLeftRight, title: 'Server sync', sub: 'Copy settings to 25 servers' },
+  { icon: Zap, title: 'API Pro', sub: '10× rate · 20 keys · 10 webhooks' },
 ];
 
 export default function PremiumCard({ guildId, onToast, onNavigate }: {
@@ -101,35 +109,43 @@ export default function PremiumCard({ guildId, onToast, onNavigate }: {
       </button>
 
       {open && (
-        <div style={{ padding: '4px 16px 16px', borderTop: '1px solid #1a1a1e' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', margin: '12px 0', borderRadius: 9, background: 'rgba(35,165,90,0.06)', border: '1px solid rgba(35,165,90,0.2)' }}>
-            <ShieldCheck size={14} color="#23a55a" style={{ flexShrink: 0, marginTop: 1 }} />
-            <span style={{ fontSize: 12, color: '#b5bac1', lineHeight: 1.55 }}>
-              <b style={{ color: '#23a55a' }}>Every security feature is free — for every server, forever.</b>{' '}
-              Premium only adds personalization and extras. We will never put protection behind a price.
+        <div style={{ padding: '0 16px 16px', borderTop: '1px solid #1a1a1e' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 2px', margin: '10px 0 12px' }}>
+            <ShieldCheck size={14} color="#23a55a" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: '#949ba4', lineHeight: 1.5 }}>
+              <b style={{ color: '#23a55a' }}>Every security feature is free — forever.</b>{' '}
+              Premium is personalization and extras, never protection.
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-            <ul style={{ flex: 1, minWidth: 220, margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {PERKS.map((p) => (
-                <li key={p} style={{ fontSize: 12.5, color: '#b5bac1' }}>· {p}</li>
-              ))}
-            </ul>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2, alignSelf: 'center' }}>
-                {(['month', 'year'] as const).map((iv) => (
-                  <button key={iv} onClick={() => setInterval_(iv)}
-                    style={{ padding: '5px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', background: interval === iv ? 'rgba(88,101,242,0.25)' : 'transparent', color: interval === iv ? '#96a4ff' : '#6d6f78' }}>
-                    {iv === 'month' ? '3,49 €/mo' : '29 €/yr'}
-                  </button>
-                ))}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {PERK_TILES.map((pk) => (
+              <div key={pk.title} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '11px 12px', borderRadius: 10, background: '#141416', border: '1px solid #1e1e22' }}>
+                <span style={{ display: 'inline-flex', width: 28, height: 28, borderRadius: 8, background: 'rgba(88,101,242,0.1)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <pk.icon size={14} color="#96a4ff" />
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#f2f3f5' }}>{pk.title}</span>
+                  <span style={{ display: 'block', fontSize: 11.5, color: '#6d6f78', marginTop: 1 }}>{pk.sub}</span>
+                </span>
               </div>
-              <button onClick={() => go('/api/stripe/checkout', { guildId, interval })} disabled={busy}
-                className="btn-primary btn-sm" style={{ opacity: busy ? 0.6 : 1 }}>
-                <Gem size={13} /> Upgrade this server <ArrowRight size={12} />
-              </button>
-              <span style={{ fontSize: 10.5, color: '#52535a', textAlign: 'center' }}>Cancel anytime · via Stripe</span>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-flex', background: '#18181b', border: '1px solid #2e2e36', borderRadius: 8, padding: 3, gap: 2 }}>
+              {(['month', 'year'] as const).map((iv) => (
+                <button key={iv} onClick={() => setInterval_(iv)}
+                  style={{ padding: '5px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', background: interval === iv ? 'rgba(88,101,242,0.25)' : 'transparent', color: interval === iv ? '#96a4ff' : '#6d6f78' }}>
+                  {iv === 'month' ? '3,49 €/mo' : '29 €/yr'}
+                </button>
+              ))}
             </div>
+            <button onClick={() => go('/api/stripe/checkout', { guildId, interval })} disabled={busy}
+              className="btn-primary btn-sm" style={{ opacity: busy ? 0.6 : 1 }}>
+              <Gem size={13} /> Upgrade this server <ArrowRight size={12} />
+            </button>
+            <span style={{ fontSize: 11, color: '#52535a' }}>Cancel anytime · via Stripe · per server</span>
           </div>
         </div>
       )}
