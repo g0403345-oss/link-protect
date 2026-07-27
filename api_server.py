@@ -4761,7 +4761,8 @@ async def delete_verify_background(request: Request, guild_id: str):
 
 # ── Premium: verify-page logo + vanity slug ──────────────────────────────────
 
-_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,31}$")
+# at least one letter: digit-only slugs would shadow real guild ids
+_SLUG_RE = re.compile(r"^(?=.*[a-z])[a-z0-9][a-z0-9-]{2,31}$")
 _SLUG_RESERVED = {"sandbox", "api", "admin", "verify", "dashboard", "premium", "www"}
 
 
