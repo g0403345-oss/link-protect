@@ -356,7 +356,7 @@ export default function AdminPanel() {
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1e22' }}>
+          <div className="admin-tabs" style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1e1e22' }}>
             {([
               { id: 'servers', label: 'Servers', icon: List },
               { id: 'threats', label: 'Threat Data', icon: ShieldAlert },

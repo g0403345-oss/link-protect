@@ -22,6 +22,10 @@
 
 html {
   scroll-behavior: smooth;
+  /* iOS: a single too-wide element inflates the layout viewport and shrinks
+     the whole page ("everything tiny, had to zoom"). clip pins the viewport
+     to device width; offenders get clipped instead of breaking the page. */
+  overflow-x: clip;
   /* Firefox scrollbar — dark like the WebKit one below */
   scrollbar-width: thin;
   scrollbar-color: var(--surface3) var(--surface);
@@ -228,6 +232,11 @@ input[type='number'] { -moz-appearance: textfield; }
   .lp-podium-info { align-items: flex-start !important; flex: 1 !important; }
   .lp-podium-info > div:last-child { justify-content: flex-start !important; }
   .lp-podium-votes { margin-left: auto !important; margin-top: 0 !important; }
+
+  /* Admin panel — tabs become a horizontal scroll strip on phones */
+  .admin-tabs { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .admin-tabs::-webkit-scrollbar { display: none; }
+  .admin-tabs button { white-space: nowrap; flex-shrink: 0; }
 
   /* Guild dashboard — sidebar → horizontal tab strip */
   .guild-sidebar { display: none !important; }

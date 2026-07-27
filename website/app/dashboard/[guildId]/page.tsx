@@ -669,7 +669,7 @@ export default function GuildDashboard() {
           const active = section === id;
           return (
             <button key={id} onClick={() => selectSection(id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, background: active ? 'rgba(88,101,242,0.15)' : 'transparent', color: active ? '#5865f2' : '#6d6f78', flexShrink: 0, transition: 'all 0.15s' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 600, background: active ? 'rgba(88,101,242,0.15)' : '#141416', border: `1px solid ${active ? 'rgba(88,101,242,0.45)' : '#1e1e22'}`, color: active ? '#96a4ff' : '#949ba4', flexShrink: 0, transition: 'all 0.15s' }}>
               <Icon size={13} /> {label}
             </button>
           );
