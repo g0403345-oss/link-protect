@@ -30,7 +30,7 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
-    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 10,
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 2,
     title: 'A notification centre you can actually use',
     items: [
       'Every notification expands on click to show its full text — nothing gets cut off anymore.',
@@ -39,7 +39,7 @@ const ENTRIES: Entry[] = [
     ],
   },
   {
-    product: 'website', date: 'July 25, 2026', ts: d('2026-07-25') + 9,
+    product: 'website', date: 'July 27, 2026', ts: d('2026-07-27') + 1,
     title: 'Leaderboard names are stable now',
     items: [
       'Voter names on the leaderboard and supporter wall no longer fall back to “User …1234” when a single Discord lookup times out — resolved names are cached for an hour and a stale name always beats no name.',
