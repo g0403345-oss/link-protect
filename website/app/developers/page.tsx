@@ -17,7 +17,7 @@ const C = {
 };
 
 function Section({ id, children }: { id?: string; children: React.ReactNode }) {
-  return <section id={id} style={{ maxWidth: 860, margin: '0 auto', padding: '0 24px' }}>{children}</section>;
+  return <section id={id} style={{ scrollMarginTop: 84 }}>{children}</section>;
 }
 
 function H2({ icon: Icon, children }: { icon: typeof Code2; children: React.ReactNode }) {
@@ -82,35 +82,52 @@ export default function DevelopersPage() {
       <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
-      <Section>
-        <div style={{ paddingTop: 64, textAlign: 'center' }}>
-          <div className="eyebrow" style={{ marginBottom: 22 }}>
-            <Code2 size={12} /> Developer Platform
-          </div>
-          <h1 style={{ fontSize: 'clamp(30px, 5.5vw, 44px)', fontWeight: 900, letterSpacing: '-0.04em', color: C.text, marginBottom: 14, lineHeight: 1.08 }}>
-            Build with Link Protect
-          </h1>
-          <p style={{ fontSize: 15.5, color: C.muted, maxWidth: 560, margin: '0 auto', lineHeight: 1.65 }}>
-            A scoped REST API for stats, link checks, moderation and config, a realtime event stream,
-            signed webhooks, ready-made SDKs and live SVG embeds — free for approved developers.
-          </p>
-        </div>
-
-        <div style={{ marginTop: 32, display: 'flex', gap: 13, alignItems: 'flex-start', padding: '15px 18px', background: 'rgba(35,165,90,0.07)', border: '1px solid rgba(35,165,90,0.3)', borderRadius: 12 }}>
-          <FlaskConical size={16} color="#23a55a" style={{ marginTop: 2, flexShrink: 0 }} />
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '72px 32px 0' }}>
+        <div className="split-hero">
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>
-              Try everything below without a server — sandbox key <Inline>lp_sandbox</Inline>
+            <div className="eyebrow" style={{ marginBottom: 20 }}>
+              <Code2 size={12} /> Developer Platform
             </div>
-            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
-              The public sandbox key works for anyone on every read endpoint and returns synthetic data —
-              no sign-up, no Discord server, no approval. It&rsquo;s prefilled in the{' '}
-              <a href="#playground" style={{ color: C.accent }}>Playground</a>. Write endpoints
-              (<Inline>moderate</Inline>, <Inline>config</Inline> scope) need a real key from your server&rsquo;s Developer tab.
+            <h1 style={{ fontSize: 'clamp(32px, 4.4vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', color: C.text, marginBottom: 14, lineHeight: 1.05 }}>
+              Build with Link Protect
+            </h1>
+            <p style={{ fontSize: 15.5, color: C.muted, maxWidth: 500, lineHeight: 1.65 }}>
+              A scoped REST API for stats, link checks, moderation and config, a realtime event stream,
+              signed webhooks, ready-made SDKs and live SVG embeds — free for approved developers.
             </p>
           </div>
+
+          <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start', padding: '18px 20px', background: 'rgba(35,165,90,0.07)', border: '1px solid rgba(35,165,90,0.3)', borderRadius: 14 }}>
+            <FlaskConical size={16} color="#23a55a" style={{ marginTop: 2, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>
+                Try everything without a server — sandbox key <Inline>lp_sandbox</Inline>
+              </div>
+              <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+                The public sandbox key works for anyone on every read endpoint and returns synthetic data —
+                no sign-up, no Discord server, no approval. It&rsquo;s prefilled in the{' '}
+                <a href="#playground" style={{ color: C.accent }}>Playground</a>. Write endpoints
+                (<Inline>moderate</Inline>, <Inline>config</Inline> scope) need a real key from your server&rsquo;s Developer tab.
+              </p>
+            </div>
+          </div>
         </div>
-      </Section>
+      </section>
+
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 32px 0' }}>
+        <div className="docs-layout">
+          <nav className="docs-nav" aria-label="On this page">
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52535a', padding: '0 10px 8px' }}>On this page</div>
+            <a href="#access">Getting access</a>
+            <a href="#auth">Authentication</a>
+            <a href="#rest">REST API</a>
+            <a href="#stream">Event stream</a>
+            <a href="#playground">Playground</a>
+            <a href="#sdks">SDKs</a>
+            <a href="#webhooks">Webhooks</a>
+            <a href="#embeds">Embeds</a>
+          </nav>
+          <div style={{ minWidth: 0 }}>
 
       <Section id="access">
         <H2 icon={ShieldCheck}>Getting access</H2>
@@ -401,6 +418,9 @@ function verify(rawBody, signatureHeader, secret) {
           </Link>
         </div>
       </Section>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

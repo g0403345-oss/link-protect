@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   PartyPopper, LayoutDashboard, SlidersHorizontal, ScrollText, ArrowRight,
   Eye, UserCheck, Gavel, Trash2, MessageSquare, Settings2, ChevronDown,
-  ExternalLink, KeyRound,
+  ExternalLink, KeyRound, ShieldCheck,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { SUPPORT_SERVER } from '@/lib/discord';
@@ -130,23 +130,32 @@ const FAQ = [
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, overflow: 'hidden' }}>
+    <div style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, overflow: 'hidden', alignSelf: 'start' }}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5' }}>{q}</span>
+        <span style={{ fontSize: 14.5, fontWeight: 700, color: '#f2f3f5' }}>{q}</span>
         <ChevronDown size={16} color="#6d6f78" style={{ flexShrink: 0, transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none' }} />
       </button>
       {open && (
-        <p style={{ padding: '0 20px 16px', fontSize: 13.5, color: '#949ba4', lineHeight: 1.6 }}>{a}</p>
+        <p style={{ padding: '0 20px 16px', fontSize: 13, color: '#949ba4', lineHeight: 1.6 }}>{a}</p>
       )}
     </div>
   );
 }
 
-function Section({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <section style={{ maxWidth: 920, margin: '0 auto', padding: '0 24px', ...style }}>{children}</section>;
+function Shell({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 32px', ...style }}>{children}</section>;
+}
+
+function SectionHead({ title, note }: { title: React.ReactNode; note?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', borderBottom: '1px solid #1e1e22', paddingBottom: 16, marginBottom: 20 }}>
+      <h2 style={{ fontSize: 26, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.02em' }}>{title}</h2>
+      {note && <p style={{ fontSize: 13, color: '#6d6f78', maxWidth: 480, lineHeight: 1.6 }}>{note}</p>}
+    </div>
+  );
 }
 
 export default function WelcomeClient() {
@@ -155,52 +164,67 @@ export default function WelcomeClient() {
       <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
-      {/* Hero */}
-      <Section style={{ paddingTop: 64, textAlign: 'center', maxWidth: 760 }}>
-        <div className="eyebrow" style={{ marginBottom: 22 }}>
-          <PartyPopper size={12} /> Welcome aboard
-        </div>
-        <h1 style={{ fontSize: 'clamp(32px, 6vw, 48px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
-          You invited Link Protect —<br />you&rsquo;re already protected 🎉
-        </h1>
-        <p style={{ fontSize: 16, color: '#6d6f78', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
-          The malware, phishing and nitro-scam blockers are on from the very first second — no setup
-          needed. Three quick steps take you from protected to perfectly tuned.
-        </p>
-      </Section>
-
-      {/* 3-step guide */}
-      <Section style={{ paddingTop: 56 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-          {STEPS.map((s, i) => (
-            <div key={s.title} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(88,101,242,0.14)', border: '1px solid rgba(88,101,242,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#96a4ff', flexShrink: 0 }}>
-                  {i + 1}
-                </div>
-                <s.icon size={17} color="#96a4ff" />
-              </div>
-              <div style={{ fontSize: 15.5, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>{s.title}</div>
-              <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55, marginBottom: s.cta ? 16 : 0 }}>{s.body}</p>
-              {s.cta && (
-                <Link href={s.cta.href} className="btn-primary" style={{ fontSize: 13.5, marginTop: 'auto', alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {s.cta.label} <ArrowRight size={13} />
-                </Link>
-              )}
+      {/* ── Hero: pitch left, 3-step rail right ── */}
+      <Shell style={{ paddingTop: 72 }}>
+        <div className="split-hero">
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 20 }}>
+              <PartyPopper size={12} /> Welcome aboard
             </div>
-          ))}
-        </div>
-      </Section>
+            <h1 style={{ fontSize: 'clamp(34px, 4.6vw, 54px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 16, lineHeight: 1.04 }}>
+              You invited Link Protect — you&rsquo;re already protected 🎉
+            </h1>
+            <p style={{ fontSize: 16, color: '#949ba4', maxWidth: 480, lineHeight: 1.65, marginBottom: 26 }}>
+              The malware, phishing and nitro-scam blockers are on from the very first second — no
+              setup needed. Three quick steps take you from protected to perfectly tuned.
+            </p>
+            <div style={{ borderLeft: '2px solid #23a55a', padding: '2px 0 2px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <ShieldCheck size={14} color="#23a55a" />
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: '#f2f3f5' }}>Already working</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.6, maxWidth: 440 }}>
+                Post a malware or fake-Nitro link in any channel and the bot removes it instantly —
+                everything below is tuning, not setup.
+              </p>
+            </div>
+          </div>
 
-      {/* Command reference */}
-      <Section style={{ paddingTop: 80 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 8, letterSpacing: '-0.02em' }}>All 18 slash commands at a glance</h2>
-        <p style={{ fontSize: 14, color: '#6d6f78', textAlign: 'center', marginBottom: 32 }}>
-          Everything also lives in the dashboard — commands are just faster when you&rsquo;re already in Discord.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
+          {/* Numbered step rail */}
+          <div style={{ borderLeft: '1px solid #1e1e22', paddingLeft: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52535a', marginBottom: 18 }}>Three steps to perfectly tuned</div>
+            {STEPS.map((s, i) => (
+              <div key={s.title} style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: i === STEPS.length - 1 ? 0 : 26 }}>
+                {i < STEPS.length - 1 && (
+                  <div aria-hidden style={{ position: 'absolute', left: 15, top: 34, bottom: 2, width: 1, background: 'linear-gradient(to bottom, #2e2e36, #1a1a1e)' }} />
+                )}
+                <div style={{ width: 31, height: 31, borderRadius: 9, background: 'rgba(88,101,242,0.12)', border: '1px solid rgba(88,101,242,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>
+                  <s.icon size={15} color="#96a4ff" />
+                </div>
+                <div style={{ paddingTop: 3 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>
+                    <span style={{ color: '#52535a', fontWeight: 800, fontSize: 11.5, marginRight: 7 }}>0{i + 1}</span>{s.title}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: '#6d6f78', lineHeight: 1.55 }}>{s.body}</p>
+                  {s.cta && (
+                    <Link href={s.cta.href} className="btn-primary" style={{ fontSize: 13, marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px' }}>
+                      {s.cta.label} <ArrowRight size={13} />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Shell>
+
+      {/* ── Command reference: 2×2 group tables ── */}
+      <Shell style={{ paddingTop: 96 }}>
+        <SectionHead title="All 18 slash commands at a glance"
+          note="Everything also lives in the dashboard — commands are just faster when you're already in Discord." />
+        <div className="grid-2col">
           {COMMAND_GROUPS.map((g) => (
-            <div key={g.title} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '16px 18px' }}>
+            <div key={g.title} style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#52535a', marginBottom: 10 }}>{g.title}</div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -219,53 +243,48 @@ export default function WelcomeClient() {
             </div>
           ))}
         </div>
-      </Section>
+      </Shell>
 
-      {/* Permissions explainer */}
-      <Section style={{ paddingTop: 80 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-            <KeyRound size={16} color="#96a4ff" />
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.02em' }}>Why the bot asks for these permissions</h2>
-          </div>
-          <p style={{ fontSize: 14, color: '#6d6f78', maxWidth: 560, margin: '0 auto', lineHeight: 1.6 }}>
-            The invite requests a small, focused set of permissions — each one has exactly one job.
-            Link Protect never asks for Administrator.
-          </p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+      {/* ── Permissions explainer: 3-col grid ── */}
+      <Shell style={{ paddingTop: 84 }}>
+        <SectionHead
+          title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><KeyRound size={19} color="#96a4ff" /> Why the bot asks for these permissions</span>}
+          note="A small, focused set — each permission has exactly one job. Link Protect never asks for Administrator." />
+        <div className="detect-3col">
           {PERMS.map((p) => (
-            <div key={p.name} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 18, display: 'flex', gap: 12 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <p.icon size={17} color="#96a4ff" />
+            <div key={p.name} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '18px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <p.icon size={16} color="#96a4ff" />
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f2f3f5' }}>{p.name}</div>
               </div>
-              <div>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>{p.name}</div>
-                <p style={{ fontSize: 13, color: '#6d6f78', lineHeight: 1.5 }}>{p.why}</p>
-              </div>
+              <p style={{ fontSize: 13, color: '#6d6f78', lineHeight: 1.55 }}>{p.why}</p>
             </div>
           ))}
         </div>
-      </Section>
+      </Shell>
 
-      {/* FAQ */}
-      <Section style={{ paddingTop: 80, maxWidth: 760 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 32, letterSpacing: '-0.02em' }}>Good to know</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* ── FAQ: two columns ── */}
+      <Shell style={{ paddingTop: 84 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', marginBottom: 20, letterSpacing: '-0.02em' }}>Good to know</h2>
+        <div className="faq-2col">
           {FAQ.map((f) => (
             <FaqItem key={f.q} q={f.q} a={f.a} />
           ))}
         </div>
-      </Section>
+      </Shell>
 
-      {/* Closing CTA */}
-      <Section style={{ paddingTop: 72, paddingBottom: 96, maxWidth: 720 }}>
-        <div style={{ padding: '32px 24px', background: 'linear-gradient(180deg, rgba(88,101,242,0.08), transparent)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 16, textAlign: 'center' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', marginBottom: 8 }}>Questions? We&rsquo;re around.</h2>
-          <p style={{ fontSize: 14, color: '#6d6f78', marginBottom: 20, lineHeight: 1.6, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
-            The dashboard has everything you just read — and the support server has real humans.
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {/* ── Closing CTA: horizontal band ── */}
+      <Shell style={{ paddingTop: 72, paddingBottom: 96 }}>
+        <div className="cta-band" style={{ padding: '28px 32px', background: 'linear-gradient(120deg, rgba(88,101,242,0.10), rgba(88,101,242,0.02))', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 16 }}>
+          <div style={{ minWidth: 260 }}>
+            <h2 style={{ fontSize: 21, fontWeight: 800, color: '#f2f3f5', marginBottom: 6 }}>Questions? We&rsquo;re around.</h2>
+            <p style={{ fontSize: 13.5, color: '#949ba4', lineHeight: 1.6, maxWidth: 520 }}>
+              The dashboard has everything you just read — and the support server has real humans.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <Link href="/dashboard" className="btn-primary" style={{ fontSize: 14 }}>
               Open dashboard
             </Link>
@@ -274,7 +293,7 @@ export default function WelcomeClient() {
             </a>
           </div>
         </div>
-      </Section>
+      </Shell>
     </div>
   );
 }

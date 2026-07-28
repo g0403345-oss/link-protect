@@ -31,8 +31,10 @@ const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
     product: 'website', date: 'July 28, 2026', ts: d('2026-07-28') + 1,
-    title: 'Premium & Link Checker: wide-screen redesign',
+    title: 'Premium, Link Checker, Welcome & Developers: wide-screen redesign',
     items: [
+      'The setup guide (/welcome) opens with the three steps as a rail right beside the headline, commands in two wide columns and permissions in a three-column grid.',
+      'The developer docs got a real docs layout: a sticky "On this page" navigation follows you while you scroll.',
       'Both pages now actually use your screen: split hero layouts (pitch left, pricing or checker beside it), a numbered how-it-works rail, perks as three open columns with hairlines instead of stacked cards, and two-column FAQs.',
       'The pricing card moved into the first viewport with the top perks at a glance — no more scrolling past a lonely centered column.',
     ],
