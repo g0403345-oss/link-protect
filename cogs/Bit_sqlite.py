@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 # The dashboard sells this blocker as "bit.ly & shorteners" — cover the common
 # URL shorteners, not just bit.ly.
@@ -25,11 +25,12 @@ class BitlyProtection(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        content_lower = message.content.lower()
+        content = normalize_scan_text(message.content)
+        content_lower = content.lower()
         if not any(d in content_lower for d in _SHORTENERS):
             return
 
-        if not _RE.search(message.content):
+        if not _RE.search(content):
             return
 
         guild_id = str(message.guild.id)

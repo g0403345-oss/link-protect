@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 _RE = re.compile(
     r"(?:https?://)?(?:www\.)?(?:discord(?:app)?\.com/invite|discord\.gg)/[\w-]+",
@@ -18,7 +18,7 @@ class DiscordInviteProtection(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        if not _RE.search(message.content):
+        if not _RE.search(normalize_scan_text(message.content)):
             return
 
         guild_id = str(message.guild.id)

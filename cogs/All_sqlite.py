@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 # Pre-compiled: require http/https/ftp or www. (no bare-domain false positives)
 _RE = re.compile(
@@ -20,7 +20,7 @@ class All(commands.Cog):
             return
 
         # Fast pre-check — skip regex + DB if there's clearly no URL
-        content = message.content
+        content = normalize_scan_text(message.content)
         if "http" not in content and "www." not in content and "ftp://" not in content:
             return
 

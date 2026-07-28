@@ -20,6 +20,9 @@ const BLOCKERS: { key: keyof ServerData['protect']; label: string }[] = [
   { key: 'twitch', label: 'Twitch' },
   { key: 'steam', label: 'Steam' },
   { key: 'bit', label: 'Shorteners (bit.ly)' },
+  { key: 'files', label: 'Dangerous Files' },
+  { key: 'webhook', label: 'Webhook Guard' },
+  { key: 'mentions', label: 'Mention Spam' },
 ];
 
 type Mode = 'default' | 'off' | 'custom';

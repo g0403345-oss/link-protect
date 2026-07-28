@@ -10,10 +10,11 @@ import CollapsibleCard from '@/components/CollapsibleCard';
 const PRESETS = [
   {
     id: 'minimal', label: 'Minimal', icon: Shield, color: '#23a55a',
-    blurb: 'Just the essentials — malware, phishing and nitro scams.',
+    blurb: 'Just the essentials — malware, phishing, nitro scams, dangerous files and hijacked webhooks.',
     values: {
       'protect.malware': true, 'protect.nitro': true, 'protect.bit': false,
       'protect.nsfw': false, 'protect.invite': false,
+      'protect.files': true, 'protect.webhook': true, 'protect.mentions': false,
       'raid.enabled': false, 'scamguard.enabled': false, 'scamguard.join_check': false,
     },
   },
@@ -23,15 +24,17 @@ const PRESETS = [
     values: {
       'protect.malware': true, 'protect.nitro': true, 'protect.bit': true,
       'protect.nsfw': true, 'protect.invite': false,
+      'protect.files': true, 'protect.webhook': true, 'protect.mentions': false,
       'raid.enabled': true, 'scamguard.enabled': true, 'scamguard.join_check': false,
     },
   },
   {
     id: 'strict', label: 'Strict', icon: ShieldAlert, color: '#f23f43',
-    blurb: 'Maximum protection — adds invite blocking and the known-scammer join check.',
+    blurb: 'Maximum protection — adds invite blocking, mention-spam defense and the known-scammer join check.',
     values: {
       'protect.malware': true, 'protect.nitro': true, 'protect.bit': true,
       'protect.nsfw': true, 'protect.invite': true,
+      'protect.files': true, 'protect.webhook': true, 'protect.mentions': true,
       'raid.enabled': true, 'scamguard.enabled': true, 'scamguard.join_check': true,
     },
   },

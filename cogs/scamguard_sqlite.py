@@ -374,6 +374,7 @@ class ScamShield(commands.Cog):
         verb = {"ban": "banned", "kick": "kicked",
                 "timeout": f"timed out for {minutes} min"}.get(action, action)
         try:
+            settings = await get_settings(str(guild.id))
             embed = discord.Embed(
                 title="🛡️ You were removed by Scam Shield",
                 description=(

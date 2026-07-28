@@ -9,12 +9,12 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Globe, Bug, Gift, Link2, EyeOff, Mail, Youtube, Search, Image as ImageIcon,
-  Twitch, Gamepad2, Loader2, Check,
+  Twitch, Gamepad2, Loader2, Check, FileWarning, Webhook, AtSign,
 } from 'lucide-react';
 
 interface Blocker { key: string; label: string; icon: LucideIcon; color: string; desc: string; }
 
-const GROUPS: { title: string; items: Blocker[] }[] = [
+const GROUPS: { title: string; items: Blocker[]; independent?: boolean }[] = [
   {
     title: 'Scams & threats',
     items: [
@@ -22,6 +22,17 @@ const GROUPS: { title: string; items: Blocker[] }[] = [
       { key: 'nitro', label: 'Nitro Scams', icon: Gift, color: '#eb459e', desc: 'Fake "free Nitro" hijack links' },
       { key: 'bit', label: 'Shorteners', icon: Link2, color: '#f0b232', desc: 'bit.ly & co. hide real targets' },
       { key: 'nsfw', label: 'NSFW', icon: EyeOff, color: '#f23f43', desc: 'Known adult sites' },
+    ],
+  },
+  {
+    // Not link blockers — "Block All Links" does not cover these, so this
+    // group stays active even while the master tile is on.
+    title: 'Beyond links',
+    independent: true,
+    items: [
+      { key: 'files', label: 'Dangerous Files', icon: FileWarning, color: '#f23f43', desc: 'Executable / script / macro attachments (.exe, .scr, .docm …)' },
+      { key: 'webhook', label: 'Webhook Guard', icon: Webhook, color: '#eb459e', desc: 'Hijacked webhooks posting scam links — deletes message and webhook' },
+      { key: 'mentions', label: 'Mention Spam', icon: AtSign, color: '#f0b232', desc: 'Mass-mention messages (8+ users/roles, @everyone + link)' },
     ],
   },
   {
@@ -92,7 +103,7 @@ export default function BlockerWall({ protect, saving, onToggle }: {
       </button>
 
       {GROUPS.map((g) => (
-        <div key={g.title} style={{ opacity: allOn ? 0.45 : 1, transition: 'opacity 0.2s', pointerEvents: allOn ? 'none' : 'auto' }}>
+        <div key={g.title} style={{ opacity: allOn && !g.independent ? 0.45 : 1, transition: 'opacity 0.2s', pointerEvents: allOn && !g.independent ? 'none' : 'auto' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#52535a', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 9 }}>{g.title}</div>
           <div className="blocker-wall-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8 }}>
             {g.items.map((b) => (
@@ -104,7 +115,7 @@ export default function BlockerWall({ protect, saving, onToggle }: {
       ))}
       {allOn && (
         <p style={{ fontSize: 12, color: '#6d6f78', marginTop: -6 }}>
-          Individual blockers are inactive while <b style={{ color: '#f23f43' }}>Block All Links</b> is on.
+          Individual link blockers are inactive while <b style={{ color: '#f23f43' }}>Block All Links</b> is on — the “Beyond links” protections still apply.
         </p>
       )}
     </div>

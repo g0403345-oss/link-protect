@@ -68,7 +68,12 @@ export interface ServerData {
     all: boolean;
     steam: boolean;
     malware: boolean;
+    files?: boolean;
+    webhook?: boolean;
+    mentions?: boolean;
   };
+  /** Mention-spam blocker config (protect.mentions turns it on/off). */
+  mentions?: { threshold: number };
   silent: boolean;
   channel: { channel: string[]; category: string[]; member: string[]; role: string[] };
   link: { links: string[]; allow?: string[] };

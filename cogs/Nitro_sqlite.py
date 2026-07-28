@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 # Nitro scam: fake domains + suspicious URL patterns — NOT plain text keywords.
 # Scam tokens must appear in the HOST (before the first "/"), not anywhere in the
@@ -27,10 +27,11 @@ class NitroProtect(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        if "http" not in message.content and "www." not in message.content:
+        content = normalize_scan_text(message.content)
+        if "http" not in content and "www." not in content:
             return
 
-        if not _RE.search(message.content):
+        if not _RE.search(content):
             return
 
         guild_id = str(message.guild.id)

@@ -79,7 +79,8 @@ _DEFAULT_TEMPLATE = {
     "protect": {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
         "invite": False, "twitch": False, "bit": False, "nitro": True,
-        "all": False, "steam": False, "malware": True
+        "all": False, "steam": False, "malware": True,
+        "files": True, "webhook": True, "mentions": False
     }
 }
 
@@ -327,7 +328,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "2.6.3"
+BOT_VERSION = "3.0.0"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -586,10 +587,14 @@ async def on_guild_join(guild):
             # Core protection is ON for new servers (since 2.6.1): malware and
             # nitro-scam links have zero false-positive risk. 85% of installs
             # never enabled anything — now the bot is useful from minute one.
+            # Same logic for dangerous files and compromised webhooks (3.0).
             "nitro": True,
             "all": False,
             "steam": False,
-            "malware": True
+            "malware": True,
+            "files": True,
+            "webhook": True,
+            "mentions": False
         }
     }
     # Re-invites keep every setting: only seed defaults for genuinely new servers.
@@ -724,7 +729,8 @@ async def database(ctx):
         "warn": {"kick": 3, "ban": 5},
         "protect": {
             "google": False, "youtube": False, "nsfw": False, "gif": False,
-            "invite": False, "twitch": False, "bit": False, "nitro": True, "all": False, "steam": False, "malware": True
+            "invite": False, "twitch": False, "bit": False, "nitro": True, "all": False, "steam": False, "malware": True,
+            "files": True, "webhook": True, "mentions": False
         }
 }
     try:
@@ -829,6 +835,30 @@ async def nootification_error(ctx, error):
         await ctx.respond(embed=embed, ephemeral=True)
 
 _CHANGELOG = [
+    {
+        "version": "3.0.0",
+        "date": "28.07.2026",
+        "fields": [
+            ("🛡️ Five new protections",
+             " • **Edit Guard** — links edited into old messages are now\n"
+             "   scanned exactly like new ones. The edit bypass is closed.\n"
+             " • **Dangerous Files** — blocks executable / script / macro\n"
+             "   attachments (.exe, .scr, .bat, .docm …), incl. double\n"
+             "   extensions like invoice.pdf.exe.\n"
+             " • **Webhook Guard** — a hijacked webhook posting a scam link\n"
+             "   loses the message AND the webhook itself.\n"
+             " • **Mention Spam** — mass-mention messages (8+ users/roles,\n"
+             "   configurable) are removed and warned.\n"
+             " • Invisible-character tricks (zero-width spaces inside\n"
+             "   d​iscord.gg links) no longer fool any blocker."),
+            ("📡 Always-fresh threat intel",
+             " • The public anti-scam feeds are now re-imported every 24h\n"
+             "   automatically — new phishing domains become live blocks\n"
+             "   within minutes of publication.\n"
+             " • New servers start with Dangerous Files & Webhook Guard on.\n"
+             " • Fixed: the Scam Shield appeal DM was never delivered."),
+        ],
+    },
     {
         "version": "2.6.3",
         "date": "27.07.2026",
@@ -1132,7 +1162,8 @@ bl_grp = bot.create_group("blacklist", "Your server's custom blocked links",
 
 _BLOCKER_MAP = {"all": "all", "google": "google", "youtube": "youtube", "nsfw": "nsfw",
                 "gif": "gif", "invites": "invite", "shorteners": "bit", "nitro": "nitro",
-                "twitch": "twitch", "steam": "steam", "malware": "malware"}
+                "twitch": "twitch", "steam": "steam", "malware": "malware",
+                "dangerous-files": "files", "webhooks": "webhook", "mention-spam": "mentions"}
 
 
 @bot.slash_command(name="blocker", description="Turn a link blocker (or silent mode) on or off",
@@ -1319,21 +1350,24 @@ async def _support(ctx):
 _PRESETS = {
     "minimal": {
         "label": "Minimal", "emoji": "🟢",
-        "protect": {"malware": True, "nitro": True, "bit": False, "nsfw": False, "invite": False},
+        "protect": {"malware": True, "nitro": True, "bit": False, "nsfw": False, "invite": False,
+                    "files": True, "webhook": True, "mentions": False},
         "raid": False, "scam": False, "join_check": False,
-        "blurb": "Just the essentials: malware/phishing and nitro-scam links are blocked.",
+        "blurb": "Just the essentials: malware/phishing links, nitro scams, dangerous files and hijacked webhooks are blocked.",
     },
     "balanced": {
         "label": "Balanced", "emoji": "🔵",
-        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": False},
+        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": False,
+                    "files": True, "webhook": True, "mentions": False},
         "raid": True, "scam": True, "join_check": False,
         "blurb": "Recommended: threat blockers plus raid protection and Scam Shield.",
     },
     "strict": {
         "label": "Strict", "emoji": "🔴",
-        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": True},
+        "protect": {"malware": True, "nitro": True, "bit": True, "nsfw": True, "invite": True,
+                    "files": True, "webhook": True, "mentions": True},
         "raid": True, "scam": True, "join_check": True,
-        "blurb": "Maximum protection: everything in Balanced plus invite blocking and the known-scammer join check.",
+        "blurb": "Maximum protection: everything in Balanced plus invite blocking, mention-spam defense and the known-scammer join check.",
     },
 }
 

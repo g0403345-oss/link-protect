@@ -25,8 +25,8 @@ FEEDS = [
     {"name": "sinkingyachts", "category": "phishing", "kind": "json",
      "url": "https://phish.sinking.yachts/v2/all",
      "headers": {"X-Identity": "LinkProtect threat-intel seed"}},
-    {"name": "nikolaischunk", "category": "phishing", "kind": "text",
-     "url": "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/domain-list.txt"},
+    {"name": "nikolaischunk", "category": "phishing", "kind": "json",
+     "url": "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/domain-list.json"},
     {"name": "discord-antiscam", "category": "scam", "kind": "text",
      "url": "https://raw.githubusercontent.com/Discord-AntiScam/scam-links/main/list.txt"},
 ]
@@ -49,6 +49,8 @@ def fetch(feed: dict) -> list:
         raw = r.read().decode("utf-8", "replace")
     if feed["kind"] == "json":
         data = json.loads(raw)
+        if isinstance(data, dict):     # e.g. {"domains": [...]}
+            data = data.get("domains") or []
         items = data if isinstance(data, list) else []
     else:
         items = [l for l in raw.splitlines() if l and not l.lstrip().startswith("#")]

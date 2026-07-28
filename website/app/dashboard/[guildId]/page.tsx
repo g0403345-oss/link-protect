@@ -289,7 +289,7 @@ function SegmentPicker({ options, value, onChange, disabled }: {
 }
 
 
-/* ── main ──────────────────────────────────────────────────── */
+/* ── main ──────────────────────────────────────────────────── */ 
 
 export default function GuildDashboard() {
   const params = useParams<{ guildId: string }>();

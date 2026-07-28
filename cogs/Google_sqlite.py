@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 _RE = re.compile(
     # Delimiter lookahead so e.g. google.community (a non-Google TLD) can't match.
@@ -19,10 +19,11 @@ class GoogleProtection(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        if "google" not in message.content.lower() and "goo.gl" not in message.content.lower():
+        content = normalize_scan_text(message.content)
+        if "google" not in content.lower() and "goo.gl" not in content.lower():
             return
 
-        if not _RE.search(message.content):
+        if not _RE.search(content):
             return
 
         guild_id = str(message.guild.id)

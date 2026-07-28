@@ -30,6 +30,19 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 28, 2026', ts: d('2026-07-28') + 3, version: '3.0.0',
+    title: 'Link Protect 3.0 — the "close every door" release',
+    items: [
+      'Edit Guard: editing a scam link into an old message no longer works — edited messages run through every blocker exactly like new ones. This closes the oldest bypass every link bot has.',
+      'Dangerous Files blocker: executable, script and macro attachments (.exe, .scr, .bat, .cmd, .msi, .jar, .vbs, .ps1, .docm and 25+ more) are removed — including double-extension tricks like invoice.pdf.exe. On by default for new servers.',
+      'Webhook Guard: a hijacked webhook posting a phishing/scam link now loses the message and the webhook itself, with an alert in your log channel. Webhooks used to be invisible to every blocker — not anymore. On by default for new servers.',
+      'Mention-spam protection: messages that ping 8+ distinct members/roles (threshold configurable) are removed and warned. Deliberately threshold-only, so a mod\'s @everyone announcement can never be a false positive.',
+      'Invisible-character tricks defeated: zero-width spaces and soft hyphens inside links (d​isc​ord.gg/…) are stripped before every check — on all 14 blockers.',
+      'Threat feeds refresh themselves every 24 h now (previously a one-off import), so newly registered phishing domains become live blocks automatically.',
+      'All three new blockers are on the dashboard (new "Beyond links" group), in /blocker, in per-channel rules and in the Quick Setup presets. Fixed: the Scam Shield appeal DM was silently never sent.',
+    ],
+  },
+  {
     product: 'app', date: 'July 28, 2026', ts: d('2026-07-28') + 2, version: '1.2.0',
     title: 'Premium in the app',
     items: [

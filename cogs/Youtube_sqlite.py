@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel
+from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
 
 _RE = re.compile(
     # Videos (watch/embed/v/shorts/live + youtu.be) …
@@ -21,11 +21,12 @@ class YouTubeProtection(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        content_lower = message.content.lower()
+        content = normalize_scan_text(message.content)
+        content_lower = content.lower()
         if "youtube" not in content_lower and "youtu.be" not in content_lower:
             return
 
-        if not _RE.search(message.content):
+        if not _RE.search(content):
             return
 
         guild_id = str(message.guild.id)

@@ -186,7 +186,10 @@ _DEFAULT = {
         "google": False, "youtube": False, "nsfw": False, "gif": False,
         "invite": False, "twitch": False, "bit": False, "nitro": False,
         "all": False, "steam": False, "malware": False,
+        "files": False, "webhook": False, "mentions": False,
     },
+    # Mention-spam blocker config (protect.mentions turns it on/off).
+    "mentions": {"threshold": 8},
     "silent": False,
     # Auto-expire warnings after N days of good behaviour (0/disabled = keep forever).
     "decay": {"enabled": False, "days": 30},
@@ -219,7 +222,8 @@ _DEFAULT = {
 
 # The set of blocker keys a channel override can toggle (mirrors `protect`).
 PROTECT_KEYS = ("all", "nsfw", "nitro", "malware", "invite",
-                "youtube", "google", "gif", "twitch", "steam", "bit")
+                "youtube", "google", "gif", "twitch", "steam", "bit",
+                "files", "webhook", "mentions")
 
 # ── settings cache ──────────────────────────────────────────────────────────
 _cache: dict[str, tuple[float, dict]] = {}
@@ -819,6 +823,18 @@ _URL_RE = re.compile(
 )
 _URL_TRAILING = ".,!?:;\"')]}>«»…"
 
+# Zero-width / invisible characters used to break up URLs so regexes miss them
+# (e.g. "disc​ord.gg/abc"). Stripped before any pattern matching.
+_ZERO_WIDTH_RE = re.compile("[\u200b\u200c\u200d\u2060\ufeff\u00ad\u180e]")
+
+
+def normalize_scan_text(text: str) -> str:
+    """Message text as the detection regexes should see it: zero-width and
+    soft-hyphen characters removed. Never used for re-posting content."""
+    if not text:
+        return ""
+    return _ZERO_WIDTH_RE.sub("", text)
+
 
 def _domain_of(url: str) -> str:
     s = re.sub(r"^https?://", "", url, flags=re.IGNORECASE).lstrip("/")
@@ -831,7 +847,7 @@ def _domain_of(url: str) -> str:
 def extract_urls(text: str) -> list:
     """De-duplicated list of (url, domain) found in `text`."""
     found: dict[str, str] = {}
-    for raw in _URL_RE.findall(text or ""):
+    for raw in _URL_RE.findall(normalize_scan_text(text)):
         url = raw.strip().rstrip(_URL_TRAILING)
         if len(url) < 4 or "." not in url:
             continue

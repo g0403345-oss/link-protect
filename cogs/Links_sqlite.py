@@ -2,7 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from .shared import (get_settings, apply_warn, is_whitelisted, db, resolve_channel,
-                     link_allowlisted, extract_urls)
+                     link_allowlisted, extract_urls, normalize_scan_text)
 
 
 class BlacklistLinkProtection(commands.Cog):
@@ -26,7 +26,7 @@ class BlacklistLinkProtection(commands.Cog):
         if not blacklist:
             return
 
-        if not any(bl in message.content for bl in blacklist if bl):
+        if not any(bl in normalize_scan_text(message.content) for bl in blacklist if bl):
             return
 
         if is_whitelisted(message, settings):
