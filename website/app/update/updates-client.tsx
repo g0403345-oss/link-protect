@@ -30,6 +30,17 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'app', date: 'July 28, 2026', ts: d('2026-07-28') + 2, version: '1.2.0',
+    title: 'Premium in the app',
+    items: [
+      'New Premium tab in every server: subscription status, all perks at a glance and a one-tap upgrade (checkout runs via Stripe in your browser).',
+      'Watchlist on your phone — see who is being watched, add members via search, remove entries.',
+      'Automation: night schedule (hours, preset) and event mode straight from the app.',
+      'Messages grew the Premium extras: welcome & leave messages, welcome channel, embed color & footer, and 1,500-character templates.',
+      'Premium features are marked with the same quiet Premium tag as the web dashboard.',
+    ],
+  },
+  {
     product: 'website', date: 'July 28, 2026', ts: d('2026-07-28') + 1,
     title: 'Premium, Link Checker, Welcome & Developers: wide-screen redesign',
     items: [

@@ -344,6 +344,66 @@ struct APIClient {
         ))
     }
 
+    // MARK: Premium
+
+    func premium(_ guildId: String) async throws -> PremiumStatus {
+        if demo { return PremiumStatus(active: true, until: Int(Date().timeIntervalSince1970) + 30 * 86400) }
+        return try await request("/api/mobile/guild/\(guildId)/premium")
+    }
+
+    func watchlist(_ guildId: String) async throws -> WatchlistState {
+        if demo {
+            return WatchlistState(entries: [
+                WatchlistEntry(userId: "480734480072114177",
+                               until: Int(Date().timeIntervalSince1970) + 5 * 86400,
+                               by: "demo", reason: "Suspicious link pattern",
+                               added: Int(Date().timeIntervalSince1970) - 86400),
+            ], premium: true)
+        }
+        return try await request("/api/mobile/guild/\(guildId)/watchlist")
+    }
+
+    func addWatchlist(_ guildId: String, userId: String, days: Int, reason: String?) async throws {
+        if demo { return }
+        struct Body: Encodable { let userId: String; let days: Int; let reason: String? }
+        try await requestVoid("/api/mobile/guild/\(guildId)/watchlist", method: "POST",
+                              body: Body(userId: userId, days: days, reason: reason))
+    }
+
+    func removeWatchlist(_ guildId: String, userId: String) async throws {
+        if demo { return }
+        try await requestVoid("/api/mobile/guild/\(guildId)/watchlist/\(userId)", method: "DELETE")
+    }
+
+    func schedule(_ guildId: String) async throws -> ScheduleState {
+        if demo {
+            return ScheduleState(night: .init(enabled: true, fromHour: 0, toHour: 8, preset: "strict"),
+                                 nightActive: false, eventUntil: 0, premium: true)
+        }
+        return try await request("/api/mobile/guild/\(guildId)/schedule")
+    }
+
+    func setSchedule(_ guildId: String, enabled: Bool, fromHour: Int, toHour: Int, preset: String) async throws {
+        if demo { return }
+        struct Body: Encodable { let enabled: Bool; let fromHour: Int; let toHour: Int; let preset: String }
+        try await requestVoid("/api/mobile/guild/\(guildId)/schedule", method: "POST",
+                              body: Body(enabled: enabled, fromHour: fromHour, toHour: toHour, preset: preset))
+    }
+
+    func startEventMode(_ guildId: String, hours: Int) async throws -> Int {
+        if demo { return Int(Date().timeIntervalSince1970) + hours * 3600 }
+        struct Body: Encodable { let hours: Int }
+        struct Resp: Decodable { let until: Int }
+        let data = try await perform("/api/mobile/guild/\(guildId)/eventmode", method: "POST", body: Body(hours: hours))
+        guard let r = try? JSONDecoder().decode(Resp.self, from: data) else { throw APIError.decoding }
+        return r.until
+    }
+
+    func stopEventMode(_ guildId: String) async throws {
+        if demo { return }
+        try await requestVoid("/api/mobile/guild/\(guildId)/eventmode", method: "DELETE")
+    }
+
     // MARK: - Core request plumbing
 
     private func request<T: Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {

@@ -82,6 +82,15 @@ function ServerSwitcher({ guildId, guildInfo }: {
   const fetched = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // App deep link (?premium=1): flag the PremiumCard to auto-expand once.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get('premium') === '1') {
+        sessionStorage.setItem('lp_open_premium', '1');
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);

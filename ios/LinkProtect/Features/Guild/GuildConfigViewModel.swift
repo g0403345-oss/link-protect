@@ -42,8 +42,87 @@ final class GuildConfigViewModel: ObservableObject {
             stats = try? await s
             actions = (try? await a) ?? []
             phase = .ready
+            premium = try? await api.premium(guildId)
         } catch {
             phase = .failed((error as? LocalizedError)?.errorDescription ?? "Couldn't load this server.")
+        }
+    }
+
+    // MARK: Premium
+
+    @Published var premium: PremiumStatus?
+    @Published var watchlist: WatchlistState?
+    @Published var scheduleState: ScheduleState?
+
+    var premiumActive: Bool { premium?.active == true }
+
+    func loadPremium() async {
+        if premium == nil { premium = try? await api.premium(guildId) }
+    }
+
+    func loadPremiumFeatures() async {
+        await loadPremium()
+        watchlist = try? await api.watchlist(guildId)
+        scheduleState = try? await api.schedule(guildId)
+        let ids = (watchlist?.entries.map(\.userId) ?? []).filter { memberNames[$0] == nil }
+        if !ids.isEmpty, let members = try? await api.resolveMembers(guildId, ids: ids) {
+            for m in members { memberNames[m.id] = m.displayName }
+        }
+    }
+
+    func addToWatchlist(userId: String, days: Int, reason: String?) async {
+        do {
+            try await api.addWatchlist(guildId, userId: userId, days: days, reason: reason)
+            watchlist = try? await api.watchlist(guildId)
+            if memberNames[userId] == nil,
+               let members = try? await api.resolveMembers(guildId, ids: [userId]) {
+                for m in members { memberNames[m.id] = m.displayName }
+            }
+            toasts?.success("Added to watchlist")
+        } catch {
+            toasts?.error((error as? LocalizedError)?.errorDescription ?? "Couldn't add to the watchlist")
+        }
+    }
+
+    func removeFromWatchlist(userId: String) async {
+        do {
+            try await api.removeWatchlist(guildId, userId: userId)
+            watchlist = try? await api.watchlist(guildId)
+            toasts?.success("Removed from watchlist")
+        } catch {
+            toasts?.error("Couldn't remove this entry")
+        }
+    }
+
+    func saveSchedule(enabled: Bool, fromHour: Int, toHour: Int, preset: String) async -> Bool {
+        do {
+            try await api.setSchedule(guildId, enabled: enabled, fromHour: fromHour, toHour: toHour, preset: preset)
+            scheduleState = try? await api.schedule(guildId)
+            toasts?.success("Schedule saved")
+            return true
+        } catch {
+            toasts?.error((error as? LocalizedError)?.errorDescription ?? "Couldn't save the schedule")
+            return false
+        }
+    }
+
+    func startEvent(hours: Int) async {
+        do {
+            _ = try await api.startEventMode(guildId, hours: hours)
+            scheduleState = try? await api.schedule(guildId)
+            toasts?.success("Event mode is on — all links blocked")
+        } catch {
+            toasts?.error((error as? LocalizedError)?.errorDescription ?? "Couldn't start event mode")
+        }
+    }
+
+    func stopEvent() async {
+        do {
+            try await api.stopEventMode(guildId)
+            scheduleState = try? await api.schedule(guildId)
+            toasts?.success("Event mode ended")
+        } catch {
+            toasts?.error("Couldn't end event mode")
         }
     }
 

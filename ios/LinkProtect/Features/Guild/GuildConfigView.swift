@@ -92,6 +92,7 @@ struct GuildConfigView: View {
     private var sectionView: some View {
         switch section {
         case .overview:     OverviewSection(vm: vm)
+        case .premium:      PremiumSection(vm: vm)
         case .blockers:     BlockersSection(vm: vm)
         case .scamShield:   ScamShieldSection(vm: vm)
         case .verification: VerificationSection(vm: vm)
@@ -108,12 +109,13 @@ struct GuildConfigView: View {
 }
 
 enum ConfigSection: String, CaseIterable, Identifiable {
-    case overview, blockers, scamShield, verification, messages, warnings, channelRules, access, blacklist, stats, log, audit
+    case overview, premium, blockers, scamShield, verification, messages, warnings, channelRules, access, blacklist, stats, log, audit
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .overview: return "Overview"
+        case .premium: return "Premium"
         case .blockers: return "Blockers"
         case .scamShield: return "Scam Shield"
         case .verification: return "Verification"
@@ -130,6 +132,7 @@ enum ConfigSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .overview: return "square.grid.2x2"
+        case .premium: return "diamond"
         case .blockers: return "link"
         case .scamShield: return "exclamationmark.shield"
         case .verification: return "checkmark.seal"

@@ -15,6 +15,9 @@ struct MessagesSection: View {
                 MessageTemplateEditor(vm: vm, template: template)
             }
 
+            WelcomeChannelCard(vm: vm)
+            AccentFooterCard(vm: vm)
+
             DiscordCard("Log Volume") {
                 ToggleRow(
                     label: "Daily digest",
@@ -39,6 +42,7 @@ private struct MessageTemplate: Identifiable {
     let defaultText: String
     let variables: [String]
     let keyPath: WritableKeyPath<ServerData, String>
+    var premium = false
 
     var id: String { key }
     var path: String { "messages.\(key)" }
@@ -82,6 +86,20 @@ private struct MessageTemplate: Identifiable {
               defaultText: "🚨 **Emergency lockdown active.** Links are blocked and invites are paused while the moderators handle the situation.",
               variables: ["{server}"],
               keyPath: \.messages.lockdownAnnounce),
+        .init(key: "welcome",
+              title: "Welcome message",
+              description: "Posted in the welcome channel when someone joins — empty = off.",
+              defaultText: "Welcome to **{server}**, {user}!",
+              variables: ["{user}", "{username}", "{server}"],
+              keyPath: \.messages.welcome,
+              premium: true),
+        .init(key: "leave",
+              title: "Leave message",
+              description: "Posted when a member leaves — empty = off.",
+              defaultText: "**{username}** left the server.",
+              variables: ["{username}", "{server}"],
+              keyPath: \.messages.leave,
+              premium: true),
     ]
 }
 
@@ -94,7 +112,8 @@ private struct MessageTemplateEditor: View {
     @State private var text = ""
     @State private var loaded = false
 
-    private let maxChars = 400
+    private var maxChars: Int { vm.premiumActive ? 1500 : 400 }
+    private var locked: Bool { template.premium && !vm.premiumActive }
 
     /// The value currently stored on the server ("" = default in use).
     private var saved: String { vm.data?[keyPath: template.keyPath] ?? "" }
@@ -102,13 +121,16 @@ private struct MessageTemplateEditor: View {
     private var saving: Bool { vm.savingPath == template.path }
 
     var body: some View {
-        DiscordCard(template.title) {
+        DiscordCard(template.title, accessory: template.premium ? AnyView(PremiumTag()) : nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(template.description)
                     .font(LPFont.caption).fontWeight(.regular)
                     .foregroundStyle(Theme.dim)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if locked {
+                    MessagesLockNote()
+                } else {
                 editor
 
                 HStack(alignment: .center, spacing: 10) {
@@ -125,6 +147,7 @@ private struct MessageTemplateEditor: View {
                 }
 
                 chips
+                }
             }
         }
         .onAppear {
@@ -238,5 +261,195 @@ private struct MessageTemplateEditor: View {
         guard draft.count <= maxChars else { return }
         text = draft
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+}
+
+
+// MARK: - Premium lock note
+
+struct MessagesLockNote: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "diamond.fill").font(.system(size: 10)).foregroundStyle(Theme.blurple).padding(.top, 2)
+            Text("A Premium extra — unlock it on the Premium tab. Protection itself always stays free.")
+                .font(LPFont.caption).foregroundStyle(Theme.faint)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(Theme.blurple.opacity(0.05))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.blurple.opacity(0.2), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - Welcome channel (Premium)
+
+private struct WelcomeChannelCard: View {
+    @ObservedObject var vm: GuildConfigViewModel
+    @State private var showPicker = false
+
+    private var channelId: String { vm.data?.messages.welcomeChannel ?? "" }
+    private var channelName: String? {
+        guard !channelId.isEmpty else { return nil }
+        return vm.channels?.first(where: { $0.id == channelId }).map { "#\($0.name)" } ?? "#\(channelId)"
+    }
+
+    var body: some View {
+        DiscordCard("Welcome channel", accessory: AnyView(PremiumTag())) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Where welcome and leave messages are posted. Without a channel they stay off.")
+                    .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !vm.premiumActive {
+                    MessagesLockNote()
+                } else {
+                    HStack(spacing: 10) {
+                        Text(channelName ?? "No channel set")
+                            .font(LPFont.bodyStrong)
+                            .foregroundStyle(channelName == nil ? Theme.faint : Theme.text)
+                        Spacer(minLength: 8)
+                        if vm.savingPath == "messages.welcome_channel" {
+                            Spinner(size: 14)
+                        } else {
+                            if channelName != nil {
+                                Button {
+                                    Task {
+                                        await vm.patch(path: "messages.welcome_channel", value: "", label: "Welcome channel") {
+                                            $0.messages.welcomeChannel = ""
+                                        }
+                                    }
+                                } label: {
+                                    Text("Clear").font(LPFont.label).foregroundStyle(Theme.muted)
+                                        .padding(.horizontal, 11).padding(.vertical, 7)
+                                        .background(Theme.surface)
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(PressScaleStyle())
+                            }
+                            Button {
+                                showPicker = true
+                            } label: {
+                                Text(channelName == nil ? "Choose channel" : "Change")
+                                    .font(LPFont.label).foregroundStyle(.white)
+                                    .padding(.horizontal, 13).padding(.vertical, 7)
+                                    .background(Theme.blurple)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(PressScaleStyle())
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            AddPickerSheet(vm: vm, type: .channel, color: Theme.blurple,
+                           selected: channelId.isEmpty ? [] : [channelId], textOnly: true) { id in
+                Task {
+                    await vm.patch(path: "messages.welcome_channel", value: id, label: "Welcome channel") {
+                        $0.messages.welcomeChannel = id
+                    }
+                }
+            }
+        }
+        .task { await vm.loadChannels() }
+    }
+}
+
+// MARK: - Embed accent & footer (Premium)
+
+private struct AccentFooterCard: View {
+    @ObservedObject var vm: GuildConfigViewModel
+    @State private var accent = ""
+    @State private var footer = ""
+    @State private var loaded = false
+
+    private var savedAccent: String { vm.data?.messages.accent ?? "" }
+    private var savedFooter: String { vm.data?.messages.footerText ?? "" }
+    private var accentValid: Bool { accent.isEmpty || accent.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil }
+    private var accentColor: Color? {
+        guard accent.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil,
+              let v = UInt32(accent.dropFirst(), radix: 16) else { return nil }
+        return Color(hex: v)
+    }
+
+    var body: some View {
+        DiscordCard("Embed accent & footer", accessory: AnyView(PremiumTag())) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Your color and footer on welcome, verify and info embeds — moderation embeds keep their warning colors on purpose.")
+                    .font(LPFont.caption).fontWeight(.regular).foregroundStyle(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !vm.premiumActive {
+                    MessagesLockNote()
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Accent color").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(accentColor ?? Theme.blurple)
+                                .frame(width: 26, height: 26)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.borderStrong, lineWidth: 1))
+                            TextField("#23a55a", text: $accent)
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .foregroundStyle(accentValid ? Theme.text : Theme.red)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .padding(.horizontal, 11).padding(.vertical, 8)
+                                .background(Theme.surface)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.borderStrong, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            if accent != savedAccent, accentValid {
+                                saveButton(path: "messages.accent", value: accent, label: "Embed accent") {
+                                    $0.messages.accent = accent
+                                }
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Embed footer").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
+                        HStack(spacing: 8) {
+                            TextField("e.g. your server name", text: $footer)
+                                .font(LPFont.body)
+                                .foregroundStyle(Theme.text)
+                                .padding(.horizontal, 11).padding(.vertical, 8)
+                                .background(Theme.surface)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.borderStrong, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .onChange(of: footer) { v in if v.count > 80 { footer = String(v.prefix(80)) } }
+                            if footer != savedFooter {
+                                saveButton(path: "messages.footer_text", value: footer, label: "Embed footer") {
+                                    $0.messages.footerText = footer
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .onAppear {
+            if !loaded { accent = savedAccent; footer = savedFooter; loaded = true }
+        }
+        .onChange(of: savedAccent) { v in accent = v }
+        .onChange(of: savedFooter) { v in footer = v }
+    }
+
+    private func saveButton(path: String, value: String, label: String,
+                            apply: @escaping (inout ServerData) -> Void) -> some View {
+        Button {
+            Task { await vm.patch(path: path, value: value, label: label, apply: apply) }
+        } label: {
+            HStack(spacing: 5) {
+                if vm.savingPath == path { Spinner(size: 12) } else { Image(systemName: "checkmark") }
+                Text("Save")
+            }
+            .font(LPFont.label).foregroundStyle(.white)
+            .padding(.horizontal, 13).padding(.vertical, 8)
+            .background(Theme.blurple)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(vm.savingPath == path)
     }
 }

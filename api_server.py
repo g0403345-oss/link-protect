@@ -4305,6 +4305,117 @@ async def stop_event_mode(request: Request, guild_id: str):
     return {"ok": True}
 
 
+# ── Premium: mobile mirrors (same features, app auth) ────────────────────────
+
+@app.get("/api/mobile/guild/{guild_id}/premium")
+async def mobile_get_premium(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    st = _premium_state(guild_id)
+    return {"active": _is_premium(guild_id), "until": st.get("until")}
+
+
+@app.get("/api/mobile/guild/{guild_id}/watchlist")
+async def mobile_get_watchlist(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    wl = _watchlist(guild_id)
+    return {"entries": [{"userId": u, **e} for u, e in
+                        sorted(wl.items(), key=lambda x: -int(x[1].get("added", 0)))],
+            "premium": _is_premium(guild_id)}
+
+
+@app.post("/api/mobile/guild/{guild_id}/watchlist")
+async def mobile_add_watchlist(request: Request, guild_id: str, body: WatchlistBody):
+    aid = await _require_access(request, guild_id)
+    _require_premium(guild_id)
+    if not body.userId.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid user id")
+    days = max(1, min(int(body.days or 7), 30))
+    aname = await _mobile_actor_name(request)
+    wl = _watchlist(guild_id)
+    wl[str(body.userId)] = {"until": int(time.time()) + days * 86400, "by": aname or "admin",
+                            "reason": (body.reason or "").strip()[:200] or None,
+                            "added": int(time.time())}
+    _kv_set(f"watchlist:{guild_id}", wl)
+    _audit_record(guild_id, aid, aname, "watchlist.add",
+                  f"Watchlisted user {body.userId} for {days}d", None, body.reason)
+    return {"ok": True, "until": wl[str(body.userId)]["until"]}
+
+
+@app.delete("/api/mobile/guild/{guild_id}/watchlist/{user_id}")
+async def mobile_remove_watchlist(request: Request, guild_id: str, user_id: str):
+    aid = await _require_access(request, guild_id)
+    wl = _watchlist(guild_id)
+    if wl.pop(str(user_id), None) is not None:
+        _kv_set(f"watchlist:{guild_id}", wl)
+        aname = await _mobile_actor_name(request)
+        _audit_record(guild_id, aid, aname, "watchlist.remove",
+                      f"Removed user {user_id} from the watchlist", None, None)
+    return {"ok": True}
+
+
+@app.get("/api/mobile/guild/{guild_id}/schedule")
+async def mobile_get_schedule(request: Request, guild_id: str):
+    await _require_access(request, guild_id)
+    sc = _kv_json(f"schedule:{guild_id}") or {}
+    ev = _kv_json(f"event:{guild_id}") or {}
+    return {"night": sc.get("night") or {"enabled": False, "fromHour": 0, "toHour": 8, "preset": "strict"},
+            "nightActive": bool(sc.get("applied")),
+            "eventUntil": int(ev.get("until", 0) or 0),
+            "premium": _is_premium(guild_id)}
+
+
+@app.post("/api/mobile/guild/{guild_id}/schedule")
+async def mobile_set_schedule(request: Request, guild_id: str, body: ScheduleBody):
+    aid = await _require_access(request, guild_id)
+    _require_premium(guild_id)
+    if body.preset not in ("strict", "balanced"):
+        raise HTTPException(status_code=400, detail="preset must be strict|balanced")
+    f, t = int(body.fromHour) % 24, int(body.toHour) % 24
+    if f == t:
+        raise HTTPException(status_code=400, detail="from and to must differ")
+    sc = _kv_json(f"schedule:{guild_id}") or {}
+    sc["night"] = {"enabled": bool(body.enabled), "fromHour": f, "toHour": t, "preset": body.preset}
+    _kv_set(f"schedule:{guild_id}", sc)
+    aname = await _mobile_actor_name(request)
+    _audit_record(guild_id, aid, aname, "schedule.night",
+                  f"Night schedule {'on' if body.enabled else 'off'} ({f:02d}\u2013{t:02d}h, {body.preset})",
+                  None, body.enabled)
+    return {"ok": True}
+
+
+@app.post("/api/mobile/guild/{guild_id}/eventmode")
+async def mobile_start_event_mode(request: Request, guild_id: str, body: EventModeBody):
+    aid = await _require_access(request, guild_id)
+    _require_premium(guild_id)
+    hours = max(1, min(int(body.hours or 2), 12))
+    data = _get_server(guild_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    prev_all = bool(_deep_get(data, "protect.all"))
+    _deep_set(data, "protect.all", True)
+    _save_server(guild_id, data)
+    _kv_set(f"event:{guild_id}", {"until": int(time.time()) + hours * 3600, "prev_all": prev_all})
+    aname = await _mobile_actor_name(request)
+    _audit_record(guild_id, aid, aname, "eventmode",
+                  f"Event mode: all links blocked for {hours}h", None, hours)
+    return {"ok": True, "until": int(time.time()) + hours * 3600}
+
+
+@app.delete("/api/mobile/guild/{guild_id}/eventmode")
+async def mobile_stop_event_mode(request: Request, guild_id: str):
+    aid = await _require_access(request, guild_id)
+    ev = _kv_json(f"event:{guild_id}") or {}
+    if ev:
+        data = _get_server(guild_id)
+        if data is not None:
+            _deep_set(data, "protect.all", bool(ev.get("prev_all")))
+            _save_server(guild_id, data)
+        _kv_set(f"event:{guild_id}", {})
+        aname = await _mobile_actor_name(request)
+        _audit_record(guild_id, aid, aname, "eventmode", "Event mode ended early", None, None)
+    return {"ok": True}
+
+
 # ── Premium: multi-server settings sync ──────────────────────────────────────
 
 _SYNC_SECTIONS = {"protect", "warn", "messages", "scamguard", "raid", "decay", "blacklist"}

@@ -157,6 +157,12 @@ struct ServerData: Codable, Equatable {
         var actionDm = ""
         var verifyDm = ""
         var lockdownAnnounce = ""
+        // Premium extras (server-side gated; free servers keep the defaults).
+        var welcome = ""
+        var leave = ""
+        var welcomeChannel = ""
+        var accent = ""
+        var footerText = ""
         init() {}
         enum CodingKeys: String, CodingKey {
             case warnChannel = "warn_channel"
@@ -165,6 +171,11 @@ struct ServerData: Codable, Equatable {
             case actionDm = "action_dm"
             case verifyDm = "verify_dm"
             case lockdownAnnounce = "lockdown_announce"
+            case welcome
+            case leave
+            case welcomeChannel = "welcome_channel"
+            case accent
+            case footerText = "footer_text"
         }
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -174,6 +185,11 @@ struct ServerData: Codable, Equatable {
             actionDm = (try? c.decode(String.self, forKey: .actionDm)) ?? ""
             verifyDm = (try? c.decode(String.self, forKey: .verifyDm)) ?? ""
             lockdownAnnounce = (try? c.decode(String.self, forKey: .lockdownAnnounce)) ?? ""
+            welcome = (try? c.decode(String.self, forKey: .welcome)) ?? ""
+            leave = (try? c.decode(String.self, forKey: .leave)) ?? ""
+            welcomeChannel = (try? c.decode(String.self, forKey: .welcomeChannel)) ?? ""
+            accent = (try? c.decode(String.self, forKey: .accent)) ?? ""
+            footerText = (try? c.decode(String.self, forKey: .footerText)) ?? ""
         }
         func encode(to encoder: Encoder) throws {}
     }
@@ -812,4 +828,42 @@ struct TrendData: Codable, Equatable {
         let count: Int
         var id: String { reason }
     }
+}
+
+
+// MARK: - Premium
+
+/// Premium subscription state of one server (`/api/mobile/guild/<id>/premium`).
+struct PremiumStatus: Codable, Equatable {
+    let active: Bool
+    let until: Int?
+}
+
+/// One watchlist entry — the member's messages get the strictest checks until `until`.
+struct WatchlistEntry: Codable, Equatable, Identifiable {
+    let userId: String
+    let until: Int
+    let by: String?
+    let reason: String?
+    let added: Int?
+    var id: String { userId }
+}
+
+struct WatchlistState: Codable, Equatable {
+    let entries: [WatchlistEntry]
+    let premium: Bool
+}
+
+/// Night schedule + event mode (`/api/mobile/guild/<id>/schedule`).
+struct ScheduleState: Codable, Equatable {
+    struct Night: Codable, Equatable {
+        var enabled: Bool
+        var fromHour: Int
+        var toHour: Int
+        var preset: String
+    }
+    var night: Night
+    var nightActive: Bool
+    var eventUntil: Int
+    var premium: Bool
 }
