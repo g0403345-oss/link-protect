@@ -8,7 +8,7 @@ import {
   Shield, AlertTriangle, Lock, List, BarChart3,
   ChevronLeft, ChevronDown, Save, CheckCircle2, XCircle, RefreshCw,
   EyeOff, Users, TrendingUp, Ban, Clock, Trash2, Plus, X, Info, Activity,
-  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck, MessageSquare,
+  Hourglass, Target, History, HelpCircle, UserX, ShieldAlert, Globe, LogIn, Radar, Code2, UserCheck, MessageSquare, AtSign,
 } from 'lucide-react';
 import Link from 'next/link';
 import ToggleSwitch from '@/components/ToggleSwitch';
@@ -759,6 +759,18 @@ export default function GuildDashboard() {
                       saving={saving}
                       onToggle={(key, v, label) => patch(`protect.${key}`, v, label)}
                     />
+                    {!!protect.mentions && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1e1e22', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                        <NumberInput
+                          label="Mention-spam threshold"
+                          description="Distinct members/roles pinged in one message before it's removed"
+                          value={data.mentions?.threshold ?? 8}
+                          icon={<AtSign size={14} color="#f0b232" />} color="#f0b232"
+                          onSave={(v) => patch('mentions.threshold', Math.max(2, v), 'Mention threshold')}
+                          saving={saving === 'mentions.threshold'}
+                        />
+                      </div>
+                    )}
                   </Card>
                   <Card title="Automation" premium>
                     <AutomationCard guildId={guildId} onToast={addToast} onNavigate={(sec) => selectSection(sec as Section)} />
