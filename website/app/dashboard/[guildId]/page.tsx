@@ -72,12 +72,6 @@ function useToast() {
   return { toasts, addToast };
 }
 
-/* ── sub-components ────────────────────────────────────────── */
-
-/** Breadcrumb server switcher — the current server (icon + name) opens a panel
- *  listing the user's other bot-installed servers for one-click switching.
- *  Uses the same client source as the /dashboard list page: the sessionStorage
- *  cache for an instant paint, then a fresh '/api/guilds' fetch. */
 function ServerSwitcher({ guildId, guildInfo }: {
   guildId: string;
   guildInfo: { name: string; icon: string | null } | null;
@@ -296,13 +290,9 @@ export default function GuildDashboard() {
 
   const [section, setSection] = useState<Section>('overview');
   const mainRef = useRef<HTMLElement>(null);
-  // Switch tab AND jump to the top: the content area scrolls on its own, so a
-  // plain setSection left you at the previous scroll offset (looked like a
-  // random jump). Reset both the content container and the window.
   const selectSection = useCallback((id: Section) => {
     setSection(id);
     if (id === 'log') {
-      // Mark the activity log as read — clears the sidebar "new" badge.
       const now = Math.floor(Date.now() / 1000);
       setLogSeenTs(now);
       try { localStorage.setItem(`lp_logseen_${guildId}`, String(now)); } catch { /* ignore */ }
@@ -315,8 +305,6 @@ export default function GuildDashboard() {
   const [selectedUser, setSelectedUser] = useState<{ id: string; warns: number; reasons: string[] } | null>(null);
   const [modalBusy, setModalBusy] = useState<string | null>(null);
   const [modalConfirm, setModalConfirm] = useState<string | null>(null);
-  // Two-click confirm for list-row deletes — first click arms ("Remove?"),
-  // auto-disarms after 2.5 s.
   const [rowConfirm, setRowConfirm] = useState<string | null>(null);
   const [data, setData] = useState<ServerData | null>(null);
   const [stats, setStats] = useState<GuildStats | null>(null);
@@ -334,21 +322,13 @@ export default function GuildDashboard() {
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [tourRun, setTourRun] = useState(false);
   const tourChecked = useRef(false);
-  // Tour completion is stored per Discord account (server-side) so it follows
-  // the user across devices and re-logins, not just this browser's localStorage.
   const [flagsReady, setFlagsReady] = useState(false);
   const tourSeenRemote = useRef(false);
-  // Vote popup: per-account "don't show again" flag + suppression while the
-  // tour is (or was) running this visit — never stack the two overlays.
   const votePromptSeenRemote = useRef(false);
   const votePromoBlocked = useRef(false);
-  // Approved developers get the extra Developer tab (badge embed etc.).
   const [devApproved, setDevApproved] = useState(false);
-  // Subtle per-server accent glow derived from the guild icon's average color.
   const tint = useGuildTint(guildId, guildInfo?.icon);
 
-  // Redesign: 14-day trend (pulse strip + stat sparkline), verify-health badge
-  // and the "new log entries since last visit" counter.
   const [trend14, setTrend14] = useState<number[] | null>(null);
   const [verifyIssue, setVerifyIssue] = useState(false);
   const [logSeenTs, setLogSeenTs] = useState(0);
@@ -380,7 +360,6 @@ export default function GuildDashboard() {
     }).catch(() => { /* best-effort — localStorage still covers this browser */ });
   }, []);
 
-  // Resolve warned-user IDs → Discord names so lists/modals never show raw IDs.
   const resolveUsers = useCallback(async (ids: string[]) => {
     const missing = Array.from(new Set(ids)).filter((id) => id && !(id in userNames));
     if (missing.length === 0) return;
@@ -404,9 +383,6 @@ export default function GuildDashboard() {
   }, [status, router]);
 
   const fetchData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    // Silent refetch (e.g. after saving a channel rule) updates the data in
-    // place without flashing the full-page spinner — that flash looked like a
-    // page reload after every toggle.
     if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/guild/${guildId}`);
@@ -480,7 +456,6 @@ export default function GuildDashboard() {
       .catch(() => {});
   }, [status]);
 
-  // Load the per-account "tour seen" flag before deciding whether to auto-launch.
   useEffect(() => {
     if (status !== 'authenticated') return;
     fetch('/api/me/flags')
@@ -493,9 +468,6 @@ export default function GuildDashboard() {
       .finally(() => setFlagsReady(true));
   }, [status]);
 
-  // Auto-launch the guided tour the first time a user opens any server dashboard.
-  // Only after both the settings and the account flag have loaded, so a user who
-  // finished the tour on another device / browser never sees it again.
   useEffect(() => {
     if (!data || !flagsReady || tourChecked.current) return;
     tourChecked.current = true;
@@ -504,7 +476,6 @@ export default function GuildDashboard() {
     if (!seen) { votePromoBlocked.current = true; setTourRun(true); }
   }, [data, flagsReady]);
 
-  // Resolve names for warned users (settings data) and top-warned (stats).
   useEffect(() => {
     if (!data?.warn) return;
     const ids = Object.keys(data.warn).filter((k) => !['kick', 'ban', 'timeout'].includes(k));
@@ -514,17 +485,14 @@ export default function GuildDashboard() {
     if (stats?.topWarned?.length) resolveUsers(stats.topWarned.map((u) => u.userId));
   }, [stats, resolveUsers]);
 
-  // Auto-refresh actions every 5 s when the log tab is active
   useEffect(() => {
     if (section !== 'log') return;
     const id = setInterval(fetchActions, 5000);
     return () => clearInterval(id);
   }, [section, fetchActions]);
 
-  // Load the audit log when its tab opens
   useEffect(() => { if (section === 'audit') fetchAudit(); }, [section, fetchAudit]);
 
-  // Load Scam Shield network stats when its tab opens
   useEffect(() => { if (section === 'scamshield') fetchShieldStats(); }, [section, fetchShieldStats]);
 
   const patch = useCallback(async (path: string, value: unknown, label?: string) => {
@@ -532,8 +500,6 @@ export default function GuildDashboard() {
     try {
       const res = await fetch(`/api/guild/${guildId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, value }) });
       if (!res.ok) {
-        // Surface the server's reason (e.g. "Premium feature" on gated paths)
-        // instead of a generic failure message.
         const d = await res.json().catch(() => ({} as { error?: string }));
         throw new Error(typeof d?.error === 'string' && d.error ? d.error : 'Failed to save');
       }
@@ -542,9 +508,6 @@ export default function GuildDashboard() {
         const u = JSON.parse(JSON.stringify(prev)) as ServerData;
         const keys = path.split('.');
         let cur: Record<string, unknown> = u as unknown as Record<string, unknown>;
-        // Create missing intermediate objects — older server data may lack
-        // whole branches (e.g. warn.timeout, decay), and walking into an
-        // undefined key here used to throw and trip the Next error page.
         for (let i = 0; i < keys.length - 1; i++) {
           if (typeof cur[keys[i]] !== 'object' || cur[keys[i]] === null) cur[keys[i]] = {};
           cur = cur[keys[i]] as Record<string, unknown>;
@@ -563,8 +526,6 @@ export default function GuildDashboard() {
     setTimeout(() => setRowConfirm((c) => (c === key ? null : c)), 2500);
   }, [rowConfirm]);
 
-  // Remote moderation: warn / timeout / kick / ban a member straight from the
-  // dashboard. Warn escalates per the configured thresholds (server-side).
   const moderate = useCallback(async (
     action: 'warn' | 'timeout' | 'kick' | 'ban',
     userId: string, username?: string, opts?: { reason?: string; minutes?: number },
@@ -619,12 +580,8 @@ export default function GuildDashboard() {
   const raid = data.raid ?? { enabled: false, threshold: 5, window: 10, timeout_minutes: 60 };
   const scamguard = data.scamguard ?? { enabled: false, channels: 3, window: 10, action: 'ban' as const, timeout_minutes: 60, join_check: false, join_action: 'kick' as const, min_servers: 2 };
   const overrides = data.overrides ?? {};
-  // Same score the hero ring shows — used to surface the preset card for
-  // barely-configured servers right on the Overview.
   const securityScore = scoreItems(data).reduce((s, i) => s + (i.met ? i.points : 0), 0);
 
-  // Scam Shield launched 2026-07-16 (members intent approved). The flag stays
-  // as a kill switch.
   const SHOW_SCAM_SHIELD = true;
 
   const NAV: { id: Section; label: string; icon: typeof Shield; desc: string }[] = [

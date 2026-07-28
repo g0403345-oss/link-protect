@@ -30,6 +30,14 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'website', date: 'July 28, 2026', ts: d('2026-07-28') + 1,
+    title: 'Premium & Link Checker: wide-screen redesign',
+    items: [
+      'Both pages now actually use your screen: split hero layouts (pitch left, pricing or checker beside it), a numbered how-it-works rail, perks as three open columns with hairlines instead of stacked cards, and two-column FAQs.',
+      'The pricing card moved into the first viewport with the top perks at a glance — no more scrolling past a lonely centered column.',
+    ],
+  },
+  {
     product: 'bot', date: 'July 27, 2026', ts: d('2026-07-27') + 8, version: '2.6.3',
     title: 'The big audit release',
     items: [

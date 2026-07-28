@@ -54,6 +54,18 @@ const PERK_GROUPS: { icon: typeof Palette; title: string; tagline: string; items
   },
 ];
 
+const FREE_CHIPS = [
+  'All 16 link blockers', 'Warnings, kicks & bans', 'Scam Shield', 'Raid protection',
+  'Verification gate', 'Emergency lockdown', 'Web dashboard', 'iOS app', 'Message Studio basics',
+];
+
+const HIGHLIGHTS = [
+  'Your color, footer & welcome messages',
+  'White-label verify page & vanity link',
+  'Watchlist, night schedule & undo',
+  'Sync to 25 servers · 10× API limits',
+];
+
 const FAQ = [
   {
     q: 'Can I cancel anytime?',
@@ -73,8 +85,8 @@ const FAQ = [
   },
 ];
 
-function Section({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <section style={{ maxWidth: 920, margin: '0 auto', padding: '0 24px', ...style }}>{children}</section>;
+function Shell({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 32px', ...style }}>{children}</section>;
 }
 
 export default function PremiumPage() {
@@ -83,77 +95,92 @@ export default function PremiumPage() {
       <div aria-hidden className="dot-grid" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 460, maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)', pointerEvents: 'none' }} />
       <Navbar />
 
-      {/* Hero */}
-      <Section style={{ paddingTop: 64, textAlign: 'center', maxWidth: 760 }}>
-        <div className="eyebrow" style={{ marginBottom: 22 }}>
-          <Gem size={12} /> Link Protect Premium
-        </div>
-        <h1 style={{ fontSize: 'clamp(32px, 6vw, 48px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 14, lineHeight: 1.05 }}>
-          Everything free, forever.<br />Premium adds polish.
-        </h1>
-        <p style={{ fontSize: 16, color: '#6d6f78', maxWidth: 520, margin: '0 auto', lineHeight: 1.6 }}>
-          Protection is not a paid feature. Premium is for teams that want the bot to look, feel and
-          scale like their own.
-        </p>
-      </Section>
-
-      {/* Free-forever pledge */}
-      <Section style={{ paddingTop: 40, maxWidth: 760 }}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: 'rgba(35,165,90,0.06)', border: '1px solid rgba(35,165,90,0.2)', borderRadius: 14, padding: '18px 22px' }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(35,165,90,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <ShieldCheck size={17} color="#23a55a" />
-          </div>
+      {/* ── Hero: pitch left, price right ── */}
+      <Shell style={{ paddingTop: 72 }}>
+        <div className="split-hero">
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 4 }}>Our free-forever pledge</div>
-            <p style={{ fontSize: 13.5, color: '#949ba4', lineHeight: 1.6 }}>
-              All 16 link blockers, warnings, Scam Shield, lockdown, the dashboard and the iOS app are
-              free — forever, for every server. No protection feature will ever move behind a paywall.
+            <div className="eyebrow" style={{ marginBottom: 20 }}>
+              <Gem size={12} /> Link Protect Premium
+            </div>
+            <h1 style={{ fontSize: 'clamp(34px, 4.6vw, 54px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#f2f3f5', marginBottom: 16, lineHeight: 1.04 }}>
+              Everything free, forever.<br />Premium adds polish.
+            </h1>
+            <p style={{ fontSize: 16, color: '#949ba4', maxWidth: 480, lineHeight: 1.65, marginBottom: 28 }}>
+              Protection is not a paid feature. Premium is for teams that want the bot to look, feel
+              and scale like their own — colors, branding, comfort tools and API headroom.
             </p>
-          </div>
-        </div>
-      </Section>
 
-      {/* Price */}
-      <Section style={{ paddingTop: 48, maxWidth: 560 }}>
-        <div style={{ background: '#111113', border: '1px solid rgba(88,101,242,0.3)', borderRadius: 16, padding: '28px 24px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
-            <span style={{ fontSize: 44, fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.04em' }}>3,49&nbsp;€</span>
-            <span style={{ fontSize: 15, color: '#6d6f78', fontWeight: 600 }}>/month</span>
-          </div>
-          <div style={{ fontSize: 14, color: '#949ba4', marginBottom: 16 }}>
-            or <strong style={{ color: '#f2f3f5' }}>29&nbsp;€/year</strong> — per server, billed via Stripe
-          </div>
-          <Link href="/dashboard"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none' }}>
-            Upgrade from your server&rsquo;s Overview tab <ArrowRight size={15} />
-          </Link>
-          <p style={{ fontSize: 12, color: '#52535a', marginTop: 12 }}>Cancel anytime · Stripe customer portal · settings always kept</p>
-        </div>
-      </Section>
-
-      {/* Perk columns */}
-      <Section style={{ paddingTop: 80 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 8, letterSpacing: '-0.02em' }}>What Premium unlocks</h2>
-        <p style={{ fontSize: 14, color: '#6d6f78', textAlign: 'center', marginBottom: 32, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
-          Your color and footer apply to welcome, verify and info embeds — moderation embeds keep
-          their warning colors on purpose, so alerts stay unmistakable.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-          {PERK_GROUPS.map((g) => (
-            <div key={g.title} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: 22 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <g.icon size={17} color="#96a4ff" />
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#f2f3f5' }}>{g.title}</div>
+            {/* Pledge as an editorial note, not another floating card */}
+            <div style={{ borderLeft: '2px solid #23a55a', padding: '2px 0 2px 16px', marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <ShieldCheck size={14} color="#23a55a" />
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: '#f2f3f5' }}>Our free-forever pledge</span>
               </div>
-              <p style={{ fontSize: 12.5, color: '#52535a', marginBottom: 14 }}>{g.tagline}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {g.items.map((item) => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                    <div style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(35,165,90,0.12)', border: '1px solid rgba(35,165,90,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                      <Check size={9} color="#23a55a" strokeWidth={3} />
-                    </div>
+              <p style={{ fontSize: 13, color: '#949ba4', lineHeight: 1.6, maxWidth: 460 }}>
+                No protection feature will ever move behind a paywall — for every server, forever.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: 520 }}>
+              {FREE_CHIPS.map((c) => (
+                <span key={c} style={{ fontSize: 11.5, fontWeight: 600, color: '#6d6f78', border: '1px solid #1e1e22', background: 'rgba(17,17,19,0.6)', borderRadius: 99, padding: '4px 11px', whiteSpace: 'nowrap' }}>
+                  {c} · free
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Price card */}
+          <div style={{ position: 'relative', background: '#111113', border: '1px solid rgba(88,101,242,0.35)', borderRadius: 16, padding: '26px 26px 22px', boxShadow: '0 24px 80px rgba(88,101,242,0.10)' }}>
+            <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 16, background: 'linear-gradient(160deg, rgba(88,101,242,0.10), transparent 45%)', pointerEvents: 'none' }} />
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#96a4ff', marginBottom: 14 }}>Per server</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 2 }}>
+              <span style={{ fontSize: 46, fontWeight: 900, color: '#f2f3f5', letterSpacing: '-0.04em' }}>3,49&nbsp;€</span>
+              <span style={{ fontSize: 15, color: '#6d6f78', fontWeight: 600 }}>/month</span>
+            </div>
+            <div style={{ fontSize: 13.5, color: '#949ba4', marginBottom: 18 }}>
+              or <strong style={{ color: '#f2f3f5' }}>29&nbsp;€/year</strong> (save ~31%) · billed via Stripe
+            </div>
+            <div style={{ borderTop: '1px solid #1e1e22', paddingTop: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {HIGHLIGHTS.map((h) => (
+                <div key={h} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                  <Check size={13} color="#23a55a" strokeWidth={3} style={{ flexShrink: 0, marginTop: 3 }} />
+                  <span style={{ fontSize: 13, color: '#b5bac1', lineHeight: 1.5 }}>{h}</span>
+                </div>
+              ))}
+            </div>
+            <Link href="/dashboard"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 24px', fontSize: 15, fontWeight: 700, background: '#5865f2', color: '#fff', borderRadius: 10, textDecoration: 'none' }}>
+              Upgrade from your server&rsquo;s Overview tab <ArrowRight size={15} />
+            </Link>
+            <p style={{ fontSize: 11.5, color: '#52535a', marginTop: 11, textAlign: 'center' }}>Cancel anytime · Stripe customer portal · settings always kept</p>
+          </div>
+        </div>
+      </Shell>
+
+      {/* ── Perks: three open columns divided by hairlines ── */}
+      <Shell style={{ paddingTop: 96 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', borderBottom: '1px solid #1e1e22', paddingBottom: 16, marginBottom: 8 }}>
+          <h2 style={{ fontSize: 26, fontWeight: 800, color: '#f2f3f5', letterSpacing: '-0.02em' }}>What Premium unlocks</h2>
+          <p style={{ fontSize: 13, color: '#6d6f78', maxWidth: 480, lineHeight: 1.6 }}>
+            Your color and footer apply to welcome, verify and info embeds — moderation embeds keep
+            their warning colors on purpose.
+          </p>
+        </div>
+        <div className="rail-3col">
+          {PERK_GROUPS.map((g, gi) => (
+            <div key={g.title} style={{ padding: gi === 0 ? '22px 28px 22px 0' : '22px 28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(88,101,242,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <g.icon size={16} color="#96a4ff" />
+                </div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#f2f3f5' }}>{g.title}</div>
+                <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: '#2e2e36' }}>0{gi + 1}</span>
+              </div>
+              <p style={{ fontSize: 12.5, color: '#52535a', marginBottom: 16 }}>{g.tagline}</p>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {g.items.map((item, ii) => (
+                  <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderTop: ii === 0 ? 'none' : '1px solid #17171a' }}>
+                    <Check size={12} color="#23a55a" strokeWidth={3} style={{ flexShrink: 0, marginTop: 4 }} />
                     <span style={{ fontSize: 13.5, color: '#949ba4', lineHeight: 1.5 }}>{item}</span>
                   </div>
                 ))}
@@ -161,39 +188,41 @@ export default function PremiumPage() {
             </div>
           ))}
         </div>
-      </Section>
+      </Shell>
 
-      {/* FAQ */}
-      <Section style={{ paddingTop: 80, maxWidth: 760 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f2f3f5', textAlign: 'center', marginBottom: 32, letterSpacing: '-0.02em' }}>Frequently asked</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* ── FAQ: two columns ── */}
+      <Shell style={{ paddingTop: 84 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', marginBottom: 20, letterSpacing: '-0.02em' }}>Frequently asked</h2>
+        <div className="faq-2col">
           {FAQ.map((f) => (
-            <div key={f.q} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '16px 20px' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#f2f3f5', marginBottom: 6 }}>{f.q}</div>
-              <p style={{ fontSize: 13.5, color: '#6d6f78', lineHeight: 1.55 }}>{f.a}</p>
+            <div key={f.q} className="card-hover" style={{ background: '#111113', border: '1px solid #1e1e22', borderRadius: 12, padding: '18px 22px' }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: '#f2f3f5', marginBottom: 7 }}>{f.q}</div>
+              <p style={{ fontSize: 13, color: '#6d6f78', lineHeight: 1.6 }}>{f.a}</p>
             </div>
           ))}
         </div>
-      </Section>
+      </Shell>
 
-      {/* Closing CTA */}
-      <Section style={{ paddingTop: 80, paddingBottom: 96, maxWidth: 720 }}>
-        <div style={{ padding: '32px 24px', background: 'linear-gradient(180deg, rgba(88,101,242,0.08), transparent)', border: '1px solid rgba(88,101,242,0.2)', borderRadius: 16, textAlign: 'center' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f2f3f5', marginBottom: 8 }}>Ready when you are</h2>
-          <p style={{ fontSize: 14, color: '#6d6f78', marginBottom: 20, lineHeight: 1.6, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
-            Open your dashboard, pick a server, and upgrade from its Overview tab — it takes about a
-            minute, and you can cancel just as fast.
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {/* ── Closing CTA: horizontal band ── */}
+      <Shell style={{ paddingTop: 72, paddingBottom: 96 }}>
+        <div className="cta-band" style={{ padding: '28px 32px', background: 'linear-gradient(120deg, rgba(88,101,242,0.10), rgba(88,101,242,0.02))', border: '1px solid rgba(88,101,242,0.22)', borderRadius: 16 }}>
+          <div style={{ minWidth: 260 }}>
+            <h2 style={{ fontSize: 21, fontWeight: 800, color: '#f2f3f5', marginBottom: 6 }}>Ready when you are</h2>
+            <p style={{ fontSize: 13.5, color: '#949ba4', lineHeight: 1.6, maxWidth: 520 }}>
+              Open your dashboard, pick a server, upgrade from its Overview tab — about a minute,
+              cancelled just as fast.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <Link href="/dashboard" className="btn-primary" style={{ fontSize: 14 }}>
               Open dashboard
             </Link>
             <Link href="/welcome" className="btn-secondary" style={{ fontSize: 14 }}>
-              New here? Read the setup guide
+              New here? Setup guide
             </Link>
           </div>
         </div>
-      </Section>
+      </Shell>
     </div>
   );
 }

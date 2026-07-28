@@ -85,6 +85,25 @@ body {
 }
 .page-fade { animation: lp-page-fade 0.22s ease; }
 
+/* Wide marketing layouts — split heroes, open column rails, 2-col FAQs.
+   Desktop uses the full container width; everything stacks below 900px. */
+.split-hero { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: start; }
+.rail-3col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rail-3col > div + div { border-left: 1px solid #1e1e22; }
+.faq-2col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.detect-3col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cta-band { display: flex; align-items: center; justify-content: space-between; gap: 28px; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .split-hero { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .rail-3col { grid-template-columns: minmax(0, 1fr); }
+  .rail-3col > div + div { border-left: none; border-top: 1px solid #1e1e22; }
+  .faq-2col { grid-template-columns: minmax(0, 1fr); }
+  .detect-3col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .detect-3col { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Shared primary/secondary buttons — one look for every CTA */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;

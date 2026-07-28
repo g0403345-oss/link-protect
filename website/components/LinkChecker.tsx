@@ -23,8 +23,10 @@ const SCAN_PHASES = [
   'Compiling the verdict…',
 ];
 
-export default function LinkChecker({ compact = false, detailed = false, initialUrl = '' }: {
+export default function LinkChecker({ compact = false, detailed = false, initialUrl = '', fluid = false }: {
   compact?: boolean;
+  /** Fill the parent column instead of capping at 560px. */
+  fluid?: boolean;
   /** Checker-page mode: deep redirect resolution, explanation + share link. */
   detailed?: boolean;
   initialUrl?: string;
@@ -86,7 +88,7 @@ export default function LinkChecker({ compact = false, detailed = false, initial
   const hops = verdict?.redirects ?? [];
 
   return (
-    <div style={{ width: '100%', maxWidth: compact ? '100%' : 560 }}>
+    <div style={{ width: '100%', maxWidth: compact || fluid ? '100%' : 560 }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ position: 'relative', flex: 1, borderRadius: 10, overflow: 'hidden' }}>
           <Search size={15} color="#52535a" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 2 }} />
