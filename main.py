@@ -328,7 +328,7 @@ bot.loop.create_task(_boot_sync_once())
 # ── Brand / embed design system ───────────────────────────────────────────────
 # One version string, one color, one footer — every reply goes through
 # brand_embed() so the bot looks like a single product, not 61 commands.
-BOT_VERSION = "3.0.0"
+BOT_VERSION = "3.0.1"
 BRAND_COLOR = 0x5B6CFF          # matches website + iOS app accent
 _EMBED_KINDS = {
     "brand": BRAND_COLOR,
@@ -835,6 +835,20 @@ async def nootification_error(ctx, error):
         await ctx.respond(embed=embed, ephemeral=True)
 
 _CHANGELOG = [
+    {
+        "version": "3.0.1",
+        "date": "29.07.2026",
+        "fields": [
+            ("🎯 False-positive fix: shorteners",
+             " • The public threat feeds list bit.ly, tinyurl & co. as\n"
+             "   'phishing' — the malware blocker treated ordinary shortened\n"
+             "   links as threats. Shorteners are now permanently excluded\n"
+             "   from domain-level blocking (existing entries cleaned up).\n"
+             " • Blocking shorteners stays what it always was: the separate\n"
+             "   opt-in Shorteners blocker (now incl. ouo.io).\n"
+             " • Feed imports also skip trusted big platforms outright."),
+        ],
+    },
     {
         "version": "3.0.0",
         "date": "28.07.2026",

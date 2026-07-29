@@ -1,13 +1,13 @@
 import re
 import discord
 from discord.ext import commands
-from .shared import get_settings, apply_warn, is_whitelisted, resolve_channel, normalize_scan_text
+from .shared import (get_settings, apply_warn, is_whitelisted, resolve_channel,
+                     normalize_scan_text, SHORTENER_DOMAINS)
 
-# The dashboard sells this blocker as "bit.ly & shorteners" — cover the common
-# URL shorteners, not just bit.ly.
-_SHORTENERS = ("bit.ly", "tinyurl.com", "is.gd", "v.gd", "t.co", "cutt.ly",
-               "rb.gy", "tiny.cc", "shorturl.at", "ow.ly", "buff.ly",
-               "rebrand.ly", "t.ly", "kutt.it", "s.id", "shorte.st", "adf.ly")
+# The dashboard sells this blocker as "bit.ly & shorteners" — the canonical
+# shortener list lives in shared.py (the threat-intel side excludes exactly
+# these domains from domain-level blocking, so the two stay in sync).
+_SHORTENERS = SHORTENER_DOMAINS
 _RE = re.compile(
     r"(?:https?://)?(?:www\.)?(?:" +
     "|".join(re.escape(d) for d in _SHORTENERS) +

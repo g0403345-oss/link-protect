@@ -55,9 +55,14 @@ def fetch(feed: dict) -> list:
     else:
         items = [l for l in raw.splitlines() if l and not l.lstrip().startswith("#")]
     out = []
+    from cogs.shared import is_safe_domain, is_shortener_domain
     for it in items:
         d = norm(str(it))
-        if d and len(d) <= 255 and _DOMAIN_RE.match(d):
+        if (d and len(d) <= 255 and _DOMAIN_RE.match(d)
+                # Never import shorteners / ubiquitous domains as domain-level
+                # blocks — feeds list them, the malware blocker must not act
+                # on them (2026-07-29 bit.ly/tinyurl incident).
+                and not is_safe_domain(d) and not is_shortener_domain(d)):
             out.append(d)
     return out
 

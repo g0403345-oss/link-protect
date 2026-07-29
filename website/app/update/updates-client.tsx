@@ -30,6 +30,16 @@ const d = (iso: string) => new Date(iso + 'T12:00:00Z').getTime();
 const ENTRIES: Entry[] = [
   /* ── Latest ──────────────────────────────────────────────────── */
   {
+    product: 'bot', date: 'July 29, 2026', ts: d('2026-07-29') + 1, version: '3.0.1',
+    title: 'False-positive fix: URL shorteners are not phishing',
+    items: [
+      'The public anti-scam feeds list bit.ly, tinyurl.com, is.gd & co. as "phishing" — after the 3.0.0 feed refresh the malware blocker started treating every shortened link as a threat. Shorteners are now permanently excluded from domain-level blocking, at import time and at match time, and the existing entries were re-categorized.',
+      'Blocking shorteners remains exactly what it always was: the separate, opt-in Shorteners blocker — which now also covers ouo.io.',
+      'Feed imports additionally skip ubiquitous trusted platforms (the same safe-list every blocker respects), so a bad feed entry can never turn YouTube or Tenor into a "threat".',
+      'Fixed a harmless-but-noisy startup warning: concurrent first-time settings reads no longer leave a stray open DB transaction.',
+    ],
+  },
+  {
     product: 'bot', date: 'July 28, 2026', ts: d('2026-07-28') + 3, version: '3.0.0',
     title: 'Link Protect 3.0 — the "close every door" release',
     items: [

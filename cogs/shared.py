@@ -245,6 +245,13 @@ def _fetch_sync(guild_id: int) -> dict:
             c.commit()
         except sqlite3.IntegrityError:
             # Another on_message thread inserted this guild first — use theirs.
+            # Roll back first: the failed INSERT leaves the implicit transaction
+            # open, which would trip the stray-transaction guard on this
+            # thread's next _get_conn (the boot-time "[db] WARNING" storms).
+            try:
+                c.rollback()
+            except sqlite3.Error:
+                pass
             row = c.execute("SELECT data FROM servers WHERE guild_id=?", (guild_id,)).fetchone()
             if row is not None:
                 return json.loads(row[0])
@@ -913,6 +920,23 @@ def is_safe_domain(domain: str) -> bool:
     return any(d == s or d.endswith("." + s) for s in _SAFE_DOMAINS)
 
 
+# Generic URL shorteners. They CARRY bad links but are not bad themselves, so
+# they must never become domain-level malware/phishing blocks — the threat
+# feeds do list them (bit.ly and tinyurl arrived as "phishing" via the
+# 2026-07-28 feed import and made the malware blocker delete ordinary
+# shortened links). Blocking shorteners is the dedicated opt-in Shorteners
+# blocker's job (Bit cog), which builds its pattern from this same list.
+SHORTENER_DOMAINS = ("bit.ly", "tinyurl.com", "is.gd", "v.gd", "t.co", "cutt.ly",
+                     "rb.gy", "tiny.cc", "shorturl.at", "ow.ly", "buff.ly",
+                     "rebrand.ly", "t.ly", "kutt.it", "s.id", "shorte.st",
+                     "adf.ly", "ouo.io")
+
+
+def is_shortener_domain(domain: str) -> bool:
+    d = (domain or "").lower().strip(".")
+    return any(d == s or d.endswith("." + s) for s in SHORTENER_DOMAINS)
+
+
 # Brand keywords we defend against look-alike spoofing.
 _BRAND_KEYWORDS = ("discord", "discordapp", "steamcommunity", "steampowered",
                    "steam", "roblox", "twitch", "youtube", "paypal")
@@ -1108,7 +1132,8 @@ def load_known_bad_sync() -> dict:
     ).fetchall()
     out: dict = {}
     for domain, category in rows:
-        if domain and not is_safe_domain(domain) and domain not in out:
+        if (domain and not is_safe_domain(domain)
+                and not is_shortener_domain(domain) and domain not in out):
             out[domain] = category
     return out
 

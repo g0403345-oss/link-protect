@@ -18,7 +18,7 @@ import time
 import aiohttp
 from discord.ext import commands, tasks
 
-from .shared import _get_conn
+from .shared import _get_conn, is_safe_domain, is_shortener_domain
 
 FEEDS = [
     {"name": "sinkingyachts", "category": "phishing", "kind": "json",
@@ -96,7 +96,13 @@ class FeedRefresh(commands.Cog):
                     domains = []
                     for it in items[:_PER_FEED_CAP]:
                         d = _norm(str(it))
-                        if d and len(d) <= 255 and _DOMAIN_RE.match(d):
+                        if (d and len(d) <= 255 and _DOMAIN_RE.match(d)
+                                # Feeds do list shorteners and even big legit
+                                # domains — those must never become domain-level
+                                # blocks (2026-07-29 incident: bit.ly/tinyurl
+                                # imported as "phishing").
+                                and not is_safe_domain(d)
+                                and not is_shortener_domain(d)):
                             domains.append(d)
                     added = await asyncio.to_thread(_import_sync, domains, feed["category"])
                     total += added
